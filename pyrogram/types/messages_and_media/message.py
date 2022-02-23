@@ -568,12 +568,6 @@ class Message(Object, Update):
 
             if isinstance(action, raw.types.MessageActionPinMessage):
                 try:
-                    parsed_message.pinned_message = await client.get_messages(
-                        parsed_message.chat.id,
-                        reply_to_message_ids=message.id,
-                        replies=0
-                    )
-
                     parsed_message.service = "pinned_message"
                 except MessageIdsEmpty:
                     pass

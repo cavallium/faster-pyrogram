@@ -152,8 +152,8 @@ class Sticker(Object):
         sticker_set = sticker_attributes.stickerset
 
         if isinstance(sticker_set, raw.types.InputStickerSetID):
-            input_sticker_set_id = (sticker_set.id, sticker_set.access_hash)
-            set_name = await Sticker._get_sticker_set_name(client.send, input_sticker_set_id)
+            # input_sticker_set_id = (sticker_set.id, sticker_set.access_hash)
+            set_name = None # await Sticker._get_sticker_set_name(client.send, input_sticker_set_id)
         else:
             set_name = None
 

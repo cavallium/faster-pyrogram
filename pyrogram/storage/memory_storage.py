@@ -31,8 +31,8 @@ class MemoryStorage(SQLiteStorage):
         super().__init__(name)
 
     async def open(self):
-        self.conn = sqlite3.connect(":memory:", check_same_thread=False)
-        self.create()
+        self.conn = await self.loop.run_in_executor(self.executor, sqlite3.connect, ":memory:")
+        await self.create()
 
         if self.name != ":memory:":
             dc_id, test_mode, auth_key, user_id, is_bot = struct.unpack(
