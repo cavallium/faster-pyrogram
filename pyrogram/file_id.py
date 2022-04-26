@@ -55,19 +55,31 @@ def b64_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
-def rle_encode(string):
-    new = b''
-    count = 0
-    for cur in string:
-        if not cur:
-            count += 1
-        else:
-            if count:
-                new += b'\0' + bytes([count])
-                count = 0
-            new += bytes([cur])
-    return new
+def rle_encode(s: bytes) -> bytes:
+    """Zero-value RLE encoder
+    Parameters:
+        s (``bytes``):
+            Bytes to encode
+    Returns:
+        ``bytes``: The encoded bytes
+    """
+    r: List[int] = []
+    n: int = 0
 
+    for b in s:
+        if not b:
+            n += 1
+        else:
+            if n:
+                r.extend((0, n))
+                n = 0
+
+            r.append(b)
+
+    if n:
+        r.extend((0, n))
+
+    return bytes(r)
 
 def rle_decode(s: bytes) -> bytes:
     """Zero-value RLE decoder
