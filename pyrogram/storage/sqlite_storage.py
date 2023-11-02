@@ -30,6 +30,7 @@ SCHEMA = """
 CREATE TABLE sessions
 (
     dc_id     INTEGER PRIMARY KEY,
+    api_id    INTEGER,
     test_mode INTEGER,
     auth_key  BLOB,
     date      INTEGER NOT NULL,
@@ -89,7 +90,7 @@ def get_input_peer(peer_id: int, access_hash: int, peer_type: str):
 
 
 class SQLiteStorage(Storage):
-    VERSION = 2
+    VERSION = 3
     USERNAME_TTL = 8 * 60 * 60
 
     def __init__(self, name: str):
@@ -109,8 +110,8 @@ class SQLiteStorage(Storage):
             )
 
             self.conn.execute(
-                "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)",
-                (2, None, None, 0, None, None)
+                "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (2, None, None, None, 0, None, None)
             )
 
     async def create(self):
@@ -134,8 +135,8 @@ class SQLiteStorage(Storage):
         with self.conn:
             self.conn.executemany(
                 "REPLACE INTO peers (id, access_hash, type, username, phone_number) VALUES (?, ?, ?, ?, ?)",
-                list(peers)
-            )
+            peers
+        )
 
     async def update_peers(self, peers: List[Tuple[int, int, str, str, str]]):
         return await self.loop.run_in_executor(self.executor, self._update_peers_impl, peers)
@@ -215,6 +216,9 @@ class SQLiteStorage(Storage):
 
     async def dc_id(self, value: int = object):
         return await self._accessor("dc_id", value)
+
+    async def api_id(self, value: int = object):
+        return await self._accessor("api_id", value)
 
     async def test_mode(self, value: bool = object):
         return await self._accessor("test_mode", value)

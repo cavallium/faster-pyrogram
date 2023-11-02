@@ -18,13 +18,13 @@
 
 from typing import Union, BinaryIO
 
+import pyrogram
 from pyrogram import raw
-from pyrogram.scaffold import Scaffold
 
 
-class SetProfilePhoto(Scaffold):
+class SetProfilePhoto:
     async def set_profile_photo(
-        self,
+        self: "pyrogram.Client",
         *,
         photo: Union[str, BinaryIO] = None,
         video: Union[str, BinaryIO] = None
@@ -38,6 +38,8 @@ class SetProfilePhoto(Scaffold):
 
             This method only works for Users.
             Bots profile photos must be set using BotFather.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             photo (``str`` | ``BinaryIO``, *optional*):
@@ -57,14 +59,14 @@ class SetProfilePhoto(Scaffold):
             .. code-block:: python
 
                 # Set a new profile photo
-                app.set_profile_photo(photo="new_photo.jpg")
+                await app.set_profile_photo(photo="new_photo.jpg")
 
                 # Set a new profile video
-                app.set_profile_photo(video="new_video.mp4")
+                await app.set_profile_photo(video="new_video.mp4")
         """
 
         return bool(
-            await self.send(
+            await self.invoke(
                 raw.functions.photos.UploadProfilePhoto(
                     file=await self.save_file(photo),
                     video=await self.save_file(video)

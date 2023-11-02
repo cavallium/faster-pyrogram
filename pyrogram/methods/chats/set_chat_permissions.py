@@ -18,14 +18,14 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class SetChatPermissions(Scaffold):
+class SetChatPermissions:
     async def set_chat_permissions(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         permissions: "types.ChatPermissions",
     ) -> "types.Chat":
@@ -33,6 +33,8 @@ class SetChatPermissions(Scaffold):
 
         You must be an administrator in the group or a supergroup for this to work and must have the
         *can_restrict_members* admin rights.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -50,10 +52,10 @@ class SetChatPermissions(Scaffold):
                 from pyrogram.types import ChatPermissions
 
                 # Completely restrict chat
-                app.set_chat_permissions(chat_id, ChatPermissions())
+                await app.set_chat_permissions(chat_id, ChatPermissions())
 
                 # Chat members can only send text messages and media messages
-                app.set_chat_permissions(
+                await app.set_chat_permissions(
                     chat_id,
                     ChatPermissions(
                         can_send_messages=True,
@@ -62,7 +64,7 @@ class SetChatPermissions(Scaffold):
                 )
         """
 
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.messages.EditChatDefaultBannedRights(
                 peer=await self.resolve_peer(chat_id),
                 banned_rights=raw.types.ChatBannedRights(

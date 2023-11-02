@@ -20,13 +20,14 @@ from typing import Optional, List, Union, BinaryIO
 
 from .input_media import InputMedia
 from ..messages_and_media import MessageEntity
+from ... import enums
 
 
 class InputMediaAnimation(InputMedia):
     """An animation file (GIF or H.264/MPEG-4 AVC video without sound) to be sent inside an album.
 
     Parameters:
-        media (``str``):
+        media (``str`` | ``BinaryIO``):
             Animation to send.
             Pass a file_id as string to send a file that exists on the Telegram servers or
             pass a file path as string to upload a new file that exists on your local machine or
@@ -43,12 +44,9 @@ class InputMediaAnimation(InputMedia):
             Caption of the animation to be sent, 0-1024 characters.
             If not specified, the original caption is kept. Pass "" (empty string) to remove the caption.
 
-        parse_mode (``str``, *optional*):
+        parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
             By default, texts are parsed using both Markdown and HTML styles.
             You can combine both syntaxes together.
-            Pass "markdown" or "md" to enable Markdown-style parsing only.
-            Pass "html" to enable HTML-style parsing only.
-            Pass None to completely disable style parsing.
 
         caption_entities (List of :obj:`~pyrogram.types.MessageEntity`):
             List of special entities that appear in the caption, which can be specified instead of *parse_mode*.
@@ -61,6 +59,9 @@ class InputMediaAnimation(InputMedia):
 
         duration (``int``, *optional*):
             Animation duration.
+
+        has_spoiler (``bool``, *optional*):
+            Pass True if the photo needs to be covered with a spoiler animation.
     """
 
     def __init__(
@@ -68,11 +69,12 @@ class InputMediaAnimation(InputMedia):
         media: Union[str, BinaryIO],
         thumb: str = None,
         caption: str = "",
-        parse_mode: Optional[str] = object,
+        parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: List[MessageEntity] = None,
         width: int = 0,
         height: int = 0,
-        duration: int = 0
+        duration: int = 0,
+        has_spoiler: bool = None
     ):
         super().__init__(media, caption, parse_mode, caption_entities)
 
@@ -80,3 +82,4 @@ class InputMediaAnimation(InputMedia):
         self.width = width
         self.height = height
         self.duration = duration
+        self.has_spoiler = has_spoiler

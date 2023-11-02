@@ -18,14 +18,14 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class SetGameScore(Scaffold):
+class SetGameScore:
     async def set_game_score(
-        self,
+        self: "pyrogram.Client",
         user_id: Union[int, str],
         score: int,
         force: bool = None,
@@ -35,6 +35,8 @@ class SetGameScore(Scaffold):
     ) -> Union["types.Message", bool]:
         # inline_message_id: str = None):  TODO Add inline_message_id
         """Set the score of the specified user in a game.
+
+        .. include:: /_includes/usable-by/bots.rst
 
         Parameters:
             user_id (``int`` | ``str``):
@@ -70,12 +72,12 @@ class SetGameScore(Scaffold):
             .. code-block:: python
 
                 # Set new score
-                app.set_game_score(user_id, 1000)
+                await app.set_game_score(user_id, 1000)
 
                 # Force set new score
-                app.set_game_score(user_id, 25, force=True)
+                await app.set_game_score(user_id, 25, force=True)
         """
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.messages.SetGameScore(
                 peer=await self.resolve_peer(chat_id),
                 score=score,

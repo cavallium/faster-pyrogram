@@ -18,18 +18,20 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
-from pyrogram.scaffold import Scaffold
 
 
-class UnpinAllChatMessages(Scaffold):
+class UnpinAllChatMessages:
     async def unpin_all_chat_messages(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
     ) -> bool:
         """Use this method to clear the list of pinned messages in a chat.
         If the chat is not a private chat, the bot must be an administrator in the chat for this to work and must have
         the 'can_pin_messages' admin right in a supergroup or 'can_edit_messages' admin right in a channel.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -42,9 +44,9 @@ class UnpinAllChatMessages(Scaffold):
             .. code-block:: python
 
                 # Unpin all chat messages
-                app.unpin_all_chat_messages(chat_id)
+                await app.unpin_all_chat_messages(chat_id)
         """
-        await self.send(
+        await self.invoke(
             raw.functions.messages.UnpinAllMessages(
                 peer=await self.resolve_peer(chat_id)
             )

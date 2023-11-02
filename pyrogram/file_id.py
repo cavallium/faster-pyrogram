@@ -23,6 +23,7 @@ import struct
 import typing
 from enum import IntEnum
 from io import BytesIO
+from typing import List
 
 from pyrogram.raw.core import Bytes, String
 
@@ -86,24 +87,26 @@ def rle_decode(s: bytes) -> bytes:
 
     Parameters:
         s (``bytes``):
-            Bytes to encode
+            Bytes to decode
 
     Returns:
-        ``bytes``: The encoded bytes
+        ``bytes``: The decoded bytes
     """
-    r = b""
-    i = 0
+    r: List[int] = []
+    z: bool = False
 
-    while i < len(s):
-        if s[i] != 0:
-            r += bytes([s[i]])
+    for b in s:
+        if not b:
+            z = True
+            continue
+
+        if z:
+            r.extend((0,) * b)
+            z = False
         else:
-            r += b"\x00" * s[i + 1]
-            i += 1
+            r.append(b)
 
-        i += 1
-
-    return r
+    return bytes(r)
 
 
 class FileType(IntEnum):

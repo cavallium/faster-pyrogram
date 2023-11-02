@@ -19,15 +19,15 @@
 import os
 from typing import Union, BinaryIO
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import utils
 from pyrogram.file_id import FileType
-from pyrogram.scaffold import Scaffold
 
 
-class SetChatPhoto(Scaffold):
+class SetChatPhoto:
     async def set_chat_photo(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         *,
         photo: Union[str, BinaryIO] = None,
@@ -40,6 +40,8 @@ class SetChatPhoto(Scaffold):
         Pass either one as named argument (see examples below).
 
         You must be an administrator in the chat for this to work and must have the appropriate admin rights.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -68,17 +70,17 @@ class SetChatPhoto(Scaffold):
             .. code-block:: python
 
                 # Set chat photo using a local file
-                app.set_chat_photo(chat_id, photo="photo.jpg")
+                await app.set_chat_photo(chat_id, photo="photo.jpg")
 
-                # Set chat photo using an exiting Photo file_id
-                app.set_chat_photo(chat_id, photo=photo.file_id)
+                # Set chat photo using an existing Photo file_id
+                await app.set_chat_photo(chat_id, photo=photo.file_id)
 
 
                 # Set chat video using a local file
-                app.set_chat_photo(chat_id, video="video.mp4")
+                await app.set_chat_photo(chat_id, video="video.mp4")
 
-                # Set chat photo using an exiting Video file_id
-                app.set_chat_photo(chat_id, video=video.file_id)
+                # Set chat photo using an existing Video file_id
+                await app.set_chat_photo(chat_id, video=video.file_id)
         """
         peer = await self.resolve_peer(chat_id)
 
@@ -100,14 +102,14 @@ class SetChatPhoto(Scaffold):
             )
 
         if isinstance(peer, raw.types.InputPeerChat):
-            await self.send(
+            await self.invoke(
                 raw.functions.messages.EditChatPhoto(
                     chat_id=peer.chat_id,
                     photo=photo,
                 )
             )
         elif isinstance(peer, raw.types.InputPeerChannel):
-            await self.send(
+            await self.invoke(
                 raw.functions.channels.EditPhoto(
                     channel=peer,
                     photo=photo

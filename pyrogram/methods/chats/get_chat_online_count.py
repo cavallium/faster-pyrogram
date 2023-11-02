@@ -18,13 +18,18 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
-from pyrogram.scaffold import Scaffold
 
 
-class GetChatOnlineCount(Scaffold):
-    async def get_chat_online_count(self, chat_id: Union[int, str]) -> int:
+class GetChatOnlineCount:
+    async def get_chat_online_count(
+        self: "pyrogram.Client",
+        chat_id: Union[int, str]
+    ) -> int:
         """Get the number of members that are currently online in a chat.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -36,10 +41,10 @@ class GetChatOnlineCount(Scaffold):
         Example:
             .. code-block:: python
 
-                online = app.get_chat_online_count(chat_id)
+                online = await app.get_chat_online_count(chat_id)
                 print(online)
         """
-        return (await self.send(
+        return (await self.invoke(
             raw.functions.messages.GetOnlines(
                 peer=await self.resolve_peer(chat_id)
             )

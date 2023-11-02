@@ -18,18 +18,20 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class GetChatInviteLink(Scaffold):
+class GetChatInviteLink:
     async def get_chat_invite_link(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         invite_link: str,
     ) -> "types.ChatInviteLink":
         """Get detailed information about a chat invite link.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -42,7 +44,7 @@ class GetChatInviteLink(Scaffold):
         Returns:
             :obj:`~pyrogram.types.ChatInviteLink`: On success, the invite link is returned.
         """
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.messages.GetExportedChatInvite(
                 peer=await self.resolve_peer(chat_id),
                 link=invite_link

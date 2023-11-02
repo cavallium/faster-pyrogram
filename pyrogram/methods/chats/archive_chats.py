@@ -18,16 +18,18 @@
 
 from typing import Union, List
 
+import pyrogram
 from pyrogram import raw
-from pyrogram.scaffold import Scaffold
 
 
-class ArchiveChats(Scaffold):
+class ArchiveChats:
     async def archive_chats(
-        self,
+        self: "pyrogram.Client",
         chat_ids: Union[int, str, List[Union[int, str]]],
     ) -> bool:
         """Archive one or more chats.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_ids (``int`` | ``str`` | List[``int``, ``str``]):
@@ -41,10 +43,10 @@ class ArchiveChats(Scaffold):
             .. code-block:: python
 
                 # Archive chat
-                app.archive_chats(chat_id)
+                await app.archive_chats(chat_id)
 
                 # Archive multiple chats at once
-                app.archive_chats([chat_id1, chat_id2, chat_id3])
+                await app.archive_chats([chat_id1, chat_id2, chat_id3])
         """
 
         if not isinstance(chat_ids, list):
@@ -60,7 +62,7 @@ class ArchiveChats(Scaffold):
                 )
             )
 
-        await self.send(
+        await self.invoke(
             raw.functions.folders.EditPeerFolders(
                 folder_peers=folder_peers
             )

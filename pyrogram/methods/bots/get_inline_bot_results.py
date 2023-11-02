@@ -18,14 +18,14 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
 from pyrogram.errors import UnknownError
-from pyrogram.scaffold import Scaffold
 
 
-class GetInlineBotResults(Scaffold):
+class GetInlineBotResults:
     async def get_inline_bot_results(
-        self,
+        self: "pyrogram.Client",
         bot: Union[int, str],
         query: str = "",
         offset: str = "",
@@ -34,6 +34,8 @@ class GetInlineBotResults(Scaffold):
     ):
         """Get bot results via inline queries.
         You can then send a result using :meth:`~pyrogram.Client.send_inline_bot_result`
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             bot (``int`` | ``str``):
@@ -64,13 +66,13 @@ class GetInlineBotResults(Scaffold):
         Example:
             .. code-block:: python
 
-                results = app.get_inline_bot_results("pyrogrambot")
+                results = await app.get_inline_bot_results("pyrogrambot")
                 print(results)
         """
         # TODO: Don't return the raw type
 
         try:
-            return await self.send(
+            return await self.invoke(
                 raw.functions.messages.GetInlineBotResults(
                     bot=await self.resolve_peer(bot),
                     peer=raw.types.InputPeerSelf(),
@@ -84,7 +86,7 @@ class GetInlineBotResults(Scaffold):
             )
         except UnknownError as e:
             # TODO: Add this -503 Timeout error into the Error DB
-            if e.x.error_code == -503 and e.x.error_message == "Timeout":
+            if e.value.error_code == -503 and e.value.error_message == "Timeout":
                 raise TimeoutError("The inline bot didn't answer in time") from None
             else:
                 raise e

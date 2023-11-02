@@ -19,14 +19,13 @@
 from typing import Callable
 
 import pyrogram
-from pyrogram.scaffold import Scaffold
 
 
-class OnRawUpdate(Scaffold):
+class OnRawUpdate:
     def on_raw_update(
         self=None,
         group: int = 0
-    ) -> callable:
+    ) -> Callable:
         """Decorator for handling raw updates.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
@@ -47,7 +46,7 @@ class OnRawUpdate(Scaffold):
                 func.handlers.append(
                     (
                         pyrogram.handlers.RawUpdateHandler(func),
-                        group if self is None else group
+                        group
                     )
                 )
 

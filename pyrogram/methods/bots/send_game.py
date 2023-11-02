@@ -18,14 +18,14 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class SendGame(Scaffold):
+class SendGame:
     async def send_game(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         game_short_name: str,
         disable_notification: bool = None,
@@ -39,6 +39,8 @@ class SendGame(Scaffold):
         ] = None
     ) -> "types.Message":
         """Send a game.
+
+        .. include:: /_includes/usable-by/bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -69,9 +71,9 @@ class SendGame(Scaffold):
         Example:
             .. code-block:: python
 
-                app.send_game(chat_id, "gamename")
+                await app.send_game(chat_id, "gamename")
         """
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.messages.SendMedia(
                 peer=await self.resolve_peer(chat_id),
                 media=raw.types.InputMediaGame(

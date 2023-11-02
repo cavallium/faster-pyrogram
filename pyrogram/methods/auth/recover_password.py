@@ -18,16 +18,21 @@
 
 import logging
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 log = logging.getLogger(__name__)
 
 
-class RecoverPassword(Scaffold):
-    async def recover_password(self, recovery_code: str) -> "types.User":
+class RecoverPassword:
+    async def recover_password(
+        self: "pyrogram.Client",
+        recovery_code: str
+    ) -> "types.User":
         """Recover your password with a recovery code and log in.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             recovery_code (``str``):
@@ -40,7 +45,7 @@ class RecoverPassword(Scaffold):
         Raises:
             BadRequest: In case the recovery code is invalid.
         """
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.auth.RecoverPassword(
                 code=recovery_code
             )

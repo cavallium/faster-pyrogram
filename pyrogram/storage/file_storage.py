@@ -16,8 +16,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import base64
-import json
 import logging
 import os
 import sqlite3
@@ -36,41 +34,6 @@ class FileStorage(SQLiteStorage):
 
         self.database = workdir / (self.name + self.FILE_EXTENSION)
 
-    async def migrate_from_json(self, session_json: dict):
-        await self.open()
-
-        await self.dc_id(session_json["dc_id"])
-        await self.test_mode(session_json["test_mode"])
-        await self.auth_key(base64.b64decode("".join(session_json["auth_key"])))
-        await self.user_id(session_json["user_id"])
-        await self.date(session_json.get("date", 0))
-        await self.is_bot(session_json.get("is_bot", False))
-
-        peers_by_id = session_json.get("peers_by_id", {})
-        peers_by_phone = session_json.get("peers_by_phone", {})
-
-        peers = {}
-
-        for k, v in peers_by_id.items():
-            if v is None:
-                type_ = "group"
-            elif k.startswith("-100"):
-                type_ = "channel"
-            else:
-                type_ = "user"
-
-            peers[int(k)] = [int(k), int(v) if v is not None else None, type_, None, None]
-
-        for k, v in peers_by_phone.items():
-            peers[v][4] = k
-
-        # noinspection PyTypeChecker
-        await self.update_peers(peers.values())
-
-    def _update_from_one_impl(self):
-        with self.conn:
-            self.conn.execute("DELETE FROM peers")
-
     def _connect_impl(self, path):
         self.conn = sqlite3.connect(path)
         
@@ -83,7 +46,18 @@ class FileStorage(SQLiteStorage):
         version = await self.version()
 
         if version == 1:
-            await self.loop.run_in_executor(self.executor, self._update_from_one_impl)
+            with self.conn:
+                self.conn.execute("DELETE FROM peers")
+
+            version += 1
+
+        if version == 2:
+            with self.conn:
+                try:
+                    self.conn.execute("ALTER TABLE sessions ADD api_id INTEGER")
+                except Exception as e:
+                    log.exception(e)
+
             version += 1
 
         await self.version(version)
@@ -92,34 +66,15 @@ class FileStorage(SQLiteStorage):
         path = self.database
         file_exists = path.is_file()
 
-        if file_exists:
-            try:
-                with open(str(path), encoding="utf-8") as f:
-                    session_json = json.load(f)
-            except ValueError:
-                pass
-            else:
-                log.warning("JSON session storage detected! Converting it into an SQLite session storage...")
-
-                path.rename(path.name + ".OLD")
-
-                log.warning(f'The old session file has been renamed to "{path.name}.OLD"')
-
-                await self.migrate_from_json(session_json)
-
-                log.warning("Done! The session has been successfully converted from JSON to SQLite storage")
-
-                return
-
-        if Path(path.name + ".OLD").is_file():
-            log.warning(f'Old session file detected: "{path.name}.OLD". You can remove this file now')
-
-        self.executor.submit(self._connect_impl, path).result()
+        self.conn = sqlite3.connect(str(path), timeout=1, check_same_thread=False)
 
         if not file_exists:
             await self.create()
         else:
             await self.update()
+
+        with self.conn:
+            self.conn.execute("VACUUM")
 
     async def delete(self):
         os.remove(self.database)

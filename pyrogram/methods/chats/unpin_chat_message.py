@@ -18,19 +18,21 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
-from pyrogram.scaffold import Scaffold
 
 
-class UnpinChatMessage(Scaffold):
+class UnpinChatMessage:
     async def unpin_chat_message(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         message_id: int = 0
     ) -> bool:
         """Unpin a message in a group, channel or your own chat.
         You must be an administrator in the chat for this to work and must have the "can_pin_messages" admin
         right in the supergroup or "can_edit_messages" admin right in the channel.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -46,9 +48,9 @@ class UnpinChatMessage(Scaffold):
         Example:
             .. code-block:: python
 
-                app.unpin_chat_message(chat_id, message_id)
+                await app.unpin_chat_message(chat_id, message_id)
         """
-        await self.send(
+        await self.invoke(
             raw.functions.messages.UpdatePinnedMessage(
                 peer=await self.resolve_peer(chat_id),
                 id=message_id,
