@@ -17,91 +17,76 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Union, List, AsyncGenerator, Optional
+from datetime import datetime
 
-from pyrogram import raw
-from pyrogram import types
-from pyrogram import utils
-from pyrogram.scaffold import Scaffold
-
-
-class Filters:
-    EMPTY = raw.types.InputMessagesFilterEmpty()
-    PHOTO = raw.types.InputMessagesFilterPhotos()
-    VIDEO = raw.types.InputMessagesFilterVideo()
-    PHOTO_VIDEO = raw.types.InputMessagesFilterPhotoVideo()
-    DOCUMENT = raw.types.InputMessagesFilterDocument()
-    URL = raw.types.InputMessagesFilterUrl()
-    ANIMATION = raw.types.InputMessagesFilterGif()
-    VOICE_NOTE = raw.types.InputMessagesFilterVoice()
-    AUDIO = raw.types.InputMessagesFilterMusic()
-    CHAT_PHOTO = raw.types.InputMessagesFilterChatPhotos()
-    PHONE_CALL = raw.types.InputMessagesFilterPhoneCalls()
-    AUDIO_VIDEO_NOTE = raw.types.InputMessagesFilterRoundVideo()
-    VIDEO_NOTE = raw.types.InputMessagesFilterRoundVideo()
-    MENTION = raw.types.InputMessagesFilterMyMentions()
-    LOCATION = raw.types.InputMessagesFilterGeo()
-    CONTACT = raw.types.InputMessagesFilterContacts()
-    PINNED = raw.types.InputMessagesFilterPinned()
-
-
-POSSIBLE_VALUES = list(map(lambda x: x.lower(), filter(lambda x: not x.startswith("__"), Filters.__dict__.keys())))
+import pyrogram
+from pyrogram import raw, types, utils, enums
 
 
 # noinspection PyShadowingBuiltins
 async def get_chunk(
-    client: Scaffold,
+    client,
     chat_id: Union[int, str],
     query: str = "",
-    filter: str = "empty",
+    filter: "enums.MessagesFilter" = enums.MessagesFilter.EMPTY,
     offset: int = 0,
+    offset_id: int = 0,
+    min_date: datetime = utils.zero_datetime(),
+    max_date: datetime = utils.zero_datetime(),
     limit: int = 100,
-    from_user: Union[int, str] = None
+    min_id: int = 0,
+    max_id: int = 0,
+    from_user: Union[int, str] = None,
+    message_thread_id: Optional[int] = None
 ) -> List["types.Message"]:
-    try:
-        filter = Filters.__dict__[filter.upper()]
-    except KeyError:
-        raise ValueError('Invalid filter "{}". Possible values are: {}'.format(
-            filter, ", ".join(f'"{v}"' for v in POSSIBLE_VALUES))) from None
-
-    r = await client.send(
+    r = await client.invoke(
         raw.functions.messages.Search(
             peer=await client.resolve_peer(chat_id),
             q=query,
-            filter=filter,
-            min_date=0,
-            max_date=0,
-            offset_id=0,
+            filter=filter.value(),
+            min_date=utils.datetime_to_timestamp(min_date),
+            max_date= utils.datetime_to_timestamp(max_date),
+            offset_id=offset_id,
             add_offset=offset,
             limit=limit,
-            min_id=0,
-            max_id=0,
+            min_id=min_id,
+            max_id=max_id,
             from_id=(
                 await client.resolve_peer(from_user)
                 if from_user
                 else None
             ),
+            top_msg_id=message_thread_id,
             hash=0
         ),
         sleep_threshold=60
     )
 
-    return await utils.parse_messages(client, r)
+    return await utils.parse_messages(client, r, replies=0)
 
 
-class SearchMessages(Scaffold):
+class SearchMessages:
     # noinspection PyShadowingBuiltins
     async def search_messages(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
-        query: str = "",
-        offset: int = 0,
-        filter: str = "empty",
-        limit: int = 0,
-        from_user: Union[int, str] = None
-    ) -> Optional[AsyncGenerator["types.Message", None]]:
+        query: Optional[str] = "",
+        offset: Optional[int] = 0,
+        offset_id: Optional[int] = 0,
+        min_date: Optional[datetime] = utils.zero_datetime(),
+        max_date: Optional[datetime] = utils.zero_datetime(),
+        min_id: Optional[int] = 0,
+        max_id: Optional[int] = 0,
+        filter: Optional["enums.MessagesFilter"] = enums.MessagesFilter.EMPTY,
+        limit: Optional[int] = 0,
+        from_user: Union[int, str] = None,
+        message_thread_id: Optional[int] = None
+    ) -> AsyncGenerator["types.Message", None]:
         """Search for text and media messages inside a specific chat.
 
         If you want to get the messages count only, see :meth:`~pyrogram.Client.search_messages_count`.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -119,26 +104,24 @@ class SearchMessages(Scaffold):
                 Sequential number of the first message to be returned.
                 Defaults to 0.
 
-            filter (``str``, *optional*):
-                Pass a filter in order to search for specific kind of messages only:
+            offset_id (``int``, *optional*):
+                Identifier of the first message to be returned.
 
-                - ``"empty"``: Search for all kind of messages (default).
-                - ``"photo"``: Search for photos.
-                - ``"video"``: Search for video.
-                - ``"photo_video"``: Search for either photo or video.
-                - ``"document"``: Search for documents (generic files).
-                - ``"url"``: Search for messages containing URLs (web links).
-                - ``"animation"``: Search for animations (GIFs).
-                - ``"voice_note"``: Search for voice notes.
-                - ``"audio"``: Search for audio files (music).
-                - ``"chat_photo"``: Search for chat photos.
-                - ``"phone_call"``: Search for phone calls.
-                - ``"audio_video_note"``: Search for either audio or video notes.
-                - ``"video_note"``: Search for video notes.
-                - ``"mention"``: Search for messages containing mentions to yourself.
-                - ``"location"``: Search for location messages.
-                - ``"contact"``: Search for contact messages.
-                - ``"pinned"``: Search for pinned messages.
+            min_date (:py:obj:`~datetime.datetime`, *optional*):
+                Pass a date as offset to retrieve only older messages starting from that date.
+
+            max_date (:py:obj:`~datetime.datetime`, *optional*):
+                Pass a date as offset to retrieve only newer messages starting from that date.
+
+            min_id (``int``, *optional*):
+                If a positive value was provided, the method will return only messages with IDs more than min_id.
+
+            max_id (``int``, *optional*):
+                If a positive value was provided, the method will return only messages with IDs less than max_id.
+
+            filter (:obj:`~pyrogram.enums.MessagesFilter`, *optional*):
+                Pass a filter in order to search for specific kind of messages only.
+                Defaults to any message (no filter).
 
             limit (``int``, *optional*):
                 Limits the number of messages to be retrieved.
@@ -147,24 +130,31 @@ class SearchMessages(Scaffold):
             from_user (``int`` | ``str``, *optional*):
                 Unique identifier (int) or username (str) of the target user you want to search for messages from.
 
+            message_thread_id (``int``, *optional*):
+                Unique identifier for the target message thread (topic) of the forum.
+                For supergroups only.
+
         Returns:
             ``Generator``: A generator yielding :obj:`~pyrogram.types.Message` objects.
 
         Example:
             .. code-block:: python
 
+                from pyrogram import enums
+
                 # Search for text messages in chat. Get the last 120 results
-                for message in app.search_messages(chat_id, query="hello", limit=120):
+                async for message in app.search_messages(chat_id, query="hello", limit=120):
                     print(message.text)
 
                 # Search for pinned messages in chat
-                for message in app.search_messages(chat_id, filter="pinned"):
+                async for message in app.search_messages(chat_id, filter=enums.MessagesFilter.PINNED):
                     print(message.text)
 
                 # Search for messages containing "hello" sent by yourself in chat
-                for message in app.search_messages(chat, "hello", from_user="me"):
+                async for message in app.search_messages(chat, "hello", from_user="me"):
                     print(message.text)
         """
+
         current = 0
         total = abs(limit) or (1 << 31) - 1
         limit = min(100, total)
@@ -176,8 +166,14 @@ class SearchMessages(Scaffold):
                 query=query,
                 filter=filter,
                 offset=offset,
+                offset_id=offset_id,
+                min_date=min_date,
+                max_date=max_date,
+                min_id=min_id,
+                max_id=max_id,
                 limit=limit,
-                from_user=from_user
+                from_user=from_user,
+                message_thread_id=message_thread_id
             )
 
             if not messages:

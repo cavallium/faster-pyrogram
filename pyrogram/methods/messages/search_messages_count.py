@@ -16,24 +16,26 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from typing import Union, Optional
 
-from pyrogram import raw
-from pyrogram.scaffold import Scaffold
-from .search_messages import Filters, POSSIBLE_VALUES
+import pyrogram
+from pyrogram import raw, enums
 
 
-class SearchMessagesCount(Scaffold):
+class SearchMessagesCount:
     async def search_messages_count(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
-        query: str = "",
-        filter: str = "empty",
-        from_user: Union[int, str] = None
+        query: Optional[str] = "",
+        filter: Optional["enums.MessagesFilter"] = enums.MessagesFilter.EMPTY,
+        from_user: Optional[Union[int, str]] = None,
+        message_thread_id: Optional[int] = None
     ) -> int:
         """Get the count of messages resulting from a search inside a chat.
 
         If you want to get the actual messages, see :meth:`~pyrogram.Client.search_messages`.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -47,44 +49,24 @@ class SearchMessagesCount(Scaffold):
                 When passed while searching for media messages, the query will be applied to captions.
                 Defaults to "" (empty string).
 
-            filter (``str``, *optional*):
+            filter (:obj:`~pyrogram.enums.MessagesFilter`, *optional*):
                 Pass a filter in order to search for specific kind of messages only:
-
-                - ``"empty"``: Search for all kind of messages (default).
-                - ``"photo"``: Search for photos.
-                - ``"video"``: Search for video.
-                - ``"photo_video"``: Search for either photo or video.
-                - ``"document"``: Search for documents (generic files).
-                - ``"url"``: Search for messages containing URLs (web links).
-                - ``"animation"``: Search for animations (GIFs).
-                - ``"voice_note"``: Search for voice notes.
-                - ``"audio"``: Search for audio files (music).
-                - ``"chat_photo"``: Search for chat photos.
-                - ``"phone_call"``: Search for phone calls.
-                - ``"audio_video_note"``: Search for either audio or video notes.
-                - ``"video_note"``: Search for video notes.
-                - ``"mention"``: Search for messages containing mentions to yourself.
-                - ``"location"``: Search for location messages.
-                - ``"contact"``: Search for contact messages.
-                - ``"pinned"``: Search for pinned messages.
 
             from_user (``int`` | ``str``, *optional*):
                 Unique identifier (int) or username (str) of the target user you want to search for messages from.
 
+            message_thread_id (``int``, *optional*):
+                Unique identifier for the target message thread (topic) of the forum.
+                For supergroups only.
+
         Returns:
             ``int``: On success, the messages count is returned.
         """
-        try:
-            filter = Filters.__dict__[filter.upper()]
-        except KeyError:
-            raise ValueError('Invalid filter "{}". Possible values are: {}'.format(
-                filter, ", ".join(f'"{v}"' for v in POSSIBLE_VALUES))) from None
-
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.messages.Search(
                 peer=await self.resolve_peer(chat_id),
                 q=query,
-                filter=filter,
+                filter=filter.value(),
                 min_date=0,
                 max_date=0,
                 offset_id=0,
@@ -97,6 +79,7 @@ class SearchMessagesCount(Scaffold):
                     if from_user
                     else None
                 ),
+                top_msg_id=message_thread_id,
                 hash=0
             )
         )

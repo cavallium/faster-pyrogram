@@ -18,25 +18,27 @@
 
 from typing import Union, Optional, AsyncGenerator
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class GetChatAdminInviteLinks(Scaffold):
+class GetChatAdminInviteLinks:
     async def get_chat_admin_invite_links(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         admin_id: Union[int, str],
         revoked: bool = False,
         limit: int = 0,
-    ) -> Optional[AsyncGenerator["types.ChatInviteLink", None]]:
+    ) -> AsyncGenerator["types.ChatInviteLink", None]:
         """Get the invite links created by an administrator in a chat.
 
         .. note::
 
             As an administrator you can only get your own links you have exported.
             As the chat or channel owner you can get everyones links.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -70,7 +72,7 @@ class GetChatAdminInviteLinks(Scaffold):
         offset_link = None
 
         while True:
-            r = await self.send(
+            r = await self.invoke(
                 raw.functions.messages.GetExportedChatInvites(
                     peer=await self.resolve_peer(chat_id),
                     admin_id=await self.resolve_peer(admin_id),

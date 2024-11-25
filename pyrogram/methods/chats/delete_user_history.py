@@ -18,17 +18,19 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
-from pyrogram.scaffold import Scaffold
 
 
-class DeleteUserHistory(Scaffold):
+class DeleteUserHistory:
     async def delete_user_history(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         user_id: Union[int, str],
     ) -> bool:
         """Delete all messages sent by a certain user in a supergroup.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -41,7 +43,7 @@ class DeleteUserHistory(Scaffold):
             ``bool``: True on success, False otherwise.
         """
 
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.channels.DeleteParticipantHistory(
                 channel=await self.resolve_peer(chat_id),
                 participant=await self.resolve_peer(user_id)

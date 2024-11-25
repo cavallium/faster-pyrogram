@@ -16,25 +16,28 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from typing import Optional, List
 
-from pyrogram import raw
+import pyrogram
+from pyrogram import raw, enums
 from pyrogram import types
 from pyrogram import utils
-from pyrogram.scaffold import Scaffold
 from .inline_session import get_session
 
 
-class EditInlineText(Scaffold):
+class EditInlineText:
     async def edit_inline_text(
-        self,
+        self: "pyrogram.Client",
         inline_message_id: str,
         text: str,
-        parse_mode: Optional[str] = object,
+        parse_mode: Optional["enums.ParseMode"] = None,
+        entities: List["types.MessageEntity"] = None,
         disable_web_page_preview: bool = None,
         reply_markup: "types.InlineKeyboardMarkup" = None
     ) -> bool:
         """Edit the text of inline messages.
+
+        .. include:: /_includes/usable-by/bots.rst
 
         Parameters:
             inline_message_id (``str``):
@@ -43,12 +46,12 @@ class EditInlineText(Scaffold):
             text (``str``):
                 New text of the message.
 
-            parse_mode (``str``, *optional*):
+            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
                 By default, texts are parsed using both Markdown and HTML styles.
                 You can combine both syntaxes together.
-                Pass "markdown" or "md" to enable Markdown-style parsing only.
-                Pass "html" to enable HTML-style parsing only.
-                Pass None to completely disable style parsing.
+
+            entities (List of :obj:`~pyrogram.types.MessageEntity`):
+                List of special entities that appear in message text, which can be specified instead of *parse_mode*.
 
             disable_web_page_preview (``bool``, *optional*):
                 Disables link previews for links in this message.
@@ -65,10 +68,10 @@ class EditInlineText(Scaffold):
                 # Bots only
 
                 # Simple edit text
-                app.edit_inline_text(inline_message_id, "new text")
+                await app.edit_inline_text(inline_message_id, "new text")
 
                 # Take the same text message, remove the web page preview only
-                app.edit_inline_text(
+                await app.edit_inline_text(
                     inline_message_id, message.text,
                     disable_web_page_preview=True)
         """
@@ -78,12 +81,12 @@ class EditInlineText(Scaffold):
 
         session = await get_session(self, dc_id)
 
-        return await session.send(
+        return await session.invoke(
             raw.functions.messages.EditInlineBotMessage(
                 id=unpacked,
                 no_webpage=disable_web_page_preview or None,
                 reply_markup=await reply_markup.write(self) if reply_markup else None,
-                **await self.parser.parse(text, parse_mode)
+                **await utils.parse_text_entities(self, text, parse_mode, entities)
             ),
             sleep_threshold=self.sleep_threshold
         )

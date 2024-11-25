@@ -1,8 +1,9 @@
 Available Methods
 =================
 
-This page is about Pyrogram methods. All the methods listed here are bound to a :class:`~pyrogram.Client` instance.
-Some other utility functions can instead be found in the main package directly.
+This page is about Pyrogram methods. All the methods listed here are bound to a :class:`~pyrogram.Client` instance,
+except for :meth:`~pyrogram.idle()` and :meth:`~pyrogram.compose()`, which are special functions that can be found in
+the main package directly.
 
 .. code-block:: python
 
@@ -12,10 +13,6 @@ Some other utility functions can instead be found in the main package directly.
 
     with app:
         app.send_message("me", "hi")
-
-.. contents:: Contents
-    :backlinks: none
-    :local:
 
 -----
 
@@ -40,11 +37,13 @@ Utilities
     :nosignatures:
 
     idle
+    compose
 
 .. toctree::
     :hidden:
 
     idle
+    compose
 
 .. currentmodule:: pyrogram.Client
 
@@ -151,6 +150,84 @@ Authorization
     :hidden:
 
     {authorization}
+
+Stories
+-------
+
+.. autosummary::
+    :nosignatures:
+
+    {stories}
+
+.. toctree::
+    :hidden:
+
+    {stories}
+
+Premium
+-------
+
+.. autosummary::
+    :nosignatures:
+
+    {premium}
+
+.. toctree::
+    :hidden:
+
+    {premium}
+
+Phone
+-----
+
+.. autosummary::
+    :nosignatures:
+
+    {phone}
+
+.. toctree::
+    :hidden:
+
+    {phone}
+
+Business
+--------
+
+.. autosummary::
+    :nosignatures:
+
+    {business}
+
+.. toctree::
+    :hidden:
+
+    {business}
+
+Payments
+--------
+
+.. autosummary::
+    :nosignatures:
+
+    {payments}
+
+.. toctree::
+    :hidden:
+
+    {payments}
+
+Account
+-------
+
+.. autosummary::
+    :nosignatures:
+
+    {account}
+
+.. toctree::
+    :hidden:
+
+    {account}
 
 Advanced
 --------

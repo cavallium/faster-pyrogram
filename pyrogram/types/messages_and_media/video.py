@@ -16,10 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from typing import List
 
 import pyrogram
-from pyrogram import raw
+from pyrogram import raw, utils
 from pyrogram import types
 from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType
 from ..object import Object
@@ -42,6 +43,9 @@ class Video(Object):
         height (``int``):
             Video height as defined by sender.
 
+        codec (``str``):
+            Codec used for video file encoding, for example, "h264", "h265", or "av1".
+
         duration (``int``):
             Duration of the video in seconds as defined by sender.
 
@@ -60,8 +64,8 @@ class Video(Object):
         ttl_seconds (``int``. *optional*):
             Time-to-live seconds, for secret photos.
 
-        date (``int``, *optional*):
-            Date the video was sent in Unix time.
+        date (:py:obj:`~datetime.datetime`, *optional*):
+            Date the video was sent.
 
         thumbs (List of :obj:`~pyrogram.types.Thumbnail`, *optional*):
             Video thumbnails.
@@ -75,13 +79,14 @@ class Video(Object):
         file_unique_id: str,
         width: int,
         height: int,
+        codec: str,
         duration: int,
         file_name: str = None,
         mime_type: str = None,
         file_size: int = None,
         supports_streaming: bool = None,
         ttl_seconds: int = None,
-        date: int = None,
+        date: datetime = None,
         thumbs: List["types.Thumbnail"] = None
     ):
         super().__init__(client)
@@ -90,6 +95,7 @@ class Video(Object):
         self.file_unique_id = file_unique_id
         self.width = width
         self.height = height
+        self.codec = codec
         self.duration = duration
         self.file_name = file_name
         self.mime_type = mime_type
@@ -119,14 +125,15 @@ class Video(Object):
                 file_unique_type=FileUniqueType.DOCUMENT,
                 media_id=video.id
             ).encode(),
-            width=video_attributes.w,
-            height=video_attributes.h,
+            width=getattr(video_attributes, "w", None),
+            height=getattr(video_attributes, "h", None),
+            codec=getattr(video_attributes, "video_codec", None),
             duration=video_attributes.duration,
             file_name=file_name,
             mime_type=video.mime_type,
             supports_streaming=video_attributes.supports_streaming,
             file_size=video.size,
-            date=video.date,
+            date=utils.timestamp_to_datetime(video.date),
             ttl_seconds=ttl_seconds,
             thumbs=types.Thumbnail._parse(client, video),
             client=client

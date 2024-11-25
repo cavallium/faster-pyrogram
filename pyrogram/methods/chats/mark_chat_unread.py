@@ -18,16 +18,18 @@
 
 from typing import Union
 
-from pyrogram.raw import functions
-from pyrogram.scaffold import Scaffold
+import pyrogram
+from pyrogram import raw
 
 
-class MarkChatUnread(Scaffold):
+class MarkChatUnread:
     async def mark_chat_unread(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
     ) -> bool:
         """Mark a chat as unread.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -37,8 +39,8 @@ class MarkChatUnread(Scaffold):
             ``bool``: On success, True is returned.
         """
 
-        return await self.send(
-            functions.messages.MarkDialogUnread(
+        return await self.invoke(
+            raw.functions.messages.MarkDialogUnread(
                 peer=await self.resolve_peer(chat_id),
                 unread=True
             )

@@ -19,20 +19,22 @@
 import logging
 from typing import Union, List
 
+import pyrogram
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 log = logging.getLogger(__name__)
 
 
-class GetMediaGroup(Scaffold):
+class GetMediaGroup:
     async def get_media_group(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         message_id: int
     ) -> List["types.Message"]:
         """Get the media group a message belongs to.
-        
+
+        .. include:: /_includes/usable-by/users-bots.rst
+
         Parameters:
             chat_id (``int`` | ``str``):
                 Unique identifier (int) or username (str) of the target chat.

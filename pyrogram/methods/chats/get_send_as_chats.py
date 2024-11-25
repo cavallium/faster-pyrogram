@@ -18,17 +18,19 @@
 
 from typing import List, Union
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class GetSendAsChats(Scaffold):
+class GetSendAsChats:
     async def get_send_as_chats(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str]
     ) -> List["types.Chat"]:
         """Get the list of "send_as" chats available.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -40,10 +42,10 @@ class GetSendAsChats(Scaffold):
         Example:
             .. code-block:: python
 
-                chats = app.get_send_as_chats(chat_id)
+                chats = await app.get_send_as_chats(chat_id)
                 print(chats)
         """
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.channels.GetSendAs(
                 peer=await self.resolve_peer(chat_id)
             )
@@ -55,9 +57,9 @@ class GetSendAsChats(Scaffold):
         send_as_chats = types.List()
 
         for p in r.peers:
-            if isinstance(p, raw.types.PeerUser):
-                send_as_chats.append(types.Chat._parse_chat(self, users[p.user_id]))
+            if isinstance(p.peer, raw.types.PeerUser):
+                send_as_chats.append(types.Chat._parse_chat(self, users[p.peer.user_id]))
             else:
-                send_as_chats.append(types.Chat._parse_chat(self, chats[p.channel_id]))
+                send_as_chats.append(types.Chat._parse_chat(self, chats[p.peer.channel_id]))
 
         return send_as_chats

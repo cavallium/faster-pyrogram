@@ -16,8 +16,10 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
+
 import pyrogram
-from pyrogram import raw
+from pyrogram import raw, utils
 from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType
 from ..object import Object
 
@@ -45,8 +47,11 @@ class Voice(Object):
         file_size (``int``, *optional*):
             File size.
 
-        date (``int``, *optional*):
-            Date the voice was sent in Unix time.
+        date (:py:obj:`~datetime.datetime`, *optional*):
+            Date the voice was sent.
+
+        ttl_seconds (``int``, *optional*):
+            Time-to-live seconds, for one-time media.
     """
 
     def __init__(
@@ -59,7 +64,8 @@ class Voice(Object):
         waveform: bytes = None,
         mime_type: str = None,
         file_size: int = None,
-        date: int = None
+        date: datetime = None,
+        ttl_seconds: int = None
     ):
         super().__init__(client)
 
@@ -70,9 +76,10 @@ class Voice(Object):
         self.mime_type = mime_type
         self.file_size = file_size
         self.date = date
+        self.ttl_seconds = ttl_seconds
 
     @staticmethod
-    def _parse(client, voice: "raw.types.Document", attributes: "raw.types.DocumentAttributeAudio") -> "Voice":
+    def _parse(client, voice: "raw.types.Document", attributes: "raw.types.DocumentAttributeAudio", ttl_seconds: int = None) -> "Voice":
         return Voice(
             file_id=FileId(
                 file_type=FileType.VOICE,
@@ -89,6 +96,7 @@ class Voice(Object):
             mime_type=voice.mime_type,
             file_size=voice.size,
             waveform=attributes.waveform,
-            date=voice.date,
+            date=utils.timestamp_to_datetime(voice.date),
+            ttl_seconds=ttl_seconds,
             client=client
         )

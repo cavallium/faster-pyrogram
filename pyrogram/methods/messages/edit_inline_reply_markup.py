@@ -16,20 +16,22 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
 from pyrogram import utils
-from pyrogram.scaffold import Scaffold
 from .inline_session import get_session
 
 
-class EditInlineReplyMarkup(Scaffold):
+class EditInlineReplyMarkup:
     async def edit_inline_reply_markup(
-        self,
+        self: "pyrogram.Client",
         inline_message_id: str,
         reply_markup: "types.InlineKeyboardMarkup" = None
     ) -> bool:
         """Edit only the reply markup of inline messages sent via the bot (for inline bots).
+
+        .. include:: /_includes/usable-by/bots.rst
 
         Parameters:
             inline_message_id (``str``):
@@ -47,7 +49,7 @@ class EditInlineReplyMarkup(Scaffold):
                 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
                 # Bots only
-                app.edit_inline_reply_markup(
+                await app.edit_inline_reply_markup(
                     inline_message_id,
                     InlineKeyboardMarkup([[
                         InlineKeyboardButton("New button", callback_data="new_data")]]))
@@ -58,7 +60,7 @@ class EditInlineReplyMarkup(Scaffold):
 
         session = await get_session(self, dc_id)
 
-        return await session.send(
+        return await session.invoke(
             raw.functions.messages.EditInlineBotMessage(
                 id=unpacked,
                 reply_markup=await reply_markup.write(self) if reply_markup else None,

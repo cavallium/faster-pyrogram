@@ -16,10 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from typing import Dict, Union
 
 import pyrogram
-from pyrogram import raw
+from pyrogram import raw, utils
 from pyrogram import types
 from ..object import Object
 from ..update import Update
@@ -35,8 +36,8 @@ class ChatMemberUpdated(Object, Update):
         from_user (:obj:`~pyrogram.types.User`):
             Performer of the action, which resulted in the change.
 
-        date (``int``):
-            Date the change was done in Unix time.
+        date (:py:obj:`~datetime.datetime`):
+            Date the change was done.
 
         old_chat_member (:obj:`~pyrogram.types.ChatMember`, *optional*):
             Previous information about the chat member.
@@ -46,6 +47,9 @@ class ChatMemberUpdated(Object, Update):
 
         invite_link (:obj:`~pyrogram.types.ChatInviteLink`, *optional*):
             Chat invite link, which was used by the user to join the chat; for joining by invite link events only.
+
+        via_join_request (``bool``, *optional*):
+            True, if the user joined the chat after sending a join request and being approved by an administrator.
     """
 
     def __init__(
@@ -54,10 +58,11 @@ class ChatMemberUpdated(Object, Update):
         client: "pyrogram.Client" = None,
         chat: "types.Chat",
         from_user: "types.User",
-        date: int,
+        date: datetime,
         old_chat_member: "types.ChatMember",
         new_chat_member: "types.ChatMember",
         invite_link: "types.ChatInviteLink" = None,
+        via_join_request: bool = None
     ):
         super().__init__(client)
 
@@ -67,6 +72,7 @@ class ChatMemberUpdated(Object, Update):
         self.old_chat_member = old_chat_member
         self.new_chat_member = new_chat_member
         self.invite_link = invite_link
+        self.via_join_request = via_join_request
 
     @staticmethod
     def _parse(
@@ -80,6 +86,7 @@ class ChatMemberUpdated(Object, Update):
         old_chat_member = None
         new_chat_member = None
         invite_link = None
+        via_join_request = None
 
         if update.prev_participant:
             old_chat_member = types.ChatMember._parse(client, update.prev_participant, users, chats)
@@ -90,12 +97,16 @@ class ChatMemberUpdated(Object, Update):
         if update.invite:
             invite_link = types.ChatInviteLink._parse(client, update.invite, users)
 
+            if isinstance(update.invite, raw.types.ChatInvitePublicJoinRequests):
+                via_join_request = True
+
         return ChatMemberUpdated(
             chat=types.Chat._parse_chat(client, chats[chat_id]),
             from_user=types.User._parse(client, users[update.actor_id]),
-            date=update.date,
+            date=utils.timestamp_to_datetime(update.date),
             old_chat_member=old_chat_member,
             new_chat_member=new_chat_member,
             invite_link=invite_link,
+            via_join_request=via_join_request,
             client=client
         )

@@ -23,9 +23,9 @@ from pyrogram.session import Session
 from pyrogram.session.auth import Auth
 
 
-async def get_session(client: "pyrogram.Client", dc_id: int):
+async def get_session(client: "pyrogram.Client", dc_id: int) -> Session:
     if dc_id == await client.storage.dc_id():
-        return client
+        return client.session
 
     async with client.media_sessions_lock:
         if client.media_sessions.get(dc_id):
@@ -33,21 +33,21 @@ async def get_session(client: "pyrogram.Client", dc_id: int):
 
         session = client.media_sessions[dc_id] = Session(
             client, dc_id,
-            await Auth(client, dc_id, False).create(),
-            False, is_media=True
+            await Auth(client, dc_id, await client.storage.test_mode()).create(),
+            await client.storage.test_mode(), is_media=True
         )
 
         await session.start()
 
         for _ in range(3):
-            exported_auth = await client.send(
+            exported_auth = await client.invoke(
                 raw.functions.auth.ExportAuthorization(
                     dc_id=dc_id
                 )
             )
 
             try:
-                await session.send(
+                await session.invoke(
                     raw.functions.auth.ImportAuthorization(
                         id=exported_auth.id,
                         bytes=exported_auth.bytes

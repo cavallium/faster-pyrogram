@@ -30,6 +30,7 @@ SCHEMA = """
 CREATE TABLE sessions
 (
     dc_id     INTEGER PRIMARY KEY,
+    api_id    INTEGER,
     test_mode INTEGER,
     auth_key  BLOB,
     date      INTEGER NOT NULL,
@@ -42,9 +43,24 @@ CREATE TABLE peers
     id             INTEGER PRIMARY KEY,
     access_hash    INTEGER,
     type           INTEGER NOT NULL,
-    username       TEXT,
     phone_number   TEXT,
     last_update_on INTEGER NOT NULL DEFAULT (CAST(STRFTIME('%s', 'now') AS INTEGER))
+);
+
+CREATE TABLE usernames
+(
+    id       INTEGER,
+    username TEXT,
+    FOREIGN KEY (id) REFERENCES peers(id)
+);
+
+CREATE TABLE update_state
+(
+    id   INTEGER PRIMARY KEY,
+    pts  INTEGER,
+    qts  INTEGER,
+    date INTEGER,
+    seq  INTEGER
 );
 
 CREATE TABLE version
@@ -53,8 +69,9 @@ CREATE TABLE version
 );
 
 CREATE INDEX idx_peers_id ON peers (id);
-CREATE INDEX idx_peers_username ON peers (username);
 CREATE INDEX idx_peers_phone_number ON peers (phone_number);
+CREATE INDEX idx_usernames_id ON usernames (id);
+CREATE INDEX idx_usernames_username ON usernames (username);
 
 CREATE TRIGGER trg_peers_last_update_on
     AFTER UPDATE
@@ -89,7 +106,7 @@ def get_input_peer(peer_id: int, access_hash: int, peer_type: str):
 
 
 class SQLiteStorage(Storage):
-    VERSION = 2
+    VERSION = 6
     USERNAME_TTL = 8 * 60 * 60
 
     def __init__(self, name: str):
@@ -97,7 +114,7 @@ class SQLiteStorage(Storage):
 
         self.executor = ThreadPoolExecutor(1)
         self.loop = asyncio.get_event_loop()
-        self.conn = None  # type: sqlite3.Connection | None
+        self.conn = None  # type: sqlite3.Connection
 
     def _create_impl(self):
         with self.conn:
@@ -109,8 +126,8 @@ class SQLiteStorage(Storage):
             )
 
             self.conn.execute(
-                "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)",
-                (2, None, None, 0, None, None)
+                "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (2, None, None, None, 0, None, None)
             )
 
     async def create(self):
@@ -130,15 +147,52 @@ class SQLiteStorage(Storage):
     async def delete(self):
         raise NotImplementedError
 
-    def _update_peers_impl(self, peers):
+    def _update_peers_impl(self, peers: List[Tuple[int, int, str, str]]):
         with self.conn:
             self.conn.executemany(
-                "REPLACE INTO peers (id, access_hash, type, username, phone_number) VALUES (?, ?, ?, ?, ?)",
+                "REPLACE INTO peers (id, access_hash, type, phone_number) VALUES (?, ?, ?, ?)",
                 list(peers)
             )
 
-    async def update_peers(self, peers: List[Tuple[int, int, str, str, str]]):
+    async def update_peers(self, peers: List[Tuple[int, int, str, str]]):
         return await self.loop.run_in_executor(self.executor, self._update_peers_impl, peers)
+
+    def _update_usernames_impl(self, usernames: List[Tuple[int, List[str]]]):
+        with self.conn:
+            self.conn.executemany(
+                "DELETE FROM usernames WHERE id = ?",
+                [(id,) for id, _ in usernames]
+            )
+
+            self.conn.executemany(
+                "REPLACE INTO usernames (id, username) VALUES (?, ?)",
+                [(id, username) for id, usernames in usernames for username in usernames]
+            )
+
+    async def update_usernames(self, usernames: List[Tuple[int, List[str]]]):
+        return await self.loop.run_in_executor(self.executor, self._update_usernames_impl, usernames)
+
+    def _update_state_impl(self, value: Tuple[int, int, int, int, int] = object):
+        if value == object:
+            return self.conn.execute(
+                "SELECT id, pts, qts, date, seq FROM update_state "
+                "ORDER BY date ASC"
+            ).fetchall()
+        else:
+            if isinstance(value, int):
+                self.conn.execute(
+                    "DELETE FROM update_state WHERE id = ?",
+                    (value,)
+                )
+            else:
+                self.conn.execute(
+                    "REPLACE INTO update_state (id, pts, qts, date, seq)"
+                    "VALUES (?, ?, ?, ?, ?)",
+                    value
+                )
+
+    async def update_state(self, value: Tuple[int, int, int, int, int] = object):
+        return await self.loop.run_in_executor(self.executor, self._update_state_impl, value)
 
     def _get_peer_by_id_impl(self, peer_id: int):
         with self.conn:
@@ -158,7 +212,10 @@ class SQLiteStorage(Storage):
     def _get_peer_by_username_impl(self, username: str):
         with self.conn:
             return self.conn.execute(
-                "SELECT id, access_hash, type, last_update_on FROM peers WHERE username = ?",
+                "SELECT p.id, p.access_hash, p.type, p.last_update_on FROM peers p "
+                "JOIN usernames u ON p.id = u.id "
+                "WHERE u.username = ? "
+                "ORDER BY p.last_update_on DESC",
                 (username,)
             ).fetchone()
 
@@ -215,6 +272,9 @@ class SQLiteStorage(Storage):
 
     async def dc_id(self, value: int = object):
         return await self._accessor("dc_id", value)
+
+    async def api_id(self, value: int = object):
+        return await self._accessor("api_id", value)
 
     async def test_mode(self, value: bool = object):
         return await self._accessor("test_mode", value)

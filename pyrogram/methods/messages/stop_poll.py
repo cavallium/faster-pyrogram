@@ -18,14 +18,14 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class StopPoll(Scaffold):
+class StopPoll:
     async def stop_poll(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         message_id: int,
         reply_markup: "types.InlineKeyboardMarkup" = None
@@ -33,6 +33,8 @@ class StopPoll(Scaffold):
         """Stop a poll which was sent by you.
 
         Stopped polls can't be reopened and nobody will be able to vote in it anymore.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -52,11 +54,11 @@ class StopPoll(Scaffold):
         Example:
             .. code-block:: python
 
-                app.stop_poll(chat_id, message_id)
+                await app.stop_poll(chat_id, message_id)
         """
         poll = (await self.get_messages(chat_id, message_id)).poll
 
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.messages.EditMessage(
                 peer=await self.resolve_peer(chat_id),
                 id=message_id,
@@ -64,7 +66,7 @@ class StopPoll(Scaffold):
                     poll=raw.types.Poll(
                         id=int(poll.id),
                         closed=True,
-                        question="",
+                        question=raw.types.TextWithEntities(text="", entities=[]),
                         answers=[]
                     )
                 ),

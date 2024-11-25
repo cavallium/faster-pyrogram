@@ -23,6 +23,7 @@ import struct
 import typing
 from enum import IntEnum
 from io import BytesIO
+from typing import List
 
 from pyrogram.raw.core import Bytes, String
 
@@ -57,9 +58,11 @@ def b64_decode(s: str) -> bytes:
 
 def rle_encode(s: bytes) -> bytes:
     """Zero-value RLE encoder
+
     Parameters:
         s (``bytes``):
             Bytes to encode
+
     Returns:
         ``bytes``: The encoded bytes
     """
@@ -81,29 +84,32 @@ def rle_encode(s: bytes) -> bytes:
 
     return bytes(r)
 
+
 def rle_decode(s: bytes) -> bytes:
     """Zero-value RLE decoder
 
     Parameters:
         s (``bytes``):
-            Bytes to encode
+            Bytes to decode
 
     Returns:
-        ``bytes``: The encoded bytes
+        ``bytes``: The decoded bytes
     """
-    r = b""
-    i = 0
+    r: List[int] = []
+    z: bool = False
 
-    while i < len(s):
-        if s[i] != 0:
-            r += bytes([s[i]])
+    for b in s:
+        if not b:
+            z = True
+            continue
+
+        if z:
+            r.extend((0,) * b)
+            z = False
         else:
-            r += b"\x00" * s[i + 1]
-            i += 1
+            r.append(b)
 
-        i += 1
-
-    return r
+    return bytes(r)
 
 
 class FileType(IntEnum):
@@ -305,25 +311,25 @@ class FileIdCached:
     _encoded: typing.Optional[str] = None
 
     def __init__(
-            self, *,
-            major: int = MAJOR,
-            minor: int = MINOR,
-            file_type: FileType,
-            dc_id: int,
-            file_reference: bytes = b"",
-            url: str = None,
-            media_id: int = None,
-            access_hash: int = None,
-            volume_id: int = None,
-            thumbnail_source: ThumbnailSource = None,
-            thumbnail_file_type: FileType = None,
-            thumbnail_size: str = "",
-            secret: int = None,
-            local_id: int = None,
-            chat_id: int = None,
-            chat_access_hash: int = None,
-            sticker_set_id: int = None,
-            sticker_set_access_hash: int = None
+        self, *,
+        major: int = MAJOR,
+        minor: int = MINOR,
+        file_type: FileType,
+        dc_id: int,
+        file_reference: bytes = b"",
+        url: str = None,
+        media_id: int = None,
+        access_hash: int = None,
+        volume_id: int = None,
+        thumbnail_source: ThumbnailSource = None,
+        thumbnail_file_type: FileType = None,
+        thumbnail_size: str = "",
+        secret: int = None,
+        local_id: int = None,
+        chat_id: int = None,
+        chat_access_hash: int = None,
+        sticker_set_id: int = None,
+        sticker_set_access_hash: int = None
     ):
         self.major = major
         self.minor = minor
@@ -475,12 +481,12 @@ class FileUniqueIdCached:
     _encoded: typing.Optional[str] = None
 
     def __init__(
-            self, *,
-            file_unique_type: FileUniqueType,
-            url: str = None,
-            media_id: int = None,
-            volume_id: int = None,
-            local_id: int = None
+        self, *,
+        file_unique_type: FileUniqueType,
+        url: str = None,
+        media_id: int = None,
+        volume_id: int = None,
+        local_id: int = None
     ):
         self.file_unique_type = file_unique_type
         self.url = url

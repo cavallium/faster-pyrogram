@@ -16,10 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from typing import List
 
 import pyrogram
-from pyrogram import raw
+from pyrogram import raw, utils
 from pyrogram import types
 from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType
 from ..object import Object
@@ -48,8 +49,11 @@ class VideoNote(Object):
         file_size (``int``, *optional*):
             File size.
 
-        date (``int``, *optional*):
-            Date the video note was sent in Unix time.
+        date (:py:obj:`~datetime.datetime`, *optional*):
+            Date the video note was sent.
+
+        ttl_seconds (``int``, *optional*):
+            Time-to-live seconds, for one-time media.
 
         thumbs (List of :obj:`~pyrogram.types.Thumbnail`, *optional*):
             Video thumbnails.
@@ -66,7 +70,8 @@ class VideoNote(Object):
         thumbs: List["types.Thumbnail"] = None,
         mime_type: str = None,
         file_size: int = None,
-        date: int = None
+        date: datetime = None,
+        ttl_seconds: int = None
     ):
         super().__init__(client)
 
@@ -75,6 +80,7 @@ class VideoNote(Object):
         self.mime_type = mime_type
         self.file_size = file_size
         self.date = date
+        self.ttl_seconds = ttl_seconds
         self.length = length
         self.duration = duration
         self.thumbs = thumbs
@@ -83,7 +89,8 @@ class VideoNote(Object):
     def _parse(
         client,
         video_note: "raw.types.Document",
-        video_attributes: "raw.types.DocumentAttributeVideo"
+        video_attributes: "raw.types.DocumentAttributeVideo",
+        ttl_seconds: int = None
     ) -> "VideoNote":
         return VideoNote(
             file_id=FileId(
@@ -101,7 +108,8 @@ class VideoNote(Object):
             duration=video_attributes.duration,
             file_size=video_note.size,
             mime_type=video_note.mime_type,
-            date=video_note.date,
+            date=utils.timestamp_to_datetime(video_note.date),
+            ttl_seconds=ttl_seconds,
             thumbs=types.Thumbnail._parse(client, video_note),
             client=client
         )

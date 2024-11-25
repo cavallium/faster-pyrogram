@@ -18,31 +18,33 @@
 
 import asyncio
 import os
-import time
 from datetime import datetime
-from typing import Union, Optional
+from typing import Union, Optional, Callable, BinaryIO
 
+import pyrogram
 from pyrogram import types
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
-from pyrogram.scaffold import Scaffold
 
 DEFAULT_DOWNLOAD_DIR = "downloads/"
 
 
-class DownloadMedia(Scaffold):
+class DownloadMedia:
     async def download_media(
-        self,
-        message: Union["types.Message", str],
+        self: "pyrogram.Client",
+        message: Union["types.Message", "types.Story", str],
         file_name: str = DEFAULT_DOWNLOAD_DIR,
+        in_memory: bool = False,
         block: bool = True,
-        progress: callable = None,
+        progress: Callable = None,
         progress_args: tuple = ()
-    ) -> Optional[str]:
+    ) -> Optional[Union[str, BinaryIO]]:
         """Download the media from a message.
 
+        .. include:: /_includes/usable-by/users-bots.rst
+
         Parameters:
-            message (:obj:`~pyrogram.types.Message` | ``str``):
-                Pass a Message containing the media, the media itself (message.audio, message.video, ...) or a file id
+            message (:obj:`~pyrogram.types.Message` | :obj:`~pyrogram.types.Story` | ``str``):
+                Pass a Message or Story containing the media, the media itself (message.audio, message.video, ...) or a file id
                 as string.
 
             file_name (``str``, *optional*):
@@ -51,11 +53,16 @@ class DownloadMedia(Scaffold):
                 You can also specify a path for downloading files in a custom location: paths that end with "/"
                 are considered directories. All non-existent folders will be created automatically.
 
+            in_memory (``bool``, *optional*):
+                Pass True to download the media in-memory.
+                A binary file-like object with its attribute ".name" set will be returned.
+                Defaults to False.
+
             block (``bool``, *optional*):
                 Blocks the code execution until the file has been downloaded.
                 Defaults to True.
 
-            progress (``callable``, *optional*):
+            progress (``Callable``, *optional*):
                 Pass a callback function to view the file transmission progress.
                 The function must take *(current, total)* as positional arguments (look at Other Parameters below for a
                 detailed description) and will be called back each time a new file chunk has been successfully
@@ -78,41 +85,67 @@ class DownloadMedia(Scaffold):
                 You can either keep ``*args`` or add every single extra argument in your function signature.
 
         Returns:
-            ``str`` | ``None``: On success, the absolute path of the downloaded file is returned, otherwise, in case
-            the download failed or was deliberately stopped with :meth:`~pyrogram.Client.stop_transmission`, None is
-            returned.
+            ``str`` | ``None`` | ``BinaryIO``: On success, the absolute path of the downloaded file is returned,
+            otherwise, in case the download failed or was deliberately stopped with
+            :meth:`~pyrogram.Client.stop_transmission`, None is returned.
+            Otherwise, in case ``in_memory=True``, a binary file-like object with its attribute ".name" set is returned.
 
         Raises:
             ValueError: if the message doesn't contain any downloadable media
 
         Example:
+            Download media to file
+
             .. code-block:: python
 
                 # Download from Message
-                app.download_media(message)
+                await app.download_media(message)
 
                 # Download from file id
-                app.download_media(message.photo.file_id)
+                await app.download_media(message.photo.file_id)
+
+                # Download document of a message
+                await app.download_media(message.document)
 
                 # Keep track of the progress while downloading
-                def progress(current, total):
+                async def progress(current, total):
                     print(f"{current * 100 / total:.1f}%")
 
-                app.download_media(message, progress=progress)
+                await app.download_media(message, progress=progress)
+
+            Download media in-memory
+
+            .. code-block:: python
+
+                file = await app.download_media(message, in_memory=True)
+
+                file_name = file.name
+                file_bytes = bytes(file.getbuffer())
         """
         available_media = ("audio", "document", "photo", "sticker", "animation", "video", "voice", "video_note",
                            "new_chat_photo")
 
-        if isinstance(message, types.Message):
+        media = None
+
+        if isinstance(message, types.Message) and message.media:
             for kind in available_media:
-                media = getattr(message, kind, None)
+                story = message.story or message.reply_to_story
+                if story:
+                    media = getattr(story, kind, None)
+                else:
+                    media = getattr(message, kind, None)
 
                 if media is not None:
                     break
-            else:
-                raise ValueError("This message doesn't contain any downloadable media")
-        else:
+        elif isinstance(message, types.Story):
+            media = getattr(message, message.media.value, None)
+        elif isinstance(message, str):
             media = message
+        elif hasattr(message, "file_id"):
+            media = getattr(message, "file_id")
+
+        if not media:
+            raise ValueError("This message doesn't contain any downloadable media")
 
         if isinstance(media, str):
             file_id_str = media
@@ -125,7 +158,7 @@ class DownloadMedia(Scaffold):
         media_file_name = getattr(media, "file_name", "")
         file_size = getattr(media, "file_size", 0)
         mime_type = getattr(media, "mime_type", "")
-        date = getattr(media, "date", 0)
+        date = getattr(media, "date", None)
 
         directory, file_name = os.path.split(file_name)
         file_name = file_name or media_file_name or ""
@@ -153,12 +186,14 @@ class DownloadMedia(Scaffold):
 
             file_name = "{}_{}_{}{}".format(
                 FileType(file_id_obj.file_type).name.lower(),
-                datetime.fromtimestamp(date or time.time()).strftime("%Y-%m-%d_%H-%M-%S"),
+                (date or datetime.now()).strftime("%Y-%m-%d_%H-%M-%S"),
                 self.rnd_id(),
                 extension
             )
 
-        downloader = self.handle_download((file_id_obj, directory, file_name, file_size, progress, progress_args))
+        downloader = self.handle_download(
+            (file_id_obj, directory, file_name, in_memory, file_size, progress, progress_args)
+        )
 
         if block:
             return await downloader

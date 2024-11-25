@@ -18,20 +18,22 @@
 
 from typing import Union
 
+import pyrogram
 from pyrogram import raw
-from pyrogram.scaffold import Scaffold
 
 
-class ApproveChatJoinRequest(Scaffold):
+class ApproveChatJoinRequest:
     async def approve_chat_join_request(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         user_id: int,
     ) -> bool:
         """Approve a chat join request.
 
-        The bot must be an administrator in the chat for this to work and must have the *can_invite_users* administrator
+        You must be an administrator in the chat for this to work and must have the *can_invite_users* administrator
         right.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -44,7 +46,7 @@ class ApproveChatJoinRequest(Scaffold):
         Returns:
             ``bool``: True on success.
         """
-        await self.send(
+        await self.invoke(
             raw.functions.messages.HideChatJoinRequest(
                 peer=await self.resolve_peer(chat_id),
                 user_id=await self.resolve_peer(user_id),

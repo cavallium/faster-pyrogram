@@ -17,10 +17,6 @@ are only returned by other methods. You also don't need to import them, unless y
 
     To tell whether a field is set or not, do a simple boolean check: ``if message.photo: ...``.
 
-.. contents:: Contents
-    :backlinks: none
-    :local:
-
 -----
 
 .. currentmodule:: pyrogram.types
@@ -51,18 +47,31 @@ Messages & Media
 
     {messages_media}
 
-Bots & Keyboards
-----------------
+Bot keyboards
+-------------
 
 .. autosummary::
     :nosignatures:
 
-    {bots_keyboard}
+    {bot_keyboards}
 
 .. toctree::
     :hidden:
 
-    {bots_keyboard}
+    {bot_keyboards}
+
+Bot commands
+-------------
+
+.. autosummary::
+    :nosignatures:
+
+    {bot_commands}
+
+.. toctree::
+    :hidden:
+
+    {bot_commands}
 
 Input Media
 -----------
@@ -115,3 +124,16 @@ Authorization
     :hidden:
 
     {authorization}
+
+InputPrivacyRule
+----------------
+
+.. autosummary::
+    :nosignatures:
+
+    {input_privacy_rule}
+
+.. toctree::
+    :hidden:
+
+    {input_privacy_rule}

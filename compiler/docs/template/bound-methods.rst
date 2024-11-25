@@ -19,10 +19,6 @@ some of the required arguments.
 
     app.run()
 
-.. contents:: Contents
-    :backlinks: none
-    :local:
-
 -----
 
 .. currentmodule:: pyrogram.types
@@ -92,6 +88,32 @@ InlineQuery
 
     {inline_query_toctree}
 
+PreCheckoutQuery
+----------------
+
+.. hlist::
+    :columns: 2
+
+    {pre_checkout_query_hlist}
+
+.. toctree::
+    :hidden:
+
+    {pre_checkout_query_toctree}
+
+ShippingQuery
+----------------
+
+.. hlist::
+    :columns: 2
+
+    {shipping_query_hlist}
+
+.. toctree::
+    :hidden:
+
+    {shipping_query_toctree}
+
 ChatJoinRequest
 ---------------
 
@@ -105,3 +127,54 @@ ChatJoinRequest
 
     {chat_join_request_toctree}
 
+Story
+-----
+
+.. hlist::
+    :columns: 3
+
+    {story_hlist}
+
+.. toctree::
+    :hidden:
+
+    {story_toctree}
+
+Folder
+------
+
+.. hlist::
+    :columns: 2
+
+    {folder_hlist}
+
+.. toctree::
+    :hidden:
+
+    {folder_toctree}
+
+ActiveSession
+-------------
+
+.. hlist::
+    :columns: 2
+
+    {active_session_hlist}
+
+.. toctree::
+    :hidden:
+
+    {active_session_toctree}
+
+StarGift
+--------
+
+.. hlist::
+    :columns: 2
+
+    {star_gift_hlist}
+
+.. toctree::
+    :hidden:
+
+    {star_gift_toctree}

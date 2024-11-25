@@ -16,19 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable
+from typing import Callable, Optional, Union
 
 import pyrogram
 from pyrogram.filters import Filter
-from pyrogram.scaffold import Scaffold
 
 
-class OnDeletedMessages(Scaffold):
+class OnDeletedMessages:
     def on_deleted_messages(
-        self=None,
-        filters=None,
-        group: int = 0
-    ) -> callable:
+        self: Union["OnDeletedMessages", Filter, None] = None,
+        filters: Optional[Filter] = None,
+        group: int = 0,
+    ) -> Callable:
         """Decorator for handling deleted messages.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the

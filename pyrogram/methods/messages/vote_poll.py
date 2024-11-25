@@ -18,19 +18,21 @@
 
 from typing import Union, List
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class VotePoll(Scaffold):
+class VotePoll:
     async def vote_poll(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
-        message_id: id,
+        message_id: int,
         options: Union[int, List[int]]
     ) -> "types.Poll":
         """Vote a poll.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -41,7 +43,7 @@ class VotePoll(Scaffold):
             message_id (``int``):
                 Identifier of the original message with the poll.
 
-            options (``Int`` | List of ``int``):
+            options (``int`` | List of ``int``):
                 Index or list of indexes (for multiple answers) of the poll option(s) you want to vote for (0 to 9).
 
         Returns:
@@ -50,13 +52,13 @@ class VotePoll(Scaffold):
         Example:
             .. code-block:: python
 
-                app.vote_poll(chat_id, message_id, 6)
+                await app.vote_poll(chat_id, message_id, 6)
         """
 
         poll = (await self.get_messages(chat_id, message_id)).poll
         options = [options] if not isinstance(options, list) else options
 
-        r = await self.send(
+        r = await self.invoke(
             raw.functions.messages.SendVote(
                 peer=await self.resolve_peer(chat_id),
                 msg_id=message_id,

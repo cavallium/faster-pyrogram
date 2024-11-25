@@ -19,27 +19,30 @@
 import os
 from typing import Union, BinaryIO
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import utils
+from pyrogram import types
 from pyrogram.file_id import FileType
-from pyrogram.scaffold import Scaffold
 
 
-class SetChatPhoto(Scaffold):
+class SetChatPhoto:
     async def set_chat_photo(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         *,
         photo: Union[str, BinaryIO] = None,
         video: Union[str, BinaryIO] = None,
         video_start_ts: float = None,
-    ) -> bool:
+    ) -> "types.Message":
         """Set a new chat photo or video (H.264/MPEG-4 AVC video, max 5 seconds).
 
         The ``photo`` and ``video`` arguments are mutually exclusive.
         Pass either one as named argument (see examples below).
 
         You must be an administrator in the chat for this to work and must have the appropriate admin rights.
+
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -59,7 +62,7 @@ class SetChatPhoto(Scaffold):
                 The timestamp in seconds of the video frame to use as photo profile preview.
 
         Returns:
-            ``bool``: True on success.
+            :obj:`~pyrogram.types.Message`: On success, the sent service message is returned.
 
         Raises:
             ValueError: if a chat_id belongs to user.
@@ -68,17 +71,17 @@ class SetChatPhoto(Scaffold):
             .. code-block:: python
 
                 # Set chat photo using a local file
-                app.set_chat_photo(chat_id, photo="photo.jpg")
+                await app.set_chat_photo(chat_id, photo="photo.jpg")
 
-                # Set chat photo using an exiting Photo file_id
-                app.set_chat_photo(chat_id, photo=photo.file_id)
+                # Set chat photo using an existing Photo file_id
+                await app.set_chat_photo(chat_id, photo=photo.file_id)
 
 
                 # Set chat video using a local file
-                app.set_chat_photo(chat_id, video="video.mp4")
+                await app.set_chat_photo(chat_id, video="video.mp4")
 
-                # Set chat photo using an exiting Video file_id
-                app.set_chat_photo(chat_id, video=video.file_id)
+                # Set chat photo using an existing Video file_id
+                await app.set_chat_photo(chat_id, video=video.file_id)
         """
         peer = await self.resolve_peer(chat_id)
 
@@ -100,14 +103,14 @@ class SetChatPhoto(Scaffold):
             )
 
         if isinstance(peer, raw.types.InputPeerChat):
-            await self.send(
+            r = await self.invoke(
                 raw.functions.messages.EditChatPhoto(
                     chat_id=peer.chat_id,
                     photo=photo,
                 )
             )
         elif isinstance(peer, raw.types.InputPeerChannel):
-            await self.send(
+            r = await self.invoke(
                 raw.functions.channels.EditPhoto(
                     channel=peer,
                     photo=photo
@@ -116,4 +119,15 @@ class SetChatPhoto(Scaffold):
         else:
             raise ValueError(f'The chat_id "{chat_id}" belongs to a user')
 
-        return True
+        for i in r.updates:
+            if isinstance(i, (raw.types.UpdateNewMessage,
+                              raw.types.UpdateNewChannelMessage,
+                              raw.types.UpdateNewScheduledMessage,
+                              raw.types.UpdateBotNewBusinessMessage)):
+                return await types.Message._parse(
+                    self, i.message,
+                    {i.id: i for i in r.users},
+                    {i.id: i for i in r.chats},
+                    is_scheduled=isinstance(i, raw.types.UpdateNewScheduledMessage),
+                    business_connection_id=getattr(i, "connection_id", None)
+                )

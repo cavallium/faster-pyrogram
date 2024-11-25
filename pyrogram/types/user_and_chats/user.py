@@ -17,9 +17,11 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 import html
-from typing import List, Optional
+from datetime import datetime
+from typing import List, Optional, Union
 
 import pyrogram
+from pyrogram import enums, utils
 from pyrogram import raw
 from pyrogram import types
 from ..object import Object
@@ -28,9 +30,9 @@ from ..update import Update
 
 class Link(str):
     HTML = "<a href={url}>{text}</a>"
-    MD = "[{text}]({url})"
+    MARKDOWN = "[{text}]({url})"
 
-    def __init__(self, url: str, text: str, style: str):
+    def __init__(self, url: str, text: str, style: enums.ParseMode):
         super().__init__()
 
         self.url = url
@@ -38,13 +40,11 @@ class Link(str):
         self.style = style
 
     @staticmethod
-    def format(url: str, text: str, style: str):
-        if style in ["md", "markdown"]:
-            fmt = Link.MD
-        elif style in ["combined", "html", None]:
-            fmt = Link.HTML
+    def format(url: str, text: str, style: enums.ParseMode):
+        if style == enums.ParseMode.MARKDOWN:
+            fmt = Link.MARKDOWN
         else:
-            raise ValueError(f"{style} is not a valid style/parse mode")
+            fmt = Link.HTML
 
         return fmt.format(url=url, text=html.escape(text))
 
@@ -97,34 +97,50 @@ class User(Object, Update):
         is_support (``bool``, *optional*):
             True, if this user is part of the Telegram support team.
 
+        is_premium (``bool``, *optional*):
+            True, if this user is a premium user.
+
+        is_contact_require_premium (``bool``, *optional*):
+            True, if this user requires premium to send messages to him.
+
+        is_close_friend (``bool``, *optional*):
+            True, if this user is a close friend.
+
+        is_stories_hidden (``bool``, *optional*):
+            True, if this user has hidden stories.
+
+        is_stories_unavailable (``bool``, *optional*):
+            True, if this user stories is unavailable.
+
+        is_business_bot (``bool``, *optional*):
+            True, if this bot can connect to business account.
+
         first_name (``str``, *optional*):
             User's or bot's first name.
 
         last_name (``str``, *optional*):
             User's or bot's last name.
 
-        status (``str``, *optional*):
-            User's Last Seen & Online status.
-            Can be one of the following:
-            "*online*", user is online right now.
-            "*offline*", user is currently offline.
-            "*recently*", user with hidden last seen time who was online between 1 second and 2-3 days ago.
-            "*within_week*", user with hidden last seen time who was online between 2-3 and seven days ago.
-            "*within_month*", user with hidden last seen time who was online between 6-7 days and a month ago.
-            "*long_time_ago*", blocked user or user with hidden last seen time who was online more than a month ago.
-            *None*, for bots.
+        status (:obj:`~pyrogram.enums.UserStatus`, *optional*):
+            User's last seen & online status. ``None``, for bots.
 
-        last_online_date (``int``, *optional*):
-            Last online date of a user, unix time. Only available in case status is "*offline*".
+        last_online_date (:py:obj:`~datetime.datetime`, *optional*):
+            Last online date of a user. Only available in case status is :obj:`~pyrogram.enums.UserStatus.OFFLINE`.
 
-        next_offline_date (``int``, *optional*):
-            Date when a user will automatically go offline, unix time. Only available in case status is "*online*".
+        next_offline_date (:py:obj:`~datetime.datetime`, *optional*):
+            Date when a user will automatically go offline. Only available in case status is :obj:`~pyrogram.enums.UserStatus.ONLINE`.
 
         username (``str``, *optional*):
             User's or bot's username.
 
+        usernames (List of :obj:`~pyrogram.types.Username`, *optional*):
+            The list of user's collectible (and basic) usernames if available.
+
         language_code (``str``, *optional*):
             IETF language tag of the user's language.
+
+        emoji_status (:obj:`~pyrogram.types.EmojiStatus`, *optional*):
+            Emoji status.
 
         dc_id (``int``, *optional*):
             User's or bot's assigned DC (data center). Available only in case the user has set a public profile photo.
@@ -142,11 +158,50 @@ class User(Object, Update):
             The list of reasons why this bot might be unavailable to some users.
             This field is available only in case *is_restricted* is True.
 
+        reply_color (:obj:`~pyrogram.types.ChatColor`, *optional*):
+            Chat reply color.
+
+        profile_color (:obj:`~pyrogram.types.ChatColor`, *optional*):
+            Chat profile color.
+
+        added_to_attachment_menu (``bool``, *optional*):
+            True, if this user added the bot to the attachment menu.
+
+        active_users_count (``int``, *optional*):
+            The number of recently (monthly) active users of the bot.
+
+        inline_need_location (``bool``, *optional*):
+            True, if the bot supports inline `user location <https://core.telegram.org/bots/inline#location-based-results>`_ requests. Returned only in get_me.
+
+        inline_query_placeholder (``str``, *optional*):
+            Placeholder for inline queries (displayed on the application input field).
+
+        can_be_edited (``bool``, *optional*):
+            True, if the current user can edit this bot's profile picture.
+
+        can_be_added_to_attachment_menu (``bool``, *optional*):
+            True, if the bot can be added to attachment or side menu.
+
+        can_join_groups (``bool``, *optional*):
+            True, if the bot can be invited to groups. Returned only in get_me.
+
+        can_read_all_group_messages (``bool``, *optional*):
+            True, if privacy mode is disabled for the bot. Returned only in get_me.
+
+        has_main_web_app (``bool``, *optional*):
+            True, if the bot has a main Web App. Returned only in get_me.
+
+        raw (:obj:`~pyrogram.raw.base.User` | :obj:`~pyrogram.raw.base.UserStatus`, *optional*):
+            The raw user or user status object, as received from the Telegram API.
+
         mention (``str``, *property*):
             Generate a text mention for this user.
             You can use ``user.mention()`` to mention the user using their first name (styled using html), or
             ``user.mention("another name")`` for a custom name. To choose a different style
             ("html" or "md"/"markdown") use ``user.mention(style="md")``.
+
+        full_name (``str``, *property*):
+            Full name of the other party in a private chat, for private chats and bots.
     """
 
     def __init__(
@@ -164,17 +219,37 @@ class User(Object, Update):
         is_scam: bool = None,
         is_fake: bool = None,
         is_support: bool = None,
+        is_premium: bool = None,
+        is_contact_require_premium: bool = None,
+        is_close_friend: bool = None,
+        is_stories_hidden: bool = None,
+        is_stories_unavailable: bool = None,
+        is_business_bot: bool = None,
         first_name: str = None,
         last_name: str = None,
-        status: str = None,
-        last_online_date: int = None,
-        next_offline_date: int = None,
+        status: "enums.UserStatus" = None,
+        last_online_date: datetime = None,
+        next_offline_date: datetime = None,
         username: str = None,
+        usernames: List["types.Username"] = None,
         language_code: str = None,
+        emoji_status: Optional["types.EmojiStatus"] = None,
         dc_id: int = None,
         phone_number: str = None,
         photo: "types.ChatPhoto" = None,
-        restrictions: List["types.Restriction"] = None
+        restrictions: List["types.Restriction"] = None,
+        reply_color: "types.ChatColor" = None,
+        profile_color: "types.ChatColor" = None,
+        added_to_attachment_menu: bool = None,
+        active_users_count: int = None,
+        inline_need_location: bool = None,
+        inline_query_placeholder: str = None,
+        can_be_edited: bool = None,
+        can_be_added_to_attachment_menu: bool = None,
+        can_join_groups: bool = None,
+        can_read_all_group_messages: bool = None,
+        has_main_web_app: bool = None,
+        raw: Union["raw.base.User", "raw.base.UserStatus"] = None
     ):
         super().__init__(client)
 
@@ -189,25 +264,53 @@ class User(Object, Update):
         self.is_scam = is_scam
         self.is_fake = is_fake
         self.is_support = is_support
+        self.is_premium = is_premium
+        self.is_contact_require_premium = is_contact_require_premium
+        self.is_close_friend = is_close_friend
+        self.is_stories_hidden = is_stories_hidden
+        self.is_stories_unavailable = is_stories_unavailable
+        self.is_business_bot = is_business_bot
         self.first_name = first_name
         self.last_name = last_name
         self.status = status
         self.last_online_date = last_online_date
         self.next_offline_date = next_offline_date
         self.username = username
+        self.usernames = usernames
         self.language_code = language_code
+        self.emoji_status = emoji_status
         self.dc_id = dc_id
         self.phone_number = phone_number
         self.photo = photo
         self.restrictions = restrictions
+        self.reply_color = reply_color
+        self.profile_color = profile_color
+        self.added_to_attachment_menu = added_to_attachment_menu
+        self.active_users_count = active_users_count
+        self.inline_need_location = inline_need_location
+        self.inline_query_placeholder = inline_query_placeholder
+        self.can_be_edited = can_be_edited
+        self.can_be_added_to_attachment_menu = can_be_added_to_attachment_menu
+        self.can_join_groups = can_join_groups
+        self.can_read_all_group_messages = can_read_all_group_messages
+        self.has_main_web_app = has_main_web_app
+        self.raw = raw
+
+    @property
+    def full_name(self) -> str:
+        return " ".join(filter(None, [self.first_name, self.last_name])) or None
 
     @property
     def mention(self):
-        return Link(f"tg://user?id={self.id}", self.first_name, self._client.parse_mode)
+        return Link(
+            f"tg://user?id={self.id}",
+            self.first_name or "Deleted Account",
+            self._client.parse_mode
+        )
 
     @staticmethod
-    def _parse(client, user: "raw.types.User") -> Optional["User"]:
-        if user is None:
+    def _parse(client, user: "raw.base.User") -> Optional["User"]:
+        if user is None or isinstance(user, raw.types.UserEmpty):
             return None
 
         return User(
@@ -222,32 +325,52 @@ class User(Object, Update):
             is_scam=user.scam,
             is_fake=user.fake,
             is_support=user.support,
+            is_premium=user.premium,
+            is_contact_require_premium=user.contact_require_premium,
+            is_close_friend=user.close_friend,
+            is_stories_hidden=user.stories_hidden,
+            is_stories_unavailable=user.stories_unavailable,
+            is_business_bot=user.bot_business,
             first_name=user.first_name,
             last_name=user.last_name,
             **User._parse_status(user.status, user.bot),
-            username=user.username,
+            username=user.username or (user.usernames[0].username if user.usernames else None),
+            usernames=types.List([types.Username._parse(r) for r in user.usernames]) or None,
             language_code=user.lang_code,
+            emoji_status=types.EmojiStatus._parse(client, user.emoji_status),
             dc_id=getattr(user.photo, "dc_id", None),
             phone_number=user.phone,
             photo=types.ChatPhoto._parse(client, user.photo, user.id, user.access_hash),
             restrictions=types.List([types.Restriction._parse(r) for r in user.restriction_reason]) or None,
+            reply_color=types.ChatColor._parse(getattr(user, "color", None)),
+            profile_color=types.ChatColor._parse_profile_color(getattr(user, "profile_color", None)),
+            added_to_attachment_menu=getattr(user, "attach_menu_enabled", None),
+            active_users_count=getattr(user, "bot_active_users", None),
+            inline_need_location=getattr(user, "bot_inline_geo", None),
+            inline_query_placeholder=getattr(user, "bot_inline_placeholder", None),
+            can_be_edited=getattr(user, "bot_can_edit", None),
+            can_be_added_to_attachment_menu=getattr(user, "bot_attach_menu", None),
+            can_join_groups=getattr(user, "bot_nochats", None),
+            can_read_all_group_messages=getattr(user, "bot_chat_history", None),
+            has_main_web_app=getattr(user, "bot_has_main_app", None),
+            raw=user,
             client=client
         )
 
     @staticmethod
     def _parse_status(user_status: "raw.base.UserStatus", is_bot: bool = False):
         if isinstance(user_status, raw.types.UserStatusOnline):
-            status, date = "online", user_status.expires
+            status, date = enums.UserStatus.ONLINE, user_status.expires
         elif isinstance(user_status, raw.types.UserStatusOffline):
-            status, date = "offline", user_status.was_online
+            status, date = enums.UserStatus.OFFLINE, user_status.was_online
         elif isinstance(user_status, raw.types.UserStatusRecently):
-            status, date = "recently", None
+            status, date = enums.UserStatus.RECENTLY, None
         elif isinstance(user_status, raw.types.UserStatusLastWeek):
-            status, date = "within_week", None
+            status, date = enums.UserStatus.LAST_WEEK, None
         elif isinstance(user_status, raw.types.UserStatusLastMonth):
-            status, date = "within_month", None
+            status, date = enums.UserStatus.LAST_MONTH, None
         else:
-            status, date = "long_time_ago", None
+            status, date = enums.UserStatus.LONG_AGO, None
 
         last_online_date = None
         next_offline_date = None
@@ -255,11 +378,11 @@ class User(Object, Update):
         if is_bot:
             status = None
 
-        if status == "online":
-            next_offline_date = date
+        if status == enums.UserStatus.ONLINE:
+            next_offline_date = utils.timestamp_to_datetime(date)
 
-        if status == "offline":
-            last_online_date = date
+        if status == enums.UserStatus.OFFLINE:
+            last_online_date = utils.timestamp_to_datetime(date)
 
         return {
             "status": status,
@@ -272,6 +395,7 @@ class User(Object, Update):
         return User(
             id=user_status.user_id,
             **User._parse_status(user_status.status),
+            raw=user_status,
             client=client
         )
 
@@ -282,12 +406,12 @@ class User(Object, Update):
 
         .. code-block:: python
 
-            client.archive_chats(123456789)
+            await client.archive_chats(123456789)
 
         Example:
             .. code-block:: python
 
-                user.archive()
+               await user.archive()
 
         Returns:
             True on success.
@@ -305,12 +429,12 @@ class User(Object, Update):
 
         .. code-block:: python
 
-            client.unarchive_chats(123456789)
+            await client.unarchive_chats(123456789)
 
         Example:
             .. code-block:: python
 
-                user.unarchive()
+                await user.unarchive()
 
         Returns:
             True on success.
@@ -328,12 +452,12 @@ class User(Object, Update):
 
         .. code-block:: python
 
-            client.block_user(123456789)
+            await client.block_user(123456789)
 
         Example:
             .. code-block:: python
 
-                user.block()
+                await user.block()
 
         Returns:
             True on success.

@@ -16,10 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List
+from datetime import datetime
+from typing import List, Dict, Type
 
 import pyrogram
-from pyrogram import raw
+from pyrogram import raw, utils
 from pyrogram import types
 from pyrogram.errors import StickersetInvalid
 from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType
@@ -44,10 +45,13 @@ class Sticker(Object):
             Sticker height.
 
         is_animated (``bool``):
-            True, if the sticker is animated
+            True, if the sticker is animated.
 
         is_video (``bool``):
-            True, if the sticker is a video sticker
+            True, if the sticker is a video sticker.
+
+        is_premium (``bool``):
+            True, if the sticker is a premium only.
 
         file_name (``str``, *optional*):
             Sticker file name.
@@ -58,8 +62,8 @@ class Sticker(Object):
         file_size (``int``, *optional*):
             File size.
 
-        date (``int``, *optional*):
-            Date the sticker was sent in Unix time.
+        date (:py:obj:`~datetime.datetime`, *optional*):
+            Date the sticker was sent.
 
         emoji (``str``, *optional*):
             Emoji associated with the sticker.
@@ -83,10 +87,11 @@ class Sticker(Object):
         height: int,
         is_animated: bool,
         is_video: bool,
+        is_premium: bool,
         file_name: str = None,
         mime_type: str = None,
         file_size: int = None,
-        date: int = None,
+        date: datetime = None,
         emoji: str = None,
         set_name: str = None,
         thumbs: List["types.Thumbnail"] = None
@@ -103,6 +108,7 @@ class Sticker(Object):
         self.height = height
         self.is_animated = is_animated
         self.is_video = is_video
+        self.is_premium = is_premium
         self.emoji = emoji
         self.set_name = set_name
         self.thumbs = thumbs
@@ -111,7 +117,7 @@ class Sticker(Object):
     cache = {}
 
     @staticmethod
-    async def _get_sticker_set_name(send, input_sticker_set_id):
+    async def _get_sticker_set_name(invoke, input_sticker_set_id):
         try:
             set_id = input_sticker_set_id[0]
             set_access_hash = input_sticker_set_id[1]
@@ -121,7 +127,7 @@ class Sticker(Object):
             if name is not None:
                 return name
 
-            name = (await send(
+            name = (await invoke(
                 raw.functions.messages.GetStickerSet(
                     stickerset=raw.types.InputStickerSetID(
                         id=set_id,
@@ -145,15 +151,23 @@ class Sticker(Object):
     async def _parse(
         client,
         sticker: "raw.types.Document",
-        image_size_attributes: "raw.types.DocumentAttributeImageSize",
-        sticker_attributes: "raw.types.DocumentAttributeSticker",
-        file_name: str
+        document_attributes: Dict[Type["raw.base.DocumentAttribute"], "raw.base.DocumentAttribute"],
     ) -> "Sticker":
+        sticker_attributes = (
+            document_attributes[raw.types.DocumentAttributeSticker]
+            if raw.types.DocumentAttributeSticker in document_attributes
+            else document_attributes[raw.types.DocumentAttributeCustomEmoji]
+        )
+
+        image_size_attributes = document_attributes.get(raw.types.DocumentAttributeImageSize, None)
+        file_name = getattr(document_attributes.get(raw.types.DocumentAttributeFilename, None), "file_name", None)
+        video_attributes = document_attributes.get(raw.types.DocumentAttributeVideo, None)
+
         sticker_set = sticker_attributes.stickerset
 
         if isinstance(sticker_set, raw.types.InputStickerSetID):
             # input_sticker_set_id = (sticker_set.id, sticker_set.access_hash)
-            set_name = None # await Sticker._get_sticker_set_name(client.send, input_sticker_set_id)
+            set_name = None # set_name = await Sticker._get_sticker_set_name(client.invoke, input_sticker_set_id)
         else:
             set_name = None
 
@@ -169,17 +183,30 @@ class Sticker(Object):
                 file_unique_type=FileUniqueType.DOCUMENT,
                 media_id=sticker.id
             ).encode(),
-            width=image_size_attributes.w if image_size_attributes else 512,
-            height=image_size_attributes.h if image_size_attributes else 512,
+            width=(
+                image_size_attributes.w
+                if image_size_attributes
+                else video_attributes.w
+                if video_attributes
+                else 512
+            ),
+            height=(
+                image_size_attributes.h
+                if image_size_attributes
+                else video_attributes.h
+                if video_attributes
+                else 512
+            ),
             is_animated=sticker.mime_type == "application/x-tgsticker",
             is_video=sticker.mime_type == "video/webm",
+            is_premium=bool(sticker.video_thumbs),
             # TODO: mask_position
             set_name=set_name,
             emoji=sticker_attributes.alt or None,
             file_size=sticker.size,
             mime_type=sticker.mime_type,
             file_name=file_name,
-            date=sticker.date,
+            date=utils.timestamp_to_datetime(sticker.date),
             thumbs=types.Thumbnail._parse(client, sticker),
             client=client
         )

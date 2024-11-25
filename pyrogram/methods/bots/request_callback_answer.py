@@ -16,22 +16,25 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from typing import Union, Optional
 
-from pyrogram import raw
-from pyrogram.scaffold import Scaffold
+import pyrogram
+from pyrogram import raw, utils
 
 
-class RequestCallbackAnswer(Scaffold):
+class RequestCallbackAnswer:
     async def request_callback_answer(
-        self,
+        self: "pyrogram.Client",
         chat_id: Union[int, str],
         message_id: int,
         callback_data: Union[str, bytes],
+        password: Optional[str] = None,
         timeout: int = 10
     ):
         """Request a callback answer from bots.
         This is the equivalent of clicking an inline button containing callback data.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -45,6 +48,10 @@ class RequestCallbackAnswer(Scaffold):
             callback_data (``str`` | ``bytes``):
                 Callback data associated with the inline button you want to get the answer from.
 
+            password (``str``, *optional*):
+                When clicking certain buttons (such as BotFather's confirmation button to transfer ownership), if your account has 2FA enabled, you need to provide your account's password.
+                The 2-step verification password for the current user. Only applicable, if the :obj:`~pyrogram.types.InlineKeyboardButton` contains ``callback_data_with_password``.
+
             timeout (``int``, *optional*):
                 Timeout in seconds.
 
@@ -54,21 +61,30 @@ class RequestCallbackAnswer(Scaffold):
 
         Raises:
             TimeoutError: In case the bot fails to answer within 10 seconds.
+            ValueError: In case of invalid arguments.
+            RPCError: In case of Telegram RPC error.
 
         Example:
             .. code-block:: python
 
-                app.request_callback_answer(chat_id, message_id, "callback_data")
+                await app.request_callback_answer(chat_id, message_id, "callback_data")
         """
 
         # Telegram only wants bytes, but we are allowed to pass strings too.
         data = bytes(callback_data, "utf-8") if isinstance(callback_data, str) else callback_data
 
-        return await self.send(
+        if password:
+            r = await self.invoke(
+                raw.functions.account.GetPassword()
+            )
+            password = utils.compute_password_check(r, password)
+
+        return await self.invoke(
             raw.functions.messages.GetBotCallbackAnswer(
                 peer=await self.resolve_peer(chat_id),
                 msg_id=message_id,
-                data=data
+                data=data,
+                password=password
             ),
             retries=0,
             timeout=timeout

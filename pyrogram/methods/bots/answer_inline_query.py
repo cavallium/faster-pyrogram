@@ -16,18 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List
+from typing import Iterable
 
+import pyrogram
 from pyrogram import raw
 from pyrogram import types
-from pyrogram.scaffold import Scaffold
 
 
-class AnswerInlineQuery(Scaffold):
+class AnswerInlineQuery:
     async def answer_inline_query(
-        self,
+        self: "pyrogram.Client",
         inline_query_id: str,
-        results: List["types.InlineQueryResult"],
+        results: Iterable["types.InlineQueryResult"],
         cache_time: int = 300,
         is_gallery: bool = False,
         is_personal: bool = False,
@@ -38,6 +38,8 @@ class AnswerInlineQuery(Scaffold):
         """Send answers to an inline query.
 
         A maximum of 50 results per query is allowed.
+
+        .. include:: /_includes/usable-by/bots.rst
 
         Parameters:
             inline_query_id (``str``):
@@ -86,7 +88,7 @@ class AnswerInlineQuery(Scaffold):
 
                 from pyrogram.types import InlineQueryResultArticle, InputTextMessageContent
 
-                app.answer_inline_query(
+                await app.answer_inline_query(
                     inline_query_id,
                     results=[
                         InlineQueryResultArticle(
@@ -94,7 +96,7 @@ class AnswerInlineQuery(Scaffold):
                             InputTextMessageContent("Message content"))])
         """
 
-        return await self.send(
+        return await self.invoke(
             raw.functions.messages.SetInlineBotResults(
                 query_id=int(inline_query_id),
                 results=[await r.write(self) for r in results],
