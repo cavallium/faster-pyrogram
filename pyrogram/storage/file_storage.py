@@ -64,9 +64,9 @@ class FileStorage(SQLiteStorage):
         self.conn = sqlite3.connect(str(path), timeout=1, check_same_thread=False)
 
         with self.conn:
-            self.conn.execute("PRAGMA journal_mode=OFF").close()
+            self.conn.execute("PRAGMA journal_mode=WAL").close()
             self.conn.execute("PRAGMA synchronous=NORMAL").close()
-            self.conn.execute("PRAGMA temp_store=0").close()
+            self.conn.execute("PRAGMA temp_store=1").close()
 
     async def update(self):
         version = await self.version()
