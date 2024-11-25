@@ -56,9 +56,29 @@ class FileStorage(SQLiteStorage):
 
         self.database = workdir / (self.name + self.FILE_EXTENSION)
 
+    def _vacuum(self):
+        with self.conn:
+            self.conn.execute("VACUUM")
+
     def _update_from_one_impl(self):
         with self.conn:
             self.conn.execute("DELETE FROM peers")
+
+    def _update_from_two_impl(self):
+        with self.conn:
+            self.conn.execute("ALTER TABLE sessions ADD api_id INTEGER")
+
+    def _update_from_three_impl(self):
+        with self.conn:
+            self.conn.executescript(USERNAMES_SCHEMA)
+
+    def _update_from_four_impl(self):
+        with self.conn:
+            self.conn.executescript(UPDATE_STATE_SCHEMA)
+
+    def _update_from_five_impl(self):
+        with self.conn:
+            self.conn.executescript("CREATE INDEX idx_usernames_id ON usernames (id);")
 
     def _connect_impl(self, path):
         self.conn = sqlite3.connect(str(path), timeout=1, check_same_thread=False)
@@ -72,33 +92,23 @@ class FileStorage(SQLiteStorage):
         version = await self.version()
 
         if version == 1:
-            with self.conn:
-                await self.conn.execute("DELETE FROM peers")
-
+            await self.loop.run_in_executor(self.executor, self._update_from_one_impl)
             version += 1
 
         if version == 2:
-            with self.conn:
-                await self.conn.execute("ALTER TABLE sessions ADD api_id INTEGER")
-
+            await self.loop.run_in_executor(self.executor, self._update_from_two_impl)
             version += 1
 
         if version == 3:
-            with self.conn:
-                await self.conn.executescript(USERNAMES_SCHEMA)
-
+            await self.loop.run_in_executor(self.executor, self._update_from_three_impl)
             version += 1
 
         if version == 4:
-            with self.conn:
-                await self.conn.executescript(UPDATE_STATE_SCHEMA)
-
+            await self.loop.run_in_executor(self.executor, self._update_from_four_impl)
             version += 1
 
         if version == 5:
-            with self.conn:
-                await self.conn.execute("CREATE INDEX idx_usernames_id ON usernames (id);")
-
+            await self.loop.run_in_executor(self.executor, self._update_from_five_impl)
             version += 1
 
         await self.version(version)
@@ -114,8 +124,7 @@ class FileStorage(SQLiteStorage):
         else:
             await self.update()
 
-        with self.conn:
-            await self.conn.execute("VACUUM")
+        await self.loop.run_in_executor(self.executor, self._vacuum)
 
     async def delete(self):
         os.remove(self.database)
