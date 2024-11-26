@@ -460,9 +460,6 @@ class Chat(Object):
     @staticmethod
     def _parse_channel_chat(client, channel: raw.types.Channel) -> "Chat":
         peer_id = utils.get_channel_id(channel.id)
-        restriction_reason = channel.restriction_reason
-        usernames = channel.usernames
-        admin_rights = channel.admin_rights
 
         if isinstance(channel, raw.types.ChannelForbidden):
             return Chat(
@@ -474,6 +471,10 @@ class Chat(Object):
                 raw=channel,
                 client=client,
             )
+
+        restriction_reason = channel.restriction_reason
+        usernames = channel.usernames
+        admin_rights = channel.admin_rights
 
         return Chat(
             id=peer_id,
