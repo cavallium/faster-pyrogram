@@ -1104,6 +1104,8 @@ class Message(Object, Update):
                             story = await client.get_stories(utils.get_peer_id(media.peer), media.id)
                         except ChannelPrivate:
                             pass
+                        except PeerIdInvalid:
+                            pass
 
                     if not story:
                         story = await types.Story._parse(client, media, users, chats, media.peer)
