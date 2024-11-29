@@ -25,7 +25,7 @@ import pyrogram
 from pyrogram import raw, enums
 from pyrogram import types
 from pyrogram import utils
-from pyrogram.errors import ChannelPrivate, MessageIdsEmpty, PeerIdInvalid, ChannelForumMissing
+from pyrogram.errors import ChannelPrivate, MessageIdsEmpty, PeerIdInvalid, ChannelForumMissing, ChannelInvalid
 from pyrogram.parser import utils as parser_utils, Parser
 from ..object import Object
 from ..update import Update
@@ -1103,6 +1103,8 @@ class Message(Object, Update):
                         try:
                             story = await client.get_stories(utils.get_peer_id(media.peer), media.id)
                         except ChannelPrivate:
+                            pass
+                        except ChannelInvalid:
                             pass
                         except PeerIdInvalid:
                             pass
