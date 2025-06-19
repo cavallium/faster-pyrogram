@@ -20,9 +20,9 @@ from datetime import datetime
 from typing import List
 
 import pyrogram
-from pyrogram import raw, utils
-from pyrogram import types
+from pyrogram import raw, types, utils
 from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType, ThumbnailSource
+
 from ..object import Object
 
 
@@ -99,7 +99,7 @@ class Photo(Object):
                         )
                     )
 
-            photos.sort(key=lambda p: p.size)
+            photos.sort(key=lambda p: p.w * p.h)
 
             main = photos[-1]
 

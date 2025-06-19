@@ -66,6 +66,12 @@ class ActiveSession(Object):
         region (``str``):
             Region determined from IP.
 
+        can_accept_secret_chats (``bool``):
+            True, if incoming secret chats can be accepted by the session.
+
+        can_accept_calls (``bool``):
+            True, if incoming calls can be accepted by the session.
+
         is_current (``bool``):
             True, if this session is the current session.
 
@@ -74,12 +80,6 @@ class ActiveSession(Object):
 
         is_unconfirmed (``bool``):
             True, if the session wasn't confirmed from another session.
-
-        can_accept_secret_chats (``bool``):
-            True, if incoming secret chats can be accepted by the session.
-
-        can_accept_calls (``bool``):
-            True, if incoming calls can be accepted by the session.
 
         is_official_application (``bool``):
             True, if the application is an official application or uses the api_id of an official application.
@@ -102,11 +102,11 @@ class ActiveSession(Object):
         location: str = None,
         country: str = None,
         region: str = None,
+        can_accept_secret_chats: bool = None,
+        can_accept_calls: bool = None,
         is_current: bool = None,
         is_password_pending: bool = None,
         is_unconfirmed: bool = None,
-        can_accept_secret_chats: bool = None,
-        can_accept_calls: bool = None,
         is_official_application: bool = None
     ):
         super().__init__()
@@ -124,11 +124,11 @@ class ActiveSession(Object):
         self.location = location
         self.country = country
         self.region = region
+        self.can_accept_secret_chats = can_accept_secret_chats
+        self.can_accept_calls = can_accept_calls
         self.is_current = is_current
         self.is_password_pending = is_password_pending
         self.is_unconfirmed = is_unconfirmed
-        self.can_accept_secret_chats = can_accept_secret_chats
-        self.can_accept_calls = can_accept_calls
         self.is_official_application = is_official_application
 
     @staticmethod
@@ -136,22 +136,22 @@ class ActiveSession(Object):
         return ActiveSession(
             id=session.hash,
             device_model=session.device_model,
-            platform=session.platform,
+            platform=session.platform or None,
             system_version=session.system_version,
             api_id=session.api_id,
             application_name=session.app_name,
             application_version=session.app_version,
             log_in_date=utils.timestamp_to_datetime(session.date_created),
             last_active_date=utils.timestamp_to_datetime(session.date_active),
-            ip_address=session.ip,
-            location=session.region,
-            country=session.country,
-            region=session.region,
+            ip_address=session.ip or None,
+            location=session.region or None,
+            country=session.country or None,
+            region=session.region or None,
+            can_accept_secret_chats=not getattr(session, "encrypted_requests_disabled", False),
+            can_accept_calls=not getattr(session, "call_requests_disabled", False),
             is_current=getattr(session, "current", None),
             is_password_pending=getattr(session, "password_pending", None),
             is_unconfirmed=getattr(session, "unconfirmed", None),
-            can_accept_secret_chats=not getattr(session, "encrypted_requests_disabled", False),
-            can_accept_calls=not getattr(session, "call_requests_disabled", False),
             is_official_application=getattr(session, "official_app", None)
         )
 

@@ -54,7 +54,7 @@ class SendInvoice:
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
         message_effect_id: Optional[int] = None,
-        reply_to_message_id: Optional[int] = None,
+        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: bool = None,
         reply_markup: Optional[Union[
             "types.InlineKeyboardMarkup",
@@ -64,7 +64,9 @@ class SendInvoice:
         ]] = None,
         caption: str = "",
         parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: Optional[List["types.MessageEntity"]] = None
+        caption_entities: Optional[List["types.MessageEntity"]] = None,
+
+        reply_to_message_id: Optional[int] = None,
     ) -> "types.Message":
         """Use this method to send invoices.
 
@@ -78,7 +80,7 @@ class SendInvoice:
                 Product name, 1-32 characters.
 
             description (``str``):
-                Product description, 1-255 characters
+                Product description, 1-255 characters.
 
             payload (``str`` | ``bytes``):
                 Bot-defined invoice payload, 1-128 bytes. This will not be displayed to the user, use for your internal processes.
@@ -92,8 +94,8 @@ class SendInvoice:
             message_thread_id (``int``, *optional*):
                 If the message is in a thread, ID of the original message.
 
-            reply_to_message_id (``int``, *optional*):
-                If the message is a reply, ID of the original message.
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Describes reply parameters for the message that is being sent.
 
             provider_token (``str``, *optional*):
                 Payment provider token, obtained via `@BotFather <https://t.me/botfather>`_. Pass an empty string for payments in `Telegram Stars <https://t.me/BotNews/90>`_.
@@ -177,6 +179,15 @@ class SendInvoice:
             :obj:`~pyrogram.types.Message`: On success, the sent invoice message is returned.
 
         """
+        if reply_to_message_id is not None:
+            log.warning(
+                "`reply_to_message_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+            )
+
+            reply_parameters = types.ReplyParameters(
+                message_id=reply_to_message_id
+            )
+
         media = raw.types.InputMediaInvoice(
             title=title,
             description=description,
@@ -217,9 +228,10 @@ class SendInvoice:
             peer=await self.resolve_peer(chat_id),
             media=media,
             silent=disable_notification or None,
-            reply_to=utils.get_reply_to(
-                reply_to_message_id=reply_to_message_id,
-                message_thread_id=message_thread_id
+            reply_to=await utils.get_reply_to(
+                self,
+                reply_parameters,
+                message_thread_id
             ),
             random_id=self.rnd_id(),
             noforwards=protect_content,
@@ -231,15 +243,6 @@ class SendInvoice:
 
         r = await self.invoke(rpc)
 
-        for i in r.updates:
-            if isinstance(i, (raw.types.UpdateNewMessage,
-                              raw.types.UpdateNewChannelMessage,
-                              raw.types.UpdateNewScheduledMessage,
-                              raw.types.UpdateBotNewBusinessMessage)):
-                return await types.Message._parse(
-                    self, i.message,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats},
-                    is_scheduled=isinstance(i, raw.types.UpdateNewScheduledMessage),
-                    business_connection_id=getattr(i, "connection_id", None)
-                )
+        messages = await utils.parse_messages(client=self, messages=r)
+
+        return messages[0] if messages else None

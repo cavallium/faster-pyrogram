@@ -121,6 +121,9 @@ class ChatPrivileges(Object):
 
     @staticmethod
     def _parse(admin_rights: "raw.base.ChatAdminRights") -> "ChatPrivileges":
+        if admin_rights is None:
+            return None
+        
         return ChatPrivileges(
             can_manage_chat=admin_rights.other,
             can_delete_messages=admin_rights.delete_messages,

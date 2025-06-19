@@ -52,8 +52,9 @@ from pyrogram.handlers.handler import Handler
 from pyrogram.methods import Methods
 from pyrogram.session import Auth, Session
 from pyrogram.storage import Storage, FileStorage, MemoryStorage
-from pyrogram.types import User, TermsOfService
-from pyrogram.utils import ainput
+from pyrogram.types import User, TermsOfService, LinkPreviewOptions
+from pyrogram.utils import MIN_MONOFORUM_CHANNEL_ID, ainput
+from pyrogram.qrlogin import QRLogin
 from .connection import Connection
 from .connection.transport import TCP, TCPAbridged
 from .dispatcher import Dispatcher
@@ -196,7 +197,11 @@ class Client(Methods):
 
         max_message_cache_size (``int``, *optional*):
             Set the maximum size of the message cache.
-            Defaults to 10000.
+            Defaults to 1000.
+
+        max_topic_cache_size (``int``, *optional*):
+            Set the maximum size of the topic cache.
+            Defaults to 1000.
 
         storage_engine (:obj:`~pyrogram.storage.Storage`, *optional*):
             Pass an instance of your own implementation of session storage engine.
@@ -205,6 +210,24 @@ class Client(Methods):
         client_platform (:obj:`~pyrogram.enums.ClientPlatform`, *optional*):
             The platform where this client is running.
             Defaults to 'other'
+
+        link_preview_options (:obj:`~pyrogram.types.LinkPreviewOptions`, *optional*):
+            Global link preview options for the client.
+
+        fetch_replies (``bool``, *optional*):
+            Pass True to automatically fetch replies for messages.
+            Defaults to True.
+
+        fetch_topics (``bool``, *optional*):
+            Pass True to automatically fetch forum topics.
+            Defaults to True.
+
+        fetch_stories (``bool``, *optional*):
+            Pass True to automatically fetch stories if they are missing.
+            Defaults to True.
+
+        loop (:py:class:`asyncio.AbstractEventLoop`, *optional*):
+            Event loop.
 
         init_connection_params (:obj:`~pyrogram.raw.base.JSONValue`, *optional*):
             Additional initConnection parameters.
@@ -222,6 +245,7 @@ class Client(Methods):
     PARENT_DIR = Path(sys.argv[0]).parent
 
     INVITE_LINK_RE = re.compile(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:joinchat/|\+))([\w-]+)$")
+    UPGRADED_GIFT_RE = re.compile(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:nft/|\+))([\w-]+)$")
     WORKERS = min(32, (os.cpu_count() or 0) + 4)  # os.cpu_count() can be None
     WORKDIR = PARENT_DIR
 
@@ -229,7 +253,8 @@ class Client(Methods):
     UPDATES_WATCHDOG_INTERVAL = 15 * 60
 
     MAX_CONCURRENT_TRANSMISSIONS = 1
-    MAX_MESSAGE_CACHE_SIZE = 10000
+    MAX_MESSAGE_CACHE_SIZE = 1000
+    MAX_TOPIC_CACHE_SIZE = 1000
 
     mimetypes = MimeTypes()
     mimetypes.readfp(StringIO(mime_types))
@@ -265,11 +290,17 @@ class Client(Methods):
         hide_password: Optional[bool] = False,
         max_concurrent_transmissions: int = MAX_CONCURRENT_TRANSMISSIONS,
         max_message_cache_size: int = MAX_MESSAGE_CACHE_SIZE,
+        max_topic_cache_size: int = MAX_TOPIC_CACHE_SIZE,
         storage_engine: Optional[Storage] = None,
         client_platform: "enums.ClientPlatform" = enums.ClientPlatform.OTHER,
+        link_preview_options: Optional[LinkPreviewOptions] = None,
+        fetch_replies: Optional[bool] = True,
+        fetch_topics: Optional[bool] = True,
+        fetch_stories: Optional[bool] = True,
         init_connection_params: Optional["raw.base.JSONValue"] = None,
         connection_factory: Type[Connection] = Connection,
-        protocol_factory: Type[TCP] = TCPAbridged
+        protocol_factory: Type[TCP] = TCPAbridged,
+        loop: Optional[asyncio.AbstractEventLoop] = None
     ):
         super().__init__()
 
@@ -302,7 +333,12 @@ class Client(Methods):
         self.hide_password = hide_password
         self.max_concurrent_transmissions = max_concurrent_transmissions
         self.max_message_cache_size = max_message_cache_size
+        self.max_topic_cache_size = max_topic_cache_size
         self.client_platform = client_platform
+        self.link_preview_options = link_preview_options
+        self.fetch_replies = fetch_replies
+        self.fetch_topics = fetch_topics
+        self.fetch_stories = fetch_stories
         self.init_connection_params = init_connection_params
         self.connection_factory = connection_factory
         self.protocol_factory = protocol_factory
@@ -344,11 +380,15 @@ class Client(Methods):
 
         self.takeout_id = None
 
+        self.start_handler = None
+        self.stop_handler = None
+        self.connect_handler = None
         self.disconnect_handler = None
 
         self.me: Optional[User] = None
 
         self.message_cache = Cache(self.max_message_cache_size)
+        self.topic_cache = Cache(self.max_topic_cache_size)
 
         # Sometimes, for some reason, the server will stop sending updates and will only respond to pings.
         # This watchdog will invoke updates.GetState in order to wake up the server and enable it sending updates again
@@ -357,7 +397,10 @@ class Client(Methods):
         self.updates_watchdog_event = asyncio.Event()
         self.last_update_time = datetime.now()
 
-        self.loop = asyncio.get_event_loop()
+        if isinstance(loop, asyncio.AbstractEventLoop):
+            self.loop = loop
+        else:
+            self.loop = asyncio.get_event_loop()
 
     def __enter__(self):
         return self.start()
@@ -401,12 +444,12 @@ class Client(Methods):
             try:
                 if not self.phone_number:
                     while True:
-                        value = await ainput("Enter phone number or bot token: ")
+                        value = await ainput("Enter phone number or bot token: ", loop=self.loop)
 
                         if not value:
                             continue
 
-                        confirm = (await ainput(f'Is "{value}" correct? (y/N): ')).lower()
+                        confirm = (await ainput(f'Is "{value}" correct? (y/N): ', loop=self.loop)).lower()
 
                         if confirm == "y":
                             break
@@ -438,7 +481,7 @@ class Client(Methods):
 
         while True:
             if not self.phone_code:
-                self.phone_code = await ainput("Enter confirmation code: ")
+                self.phone_code = await ainput("Enter confirmation code: ", loop=self.loop)
 
             try:
                 signed_in = await self.sign_in(self.phone_number, sent_code.phone_code_hash, self.phone_code)
@@ -452,18 +495,18 @@ class Client(Methods):
                     print("Password hint: {}".format(await self.get_password_hint()))
 
                     if not self.password:
-                        self.password = await ainput("Enter password (empty to recover): ", hide=self.hide_password)
+                        self.password = await ainput("Enter password (empty to recover): ", hide=self.hide_password, loop=self.loop)
 
                     try:
                         if not self.password:
-                            confirm = await ainput("Confirm password recovery (y/n): ")
+                            confirm = await ainput("Confirm password recovery (y/n): ", loop=self.loop)
 
                             if confirm == "y":
                                 email_pattern = await self.send_recovery_code()
                                 print(f"The recovery code has been sent to {email_pattern}")
 
                                 while True:
-                                    recovery_code = await ainput("Enter recovery code: ")
+                                    recovery_code = await ainput("Enter recovery code: ", loop=self.loop)
 
                                     try:
                                         return await self.recover_password(recovery_code)
@@ -486,8 +529,8 @@ class Client(Methods):
             return signed_in
 
         while True:
-            first_name = await ainput("Enter first name: ")
-            last_name = await ainput("Enter last name (empty to skip): ")
+            first_name = await ainput("Enter first name: ", loop=self.loop)
+            last_name = await ainput("Enter last name (empty to skip): ", loop=self.loop)
 
             try:
                 signed_up = await self.sign_up(
@@ -506,6 +549,38 @@ class Client(Methods):
             await self.accept_terms_of_service(signed_in.id)
 
         return signed_up
+
+    async def authorize_qr(self, except_ids: List[int] = []) -> User:
+        from qrcode import QRCode
+        qr_login = QRLogin(self, except_ids)
+
+        while True:
+            try:
+                log.info("Waiting for QR code being scanned.")
+
+                signed_in = await qr_login.wait()
+
+                if signed_in:
+                    log.info(f"Logged in successfully as {signed_in.full_name}")
+                    return signed_in
+            except asyncio.TimeoutError:
+                log.info("Recreating QR code.")
+                await qr_login.recreate()
+                print("\x1b[2J")
+                print(f"Welcome to Pyrogram (version {__version__})")
+                print(f"Pyrogram is free software and comes with ABSOLUTELY NO WARRANTY. Licensed\n"
+                      f"under the terms of the {__license__}.\n")
+                print("Scan the QR code below to login")
+                print("Settings -> Privacy and Security -> Active Sessions -> Scan QR Code.\n")
+
+                qrcode = QRCode(version=1)
+                qrcode.add_data(qr_login.url)
+                qrcode.print_ascii(invert=True)
+            except SessionPasswordNeeded:
+                print(f"Password hint: {await self.get_password_hint()}")
+                return await self.check_password(
+                    await ainput("Enter 2FA password: ", hide=self.hide_password, loop=self.loop)
+                )
 
     def set_parse_mode(self, parse_mode: Optional["enums.ParseMode"]):
         """Set the parse mode to be used globally by the client.
@@ -723,7 +798,7 @@ class Client(Methods):
                             pts=local_pts,
                             limit=10000,
                             force=False
-                        ) if id < 0 else
+                        ) if id < 0 or id > MIN_MONOFORUM_CHANNEL_ID else
                         raw.functions.updates.GetDifference(
                             pts=local_pts,
                             date=local_date,
@@ -822,13 +897,13 @@ class Client(Methods):
                 else:
                     while True:
                         try:
-                            value = int(await ainput("Enter the api_id part of the API key: "))
+                            value = int(await ainput("Enter the api_id part of the API key: ", loop=self.loop))
 
                             if value <= 0:
                                 print("Invalid value")
                                 continue
 
-                            confirm = (await ainput(f'Is "{value}" correct? (y/N): ')).lower()
+                            confirm = (await ainput(f'Is "{value}" correct? (y/N): ', loop=self.loop)).lower()
 
                             if confirm == "y":
                                 await self.storage.api_id(value)
@@ -1207,7 +1282,10 @@ class Client(Methods):
             except Exception as e:
                 log.exception(e)
 
-    def guess_mime_type(self, filename: str) -> Optional[str]:
+    def guess_mime_type(self, filename: Union[str, BytesIO]) -> Optional[str]:
+        if isinstance(filename, BytesIO):
+            return self.mimetypes.guess_type(filename.name)[0]
+
         return self.mimetypes.guess_type(filename)[0]
 
     def guess_extension(self, mime_type: str) -> Optional[str]:

@@ -46,11 +46,11 @@ from .pre_checkout_query import PreCheckoutQuery
 from .purchased_paid_media import PurchasedPaidMedia
 from .reply_keyboard_markup import ReplyKeyboardMarkup
 from .reply_keyboard_remove import ReplyKeyboardRemove
-from .request_channel_info import RequestChannelInfo
-from .request_chat_info import RequestChatInfo
-from .request_poll_info import RequestPollInfo
-from .request_user_info import RequestUserInfo
-from .requested_chats import RequestedChats
+from .keyboard_button_request_chat import KeyboardButtonRequestChat
+from .keyboard_button_poll_type import KeyboardButtonPollType
+from .keyboard_button_request_users import KeyboardButtonRequestUsers
+from .chat_shared import ChatShared
+from .users_shared import UsersShared
 from .sent_web_app_message import SentWebAppMessage
 from .shipping_option import ShippingOption
 from .shipping_query import ShippingQuery
@@ -68,11 +68,11 @@ __all__ = [
     "KeyboardButton",
     "ReplyKeyboardMarkup",
     "ReplyKeyboardRemove",
-    "RequestChannelInfo",
-    "RequestChatInfo",
-    "RequestUserInfo",
-    "RequestPollInfo",
-    "RequestedChats",
+    "KeyboardButtonRequestChat",
+    "KeyboardButtonRequestUsers",
+    "KeyboardButtonPollType",
+    "ChatShared",
+    "UsersShared",
     "LabeledPrice",
     "LoginUrl",
     "BotCommand",

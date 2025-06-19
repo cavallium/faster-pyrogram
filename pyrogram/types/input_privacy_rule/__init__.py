@@ -18,11 +18,14 @@
 
 from .input_privacy_rule import InputPrivacyRule
 from .input_privacy_rule_allow_all import InputPrivacyRuleAllowAll
+from .input_privacy_rule_allow_bots import InputPrivacyRuleAllowBots
 from .input_privacy_rule_allow_chats import InputPrivacyRuleAllowChats
+from .input_privacy_rule_allow_close_friends import InputPrivacyRuleAllowCloseFriends
 from .input_privacy_rule_allow_contacts import InputPrivacyRuleAllowContacts
 from .input_privacy_rule_allow_premium import InputPrivacyRuleAllowPremium
 from .input_privacy_rule_allow_users import InputPrivacyRuleAllowUsers
 from .input_privacy_rule_disallow_all import InputPrivacyRuleDisallowAll
+from .input_privacy_rule_disallow_bots import InputPrivacyRuleDisallowBots
 from .input_privacy_rule_disallow_chats import InputPrivacyRuleDisallowChats
 from .input_privacy_rule_disallow_contacts import InputPrivacyRuleDisallowContacts
 from .input_privacy_rule_disallow_users import InputPrivacyRuleDisallowUsers
@@ -30,11 +33,14 @@ from .input_privacy_rule_disallow_users import InputPrivacyRuleDisallowUsers
 __all__ = [
     "InputPrivacyRule",
     "InputPrivacyRuleAllowAll",
+    "InputPrivacyRuleAllowBots",
     "InputPrivacyRuleAllowChats",
+    "InputPrivacyRuleAllowCloseFriends",
     "InputPrivacyRuleAllowContacts",
     "InputPrivacyRuleAllowPremium",
     "InputPrivacyRuleAllowUsers",
     "InputPrivacyRuleDisallowAll",
+    "InputPrivacyRuleDisallowBots",
     "InputPrivacyRuleDisallowChats",
     "InputPrivacyRuleDisallowContacts",
     "InputPrivacyRuleDisallowUsers"

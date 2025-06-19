@@ -16,64 +16,78 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Union
+from typing import List, Optional, Union
 
 import pyrogram
-from pyrogram import enums
-from pyrogram import raw
-from pyrogram import types
-from pyrogram import utils
+from pyrogram import enums, raw, types, utils
+
 from ..object import Object
 
 
 class Folder(Object):
-    """A user's folder.
+    """Represents a folder for user chats.
 
     Parameters:
         id (``int``):
-            The folder id.
+            Unique chat folder identifier.
 
-        title (``str``):
-            The folder title.
+        name (``str``):
+            The text of the chat folder name, 1-12 characters without line feeds.
 
-        included_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
-            A list of included chats in folder.
+        entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
+            Special entities like bold, italic, etc. that appear in the folder name.
 
-        excluded_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
-            A list of excluded chats in folder.
+        animate_custom_emoji (``bool``, *optional*):
+            True, if custom emoji in the name must be animated.
 
-        pinned_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
-            A list of pinned chats in folder.
-
-        contacts (``bool``, *optional*):
-            True, if the folder includes contacts.
-
-        non_contacts (``bool``, *optional*):
-            True, if the folder includes non contacts.
-
-        groups (``bool``, *optional*):
-            True, if the folder includes groups.
-
-        channels (``bool``, *optional*):
-            True, if the folder includes channels.
-
-        bots (``bool``, *optional*):
-            True, if the folder includes bots.
-
-        exclude_muted (``bool``, *optional*):
-            True, if the folder exclude muted.
-
-        exclude_read (``bool``, *optional*):
-            True, if the folder exclude read.
-
-        exclude_archived (``bool``, *optional*):
-            True, if the folder exclude archived.
-
-        emoji (``str``, *optional*):
-            Folder emoji.
+        icon (``str``, *optional*):
+            The chosen icon for the chat folder.
 
         color (:obj:`~pyrogram.enums.FolderColor`, *optional*)
-            Chat reply color.
+            The identifier of the chosen color for the chat folder icon.
+            Can't be changed if folder tags are disabled or the current user doesn't have Telegram Premium subscription.
+
+        is_shareable (``bool``, *optional*):
+            True, if at least one link has been created for the folder.
+
+        pinned_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
+            The pinned chats in the folder.
+            There can be up to getOption("chat_folder_chosen_chat_count_max") pinned and always included non-secret chats and the same number of secret chats, but the limit can be increased with Telegram Premium.
+
+        included_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
+            The always included chats in the folder.
+            There can be up to getOption("chat_folder_chosen_chat_count_max") pinned and always included non-secret chats and the same number of secret chats, but the limit can be increased with Telegram Premium.
+
+        excluded_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
+            The always excluded chats in the folder.
+            There can be up to getOption("chat_folder_chosen_chat_count_max") always excluded non-secret chats and the same number of secret chats, but the limit can be increased with Telegram Premium.
+
+        exclude_muted (``bool``, *optional*):
+            True, if muted chats need to be excluded.
+
+        exclude_read (``bool``, *optional*):
+            True, if read chats need to be excluded.
+
+        exclude_archived (``bool``, *optional*):
+            True, if archived chats need to be excluded.
+
+        include_contacts (``bool``, *optional*):
+            True, if contacts need to be included.
+
+        include_non_contacts (``bool``, *optional*):
+            True, if non-contact users need to be included.
+
+        include_bots (``bool``, *optional*):
+            True, if bots need to be included.
+
+        include_groups (``bool``, *optional*):
+            True, if basic groups and supergroups need to be included.
+
+        include_channels (``bool``, *optional*):
+            True, if channels need to be included.
+
+        raw (``raw.base.DialogFilter``, *optional*):
+            The raw chat folder object.
     """
 
     def __init__(
@@ -81,83 +95,91 @@ class Folder(Object):
         *,
         client: "pyrogram.Client" = None,
         id: int,
-        title: str,
-        included_chats: List["types.Chat"] = None,
-        excluded_chats: List["types.Chat"] = None,
-        pinned_chats: List["types.Chat"] = None,
-        contacts: bool = None,
-        non_contacts: bool = None,
-        groups: bool = None,
-        channels: bool = None,
-        bots: bool = None,
-        exclude_muted: bool = None,
-        exclude_read: bool = None,
-        exclude_archived: bool = None,
-        emoji: str = None,
-        color: "enums.FolderColor" = None,
-        has_my_invites: bool = None
+        name: str,
+        entities: Optional[List["types.MessageEntity"]] = None,
+        animate_custom_emoji: Optional[bool] = None,
+        icon: Optional[str] = None,
+        color: Optional["enums.FolderColor"] = None,
+        is_shareable: Optional[bool] = None,
+        pinned_chats: Optional[List["types.Chat"]] = None,
+        included_chats: Optional[List["types.Chat"]] = None,
+        excluded_chats: Optional[List["types.Chat"]] = None,
+        exclude_muted: Optional[bool] = None,
+        exclude_read: Optional[bool] = None,
+        exclude_archived: Optional[bool] = None,
+        include_contacts: Optional[bool] = None,
+        include_non_contacts: Optional[bool] = None,
+        include_bots: Optional[bool] = None,
+        include_groups: Optional[bool] = None,
+        include_channels: Optional[bool] = None,
+        raw: Optional["raw.base.DialogFilter"] = None
     ):
         super().__init__(client)
 
         self.id = id
-        self.title = title
+        self.name = name
+        self.entities = entities
+        self.animate_custom_emoji = animate_custom_emoji
+        self.icon = icon
+        self.color = color
+        self.is_shareable = is_shareable
+        self.pinned_chats = pinned_chats
         self.included_chats = included_chats
         self.excluded_chats = excluded_chats
-        self.pinned_chats = pinned_chats
-        self.contacts = contacts
-        self.non_contacts = non_contacts
-        self.groups = groups
-        self.channels = channels
-        self.bots = bots
         self.exclude_muted = exclude_muted
         self.exclude_read = exclude_read
         self.exclude_archived = exclude_archived
-        self.emoji = emoji
-        self.color = color
-        self.has_my_invites = has_my_invites
+        self.include_contacts = include_contacts
+        self.include_non_contacts = include_non_contacts
+        self.include_bots = include_bots
+        self.include_groups = include_groups
+        self.include_channels = include_channels
+        self.raw = raw
 
     @staticmethod
-    def _parse(client, folder: "raw.types.DialogFilter", users, chats) -> "Folder":
-        included_chats = []
-        excluded_chats = []
-        pinned_chats = []
+    async def _parse(client: "pyrogram.Client", folder: "raw.base.DialogFilter", users, chats) -> Optional["Folder"]:
+        if not folder:
+            return
+
+        if isinstance(folder, raw.types.DialogFilterDefault):
+            return
+
+        pinned_chats = types.List()
+        included_chats = types.List()
+        excluded_chats = types.List()
+
+        for peer in folder.pinned_peers:
+            pinned_chats.append(types.Chat._parse_dialog(client, peer, users, chats))
 
         for peer in folder.include_peers:
-            try:
-                included_chats.append(types.Chat._parse_dialog(client, peer, users, chats))
-            except KeyError:
-                pass
+            included_chats.append(types.Chat._parse_dialog(client, peer, users, chats))
 
         if getattr(folder, "exclude_peers", None):
             for peer in folder.exclude_peers:
-                try:
-                    excluded_chats.append(types.Chat._parse_dialog(client, peer, users, chats))
-                except KeyError:
-                    pass
+                excluded_chats.append(types.Chat._parse_dialog(client, peer, users, chats))
 
-        for peer in folder.pinned_peers:
-            try:
-                pinned_chats.append(types.Chat._parse_dialog(client, peer, users, chats))
-            except KeyError:
-                pass
+        name, entities = (utils.parse_text_with_entities(client, folder.title, {})).values()
 
         return Folder(
             id=folder.id,
-            title=folder.title,
-            included_chats=types.List(included_chats) or None,
-            excluded_chats=types.List(excluded_chats) or None,
-            pinned_chats=types.List(pinned_chats) or None,
-            contacts=getattr(folder, "contacts", None),
-            non_contacts=getattr(folder, "non_contacts", None),
-            groups=getattr(folder, "groups", None),
-            channels=getattr(folder, "broadcasts", None),
-            bots=getattr(folder, "bots", None),
+            name=name,
+            entities=entities,
+            animate_custom_emoji=not folder.title_noanimate,
+            icon=folder.emoticon or None,
+            color=enums.FolderColor(folder.color),
+            is_shareable=isinstance(folder, raw.types.DialogFilterChatlist),
+            pinned_chats=pinned_chats or None,
+            included_chats=included_chats or None,
+            excluded_chats=excluded_chats or None,
             exclude_muted=getattr(folder, "exclude_muted", None),
             exclude_read=getattr(folder, "exclude_read", None),
             exclude_archived=getattr(folder, "exclude_archived", None),
-            emoji=folder.emoticon or None,
-            color=enums.FolderColor(getattr(folder, "color", None)),
-            has_my_invites=getattr(folder, "has_my_invites", None),
+            include_contacts=getattr(folder, "contacts", None),
+            include_non_contacts=getattr(folder, "non_contacts", None),
+            include_bots=getattr(folder, "bots", None),
+            include_groups=getattr(folder, "groups", None),
+            include_channels=getattr(folder, "broadcasts", None),
+            raw=folder,
             client=client
         )
 
@@ -178,25 +200,27 @@ class Folder(Object):
         Returns:
             True on success.
         """
-
         return await self._client.delete_folder(self.id)
 
-    async def update(
+    async def edit(
         self,
-        included_chats: List[Union[int, str]] = None,
-        excluded_chats: List[Union[int, str]] = None,
-        pinned_chats: List[Union[int, str]] = None,
-        title: str = None,
-        contacts: bool = None,
-        non_contacts: bool = None,
-        groups: bool = None,
-        channels: bool = None,
-        bots: bool = None,
-        exclude_muted: bool = None,
-        exclude_read: bool = None,
-        exclude_archived: bool = None,
-        emoji: str = None,
-        color: "enums.FolderColor" = None
+        name: Optional[str] = None,
+        parse_mode: Optional["enums.ParseMode"] = None,
+        entities: Optional[List["types.MessageEntity"]] = None,
+        animate_custom_emoji: Optional[bool] = None,
+        icon: Optional[str] = None,
+        color: Optional["enums.FolderColor"] = None,
+        pinned_chats: Optional[List["types.Chat"]] = None,
+        included_chats: Optional[List["types.Chat"]] = None,
+        excluded_chats: Optional[List["types.Chat"]] = None,
+        exclude_muted: Optional[bool] = None,
+        exclude_read: Optional[bool] = None,
+        exclude_archived: Optional[bool] = None,
+        include_contacts: Optional[bool] = None,
+        include_non_contacts: Optional[bool] = None,
+        include_bots: Optional[bool] = None,
+        include_groups: Optional[bool] = None,
+        include_channels: Optional[bool] = None
     ):
         """Bound method *update_peers* of :obj:`~pyrogram.types.Folder`.
 
@@ -204,9 +228,9 @@ class Folder(Object):
 
         .. code-block:: python
 
-            await client.update_folder(
+            await client.edit_folder(
                 folder_id,
-                title="New folder",
+                name="New folder",
                 included_chats=["me"]
             )
 
@@ -216,81 +240,100 @@ class Folder(Object):
                await folder.update(included_chats=["me"])
 
         Parameters:
-            included_chats (``int`` | ``str`` | List of ``int`` or ``str``, *optional*):
-                Users or chats that should added in the folder
-                You can pass an ID (int), username (str) or phone number (str).
-                Multiple users can be added by passing a list of IDs, usernames or phone numbers.
+            name (``str``, *optional*):
+                The text of the chat folder name, 1-12 characters without line feeds.
 
-            excluded_chats (``int`` | ``str`` | List of ``int`` or ``str``, *optional*):
-                Users or chats that should excluded from the folder
-                You can pass an ID (int), username (str) or phone number (str).
-                Multiple users can be added by passing a list of IDs, usernames or phone numbers.
+            entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
+                Special entities like bold, italic, etc. that appear in the folder name.
 
-            pinned_chats (``int`` | ``str`` | List of ``int`` or ``str``, *optional*):
-                Users or chats that should pinned in the folder
-                You can pass an ID (int), username (str) or phone number (str).
-                Multiple users can be added by passing a list of IDs, usernames or phone numbers.
+            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
+                By default, texts are parsed using both Markdown and HTML styles.
+                You can combine both syntaxes together.
 
-            title (``str``, *optional*):
-                A folder title was changed to this value.
+            animate_custom_emoji (``bool``, *optional*):
+                True, if custom emoji in the name must be animated.
 
-            contacts (``bool``, *optional*):
-                Pass True if folder should contain contacts.
+            icon (``str``, *optional*):
+                The chosen icon for the chat folder.
 
-            non_contacts (``bool``, *optional*):
-                Pass True if folder should contain non contacts.
+            color (:obj:`~pyrogram.enums.FolderColor`, *optional*)
+                The identifier of the chosen color for the chat folder icon.
+                Can't be changed if folder tags are disabled or the current user doesn't have Telegram Premium subscription.
 
-            groups (``bool``, *optional*):
-                Pass True if folder should contain groups.
+            is_shareable (``bool``, *optional*):
+                True, if at least one link has been created for the folder.
 
-            channels (``bool``, *optional*):
-                Pass True if folder should contain channels.
+            pinned_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
+                The pinned chats in the folder.
+                There can be up to getOption("chat_folder_chosen_chat_count_max") pinned and always included non-secret chats and the same number of secret chats, but the limit can be increased with Telegram Premium.
 
-            bots (``bool``, *optional*):
-                Pass True if folder should contain bots.
+            included_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
+                The always included chats in the folder.
+                There can be up to getOption("chat_folder_chosen_chat_count_max") pinned and always included non-secret chats and the same number of secret chats, but the limit can be increased with Telegram Premium.
+
+            excluded_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
+                The always excluded chats in the folder.
+                There can be up to getOption("chat_folder_chosen_chat_count_max") always excluded non-secret chats and the same number of secret chats, but the limit can be increased with Telegram Premium.
 
             exclude_muted (``bool``, *optional*):
-                Pass True if folder should exclude muted users.
+                True, if muted chats need to be excluded.
+
+            exclude_read (``bool``, *optional*):
+                True, if read chats need to be excluded.
 
             exclude_archived (``bool``, *optional*):
-                Pass True if folder should exclude archived users.
+                True, if archived chats need to be excluded.
 
-            emoji (``str``, *optional*):
-                Folder emoji.
-                Pass None to leave the folder icon as default.
+            include_contacts (``bool``, *optional*):
+                True, if contacts need to be included.
 
-            color (:obj:`~pyrogram.enums.FolderColor`, *optional*):
-                Color type.
-                Pass :obj:`~pyrogram.enums.FolderColor` to set folder color.
+            include_non_contacts (``bool``, *optional*):
+                True, if non-contact users need to be included.
+
+            include_bots (``bool``, *optional*):
+                True, if bots need to be included.
+
+            include_groups (``bool``, *optional*):
+                True, if basic groups and supergroups need to be included.
+
+            include_channels (``bool``, *optional*):
+                True, if channels need to be included.
 
         Returns:
             True on success.
         """
-        if not included_chats:
-            included_chats = [i.id for i in self.included_chats or []]
+        if name:
+            name, entities = (await utils.parse_text_entities(self, name, parse_mode, entities)).values()
+            entities = entities or []
 
-        if not included_chats:
-            excluded_chats = [i.id for i in self.excluded_chats or []]
+        if pinned_chats and self.pinned_chats:
+            pinned_chats = [i.id for i in self.pinned_chats or []] + pinned_chats
 
-        if not included_chats:
-            pinned_chats = [i.id for i in self.pinned_chats or []]
+        if included_chats and self.included_chats:
+            included_chats = [i.id for i in self.included_chats or []] + included_chats
 
-        return await self._client.update_folder(
+        if excluded_chats and self.excluded_chats:
+            excluded_chats = [i.id for i in self.excluded_chats or []] + excluded_chats
+
+        return await self._client.edit_folder(
             folder_id=self.id,
-            title=title or self.title,
-            included_chats=included_chats,
-            excluded_chats=excluded_chats,
-            pinned_chats=pinned_chats,
-            contacts=contacts or self.contacts,
-            non_contacts=non_contacts or self.non_contacts,
-            groups=groups or self.groups,
-            channels=channels or self.channels,
-            bots=bots or self.bots,
+            name=name or self.name,
+            parse_mode=parse_mode,
+            entities=entities or self.entities,
+            animate_custom_emoji=animate_custom_emoji or self.animate_custom_emoji,
+            icon=icon or self.icon,
+            color=color or self.color,
+            pinned_chats=pinned_chats or self.pinned_chats,
+            included_chats=included_chats or self.included_chats,
+            excluded_chats=excluded_chats or self.excluded_chats,
             exclude_muted=exclude_muted or self.exclude_muted,
             exclude_read=exclude_read or self.exclude_read,
             exclude_archived=exclude_archived or self.exclude_archived,
-            emoji=emoji or self.emoji,
-            color=color or self.color
+            include_contacts=include_contacts or self.include_contacts,
+            include_non_contacts=include_non_contacts or self.include_non_contacts,
+            include_bots=include_bots or self.include_bots,
+            include_groups=include_groups or self.include_groups,
+            include_channels=include_channels or self.include_channels
         )
 
     async def include_chat(self, chat_id: Union[int, str]):
@@ -300,11 +343,9 @@ class Folder(Object):
 
         .. code-block:: python
 
-            await client.update_folder(
+            await client.edit_folder(
                 folder_id=123456789,
-                included_chats=[chat_id],
-                excluded_chats=[...],
-                pinned_chats=[...]
+                included_chats=[chat_id]
             )
 
         Example:
@@ -320,11 +361,8 @@ class Folder(Object):
         Returns:
             True on success.
         """
-
-        return await self.update(
+        return await self.edit(
             included_chats=[i.id for i in self.included_chats or []] + [chat_id],
-            excluded_chats=[i.id for i in self.excluded_chats or []],
-            pinned_chats=[i.id for i in self.pinned_chats or []]
         )
 
     async def exclude_chat(self, chat_id: Union[int, str]):
@@ -334,11 +372,9 @@ class Folder(Object):
 
         .. code-block:: python
 
-            await client.update_folder(
+            await client.edit_folder(
                 folder_id=123456789,
-                included_chats=[...],
                 excluded_chats=[chat_id],
-                pinned_chats=[...]
             )
 
         Example:
@@ -354,11 +390,8 @@ class Folder(Object):
         Returns:
             True on success.
         """
-
-        return await self.update(
-            included_chats=[i.id for i in self.included_chats or []],
+        return await self.edit(
             excluded_chats=[i.id for i in self.excluded_chats or []] + [chat_id],
-            pinned_chats=[i.id for i in self.pinned_chats or []],
         )
 
     async def update_color(self, color: "enums.FolderColor"):
@@ -368,11 +401,8 @@ class Folder(Object):
 
         .. code-block:: python
 
-            await client.update_folder(
+            await client.edit_folder(
                 folder_id=123456789,
-                included_chats=[chat_id],
-                excluded_chats=[chat_id],
-                pinned_chats=[...],
                 color=color
             )
 
@@ -389,8 +419,7 @@ class Folder(Object):
         Returns:
             True on success.
         """
-
-        return await self.update(
+        return await self.edit(
             color=color
         )
 
@@ -401,11 +430,10 @@ class Folder(Object):
 
         .. code-block:: python
 
-            await client.update_folder(
+            await client.edit_folder(
                 folder_id=123456789,
                 included_chats=[chat_id],
-                excluded_chats=[chat_id],
-                pinned_chats=[...]
+                pinned_chats=[chat_id]
             )
 
         Example:
@@ -421,28 +449,15 @@ class Folder(Object):
         Returns:
             True on success.
         """
-
-        return await self.update(
+        return await self.edit(
             included_chats=[i.id for i in self.included_chats or []] + [chat_id],
-            excluded_chats=[i.id for i in self.excluded_chats or []],
             pinned_chats=[i.id for i in self.pinned_chats or []] + [chat_id]
         )
 
     async def remove_chat(self, chat_id: Union[int, str]):
         """Bound method *remove_chat* of :obj:`~pyrogram.types.Folder`.
 
-        Remove chat from included, excluded and pinned chats.
-
-        Use as a shortcut for:
-
-        .. code-block:: python
-
-            await client.update_folder(
-                folder_id=123456789,
-                included_chats=[...],
-                excluded_chats=[...],
-                pinned_chats=[...]
-            )
+        Remove chat from folder.
 
         Example:
             .. code-block:: python
@@ -460,10 +475,10 @@ class Folder(Object):
         peer = await self._client.resolve_peer(chat_id)
         peer_id = utils.get_peer_id(peer)
 
-        return await self.update(
+        return await self.edit(
+            pinned_chats=[i.id for i in self.pinned_chats or [] if peer_id != i.id],
             included_chats=[i.id for i in self.included_chats or [] if peer_id != i.id],
-            excluded_chats=[i.id for i in self.excluded_chats or [] if peer_id != i.id],
-            pinned_chats=[i.id for i in self.pinned_chats or [] if peer_id != i.id]
+            excluded_chats=[i.id for i in self.excluded_chats or [] if peer_id != i.id]
         )
 
     async def export_link(self):
@@ -483,7 +498,6 @@ class Folder(Object):
         Returns:
             ``str``: On success, a link to the folder as string is returned.
         """
-
         return await self._client.export_folder_link(
             folder_id=self.id
         )

@@ -75,7 +75,7 @@ class GetAllStories:
                 yield await types.Story._parse(
                     self,
                     story,
+                    peer_story.peer,
                     users,
-                    chats,
-                    peer_story.peer
+                    chats
                 )

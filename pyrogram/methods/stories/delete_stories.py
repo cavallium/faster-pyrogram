@@ -48,10 +48,10 @@ class DeleteStories:
             .. code-block:: python
 
                 # Delete a single story
-                app.delete_stories(chat_id, 1)
+                await app.delete_stories(chat_id, 1)
 
                 # Delete multiple stories
-                app.delete_stories(chat_id, [1, 2])
+                await app.delete_stories(chat_id, [1, 2])
         """
         is_iterable = not isinstance(story_ids, int)
         ids = list(story_ids) if is_iterable else [story_ids]

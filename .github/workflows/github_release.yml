@@ -1,0 +1,46 @@
+name: Upload release to GitHub
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions: write-all
+
+jobs:
+  build-n-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Build package
+        run: hatch build
+
+      - name: Get package version
+        run: |
+          echo "CURRENT_LIB_VERSION=v$(hatch version)" >> $GITHUB_ENV
+
+      - name: Create and upload release
+        id: upload-release-asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.CURRENT_LIB_VERSION }}
+          name: ${{ env.CURRENT_LIB_VERSION }}
+          generate_release_notes: true
+          make_latest: true
+          draft: false
+          prerelease: false
+          files: dist/*

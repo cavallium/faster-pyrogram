@@ -61,21 +61,21 @@ class RefundedPayment(Object):
 
     @staticmethod
     def _parse(
-        refunded_payment: "raw.types.MessageActionPaymentRefunded"
+        payment: "raw.types.MessageActionPaymentRefunded"
     ) -> "RefundedPayment":
         invoice_payload = None
 
         # Try to decode invoice payload into string. If that fails, fallback to bytes instead of decoding by
         # ignoring/replacing errors, this way, button clicks will still work.
         try:
-            invoice_payload = refunded_payment.payload.decode()
+            invoice_payload = payment.payload.decode()
         except (UnicodeDecodeError, AttributeError):
-            invoice_payload = getattr(refunded_payment, "payload", None)
+            invoice_payload = getattr(payment, "payload", None)
 
         return RefundedPayment(
-            currency=refunded_payment.currency,
-            total_amount=refunded_payment.total_amount,
+            currency=payment.currency,
+            total_amount=payment.total_amount,
             invoice_payload=invoice_payload,
-            telegram_payment_charge_id=refunded_payment.charge.id,
-            provider_payment_charge_id=refunded_payment.charge.provider_charge_id
+            telegram_payment_charge_id=payment.charge.id,
+            provider_payment_charge_id=payment.charge.provider_charge_id
         )

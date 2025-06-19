@@ -55,3 +55,9 @@ class PrivacyKey(AutoName):
 
     VOICE_MESSAGES = raw.types.InputPrivacyKeyVoiceMessages
     "Whether people can send you voice messages or round videos (Premium users only)."
+
+    GIFTS = raw.types.InputPrivacyKeyStarGiftsAutoSave
+    "Whether received gifts will be automatically displayed on our profile"
+
+    NO_PAID_MESSAGES = raw.types.InputPrivacyKeyNoPaidMessages
+    "Whether people who won't have to pay to send you messages"

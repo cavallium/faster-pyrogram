@@ -30,7 +30,7 @@ class PaidMediaInfo(Object):
         stars_amount (``int``):
             The number of Telegram Stars that must be paid to buy access to the media.
 
-        media  (List of :obj:`~pyrogram.types.Photo` | :obj:`~pyrogram.types.Video` | :obj:`~pyrogram.types.PaidMediaPreview`):
+        media (List of :obj:`~pyrogram.types.Photo` | :obj:`~pyrogram.types.Video` | :obj:`~pyrogram.types.PaidMediaPreview`):
             Information about the paid media.
     """
 

@@ -29,7 +29,7 @@ class WriteAccessAllowed(Object):
 
         web_app_name (``str``, *optional*):
             Name of the Web App, if the access was granted when the Web App was launched from a link
-        
+
         from_attachment_menu (``bool``, *optional*):
             True, if the access was granted when the bot was added to the attachment or side menu
 
@@ -51,7 +51,7 @@ class WriteAccessAllowed(Object):
     @staticmethod
     def _parse(action: "raw.types.MessageActionBotAllowed"):
         return WriteAccessAllowed(
-            from_request=action.from_request if action.from_request else None,
-            web_app_name=action.app.short_name if action.app is not None else None,
-            from_attachment_menu=action.attach_menu if action.attach_menu else None,
+            from_request=getattr(action, "from_request", None),
+            web_app_name=getattr(getattr(action, "app", None), "short_name", None),
+            from_attachment_menu=getattr(action, "attach_menu", None),
         )

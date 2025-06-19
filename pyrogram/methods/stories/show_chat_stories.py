@@ -44,7 +44,7 @@ class ShowChatStories:
             .. code-block:: python
 
                 # Show stories from specific chat
-                app.show_chat_stories(chat_id)
+                await app.show_chat_stories(chat_id)
         """
         r = await self.invoke(
             raw.functions.stories.TogglePeerStoriesHidden(

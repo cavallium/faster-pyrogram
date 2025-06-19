@@ -17,12 +17,11 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import Union, Optional
+from typing import Optional, Union
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
-from pyrogram import utils
+from pyrogram import raw, types, utils
+
 
 class ForwardStory:
     async def forward_story(
@@ -33,10 +32,21 @@ class ForwardStory:
         disable_notification: bool = None,
         message_thread_id: int = None,
         schedule_date: datetime = None,
+        paid_message_star_count: int = None,
+        protect_content: bool = None,
+        allow_paid_broadcast: bool = None,
+        reply_parameters: "types.ReplyParameters" = None,
+        reply_markup: Union[
+            "types.InlineKeyboardMarkup",
+            "types.ReplyKeyboardMarkup",
+            "types.ReplyKeyboardRemove",
+            "types.ForceReply"
+        ] = None,
+        message_effect_id: int = None
     ) -> Optional["types.Message"]:
         """Forward story.
 
-        .. include:: /_includes/usable-by/users.rst
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -63,6 +73,25 @@ class ForwardStory:
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
 
+            paid_message_star_count (``int``, *optional*):
+                The number of Telegram Stars the user agreed to pay to send the messages.
+
+            protect_content (``bool``, *optional*):
+                Pass True if the content of the message must be protected from forwarding and saving; for bots only.
+
+            allow_paid_broadcast (``bool``, *optional*):
+                Pass True to allow the message to ignore regular broadcast limits for a small fee; for bots only
+
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Description of the message to reply to.
+
+            reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
+                Additional interface options. An object for an inline keyboard, custom reply keyboard,
+                instructions to remove reply keyboard or to force a reply from the user.
+
+            message_effect_id (``int`` ``64-bit``, *optional*):
+                Unique identifier of the message effect to be added to the message; for private chats only.
+
         Returns:
             :obj:`~pyrogram.types.Message`: On success, the sent story message is returned.
 
@@ -83,19 +112,19 @@ class ForwardStory:
                 random_id=self.rnd_id(),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
                 message="",
-                reply_to=utils.get_reply_to(
-                    message_thread_id=message_thread_id
+                reply_to=await utils.get_reply_to(
+                    self,
+                    reply_parameters,
+                    message_thread_id
                 ),
+                allow_paid_stars=paid_message_star_count,
+                allow_paid_floodskip=allow_paid_broadcast,
+                reply_markup=await reply_markup.write(self) if reply_markup else None,
+                noforwards=protect_content,
+                effect=message_effect_id,
             )
         )
 
-        for i in r.updates:
-            if isinstance(i, (raw.types.UpdateNewMessage,
-                                raw.types.UpdateNewChannelMessage,
-                                raw.types.UpdateNewScheduledMessage)):
-                return await types.Message._parse(
-                    self, i.message,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats},
-                    is_scheduled=isinstance(i, raw.types.UpdateNewScheduledMessage)
-                )
+        messages = await utils.parse_messages(client=self, messages=r)
+
+        return messages[0] if messages else None

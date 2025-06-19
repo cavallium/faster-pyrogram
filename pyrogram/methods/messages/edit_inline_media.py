@@ -113,7 +113,7 @@ class EditInlineMedia:
         elif isinstance(media, types.InputMediaVideo):
             if is_uploaded_file:
                 media = raw.types.InputMediaUploadedDocument(
-                    mime_type=(None if is_bytes_io else self.guess_mime_type(media.media)) or "video/mp4",
+                    mime_type=self.guess_mime_type(media.media) or "video/mp4",
                     thumb=await self.save_file(media.thumb),
                     file=await self.save_file(media.media),
                     spoiler=media.has_spoiler,
@@ -136,7 +136,7 @@ class EditInlineMedia:
         elif isinstance(media, types.InputMediaAudio):
             if is_uploaded_file:
                 media = raw.types.InputMediaUploadedDocument(
-                    mime_type=(None if is_bytes_io else self.guess_mime_type(media.media)) or "audio/mpeg",
+                    mime_type=self.guess_mime_type(media.media) or "audio/mpeg",
                     thumb=await self.save_file(media.thumb),
                     file=await self.save_file(media.media),
                     attributes=[
@@ -156,7 +156,7 @@ class EditInlineMedia:
         elif isinstance(media, types.InputMediaAnimation):
             if is_uploaded_file:
                 media = raw.types.InputMediaUploadedDocument(
-                    mime_type=(None if is_bytes_io else self.guess_mime_type(media.media)) or "video/mp4",
+                    mime_type=self.guess_mime_type(media.media) or "video/mp4",
                     thumb=await self.save_file(media.thumb),
                     file=await self.save_file(media.media),
                     spoiler=media.has_spoiler,
@@ -181,7 +181,7 @@ class EditInlineMedia:
         elif isinstance(media, types.InputMediaDocument):
             if is_uploaded_file:
                 media = raw.types.InputMediaUploadedDocument(
-                    mime_type=(None if is_bytes_io else self.guess_mime_type(media.media)) or "application/zip",
+                    mime_type=self.guess_mime_type(media.media) or "application/zip",
                     thumb=await self.save_file(media.thumb),
                     file=await self.save_file(media.media),
                     attributes=filename_attribute,

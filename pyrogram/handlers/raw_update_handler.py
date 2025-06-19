@@ -34,6 +34,10 @@ class RawUpdateHandler(Handler):
             *(client, update, users, chats)* as positional arguments (look at the section below for
             a detailed description).
 
+        filters (:obj:`Filters`):
+            Pass one or more filters to allow only a subset of updates to be passed
+            in your callback function.
+
     Other Parameters:
         client (:obj:`~pyrogram.Client`):
             The Client itself, useful when you want to call other API methods inside the update handler.
@@ -53,7 +57,8 @@ class RawUpdateHandler(Handler):
             You can access extra info about the chat (such as *title*, *participants_count*, etc...)
             by using the IDs you find in the *update* argument (e.g.: *chats[1701277281]*).
 
-    Note:
+    .. note::
+
         The following Empty or Forbidden types may exist inside the *users* and *chats* dictionaries.
         They mean you have been blocked by the user or banned from the group/channel.
 
@@ -63,5 +68,5 @@ class RawUpdateHandler(Handler):
         - :obj:`~pyrogram.raw.types.ChannelForbidden`
     """
 
-    def __init__(self, callback: Callable):
-        super().__init__(callback)
+    def __init__(self, callback: Callable, filters=None):
+        super().__init__(callback, filters)

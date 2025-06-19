@@ -50,6 +50,7 @@ class Auth:
         self.proxy = client.proxy
         self.connection_factory = client.connection_factory
         self.protocol_factory = client.protocol_factory
+        self.loop = client.loop
 
         self.connection: Optional[Connection] = None
 
@@ -90,7 +91,8 @@ class Auth:
                 ipv6=self.ipv6,
                 proxy=self.proxy,
                 media=False,
-                protocol_factory=self.protocol_factory
+                protocol_factory=self.protocol_factory,
+                loop=self.loop
             )
 
             try:
@@ -280,6 +282,9 @@ class Auth:
                 log.debug("Server salt: %s", int.from_bytes(server_salt, "little"))
 
                 log.info("Done auth key exchange: %s", set_client_dh_params_answer.__class__.__name__)
+            except ConnectionError as e:
+                log.info("Unable to connect due to network issues.")
+                raise e
             except Exception as e:
                 log.info("Retrying due to %s: %s", type(e).__name__, e)
 

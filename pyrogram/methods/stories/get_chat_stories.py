@@ -66,7 +66,7 @@ class GetChatStories:
             yield await types.Story._parse(
                 self,
                 story,
+                r.stories.peer,
                 users,
-                chats,
-                r.stories.peer
+                chats
             )

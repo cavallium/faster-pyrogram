@@ -51,35 +51,27 @@ class SendCode:
 
             current_number (``bool``, *optional*):
                 Whether the phone number is the current one.
-                Defaults to None.
 
             allow_flashcall (``bool``, *optional*):
                 Whether to allow a flash call.
-                Defaults to None.
 
             allow_app_hash (``bool``, *optional*):
                 Whether to allow an app hash.
-                Defaults to None.
 
             allow_missed_call (``bool``, *optional*):
                 Whether to allow a missed call.
-                Defaults to None.
 
             allow_firebase (``bool``, *optional*):
                 Whether to allow firebase.
-                Defaults to None.
 
             logout_tokens (List of ``bytes``, *optional*):
                 List of logout tokens.
-                Defaults to None.
 
             token (``str``, *optional*):
                 Token.
-                Defaults to None.
 
             app_sandbox (``bool``, *optional*):
                 Whether to use the app sandbox.
-                Defaults to None.
 
         Returns:
             :obj:`~pyrogram.types.SentCode`: On success, an object containing information on the sent confirmation code

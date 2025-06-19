@@ -45,7 +45,7 @@ class JoinFolder:
             .. code-block:: python
 
                 # join folder
-                app.join_folder("t.me/addlist/ebXQ0Q0I3RnGQ")
+                await app.join_folder("t.me/addlist/ebXQ0Q0I3RnGQ")
         """
         match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:addlist/|\+))([\w-]+)$", link)
 

@@ -78,8 +78,8 @@ class GiveawayCompleted(Object):
         if chat and message_id:
             try:
                 giveaway_message = await client.get_messages(
-                    chat.id,
-                    message_id,
+                    chat_id=chat.id,
+                    message_ids=message_id,
                     replies=0
                 )
             except (errors.ChannelPrivate, errors.ChannelInvalid):

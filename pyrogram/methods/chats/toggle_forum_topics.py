@@ -27,7 +27,8 @@ class ToggleForumTopics:
     async def toggle_forum_topics(
         self: "pyrogram.Client",
         chat_id: Union[int, str],
-        enabled: bool = False
+        is_forum: bool = False,
+        has_forum_tabs: bool = False
     ) -> bool:
         """Enable or disable forum functionality in a supergroup.
 
@@ -40,6 +41,9 @@ class ToggleForumTopics:
             enabled (``bool``):
                 The new status. Pass True to enable forum topics.
 
+            has_forum_tabs (``bool``):
+                Whether to enable or disable tabs in the forum. Defaults to False.
+
         Returns:
             ``bool``: True on success. False otherwise.
 
@@ -47,16 +51,17 @@ class ToggleForumTopics:
             .. code-block:: python
 
                 # Change status of topics to disabled
-                await app.toggle_topics()
+                await app.toggle_forum_topics()
 
                 # Change status of topics to enabled
-                await app.toggle_topics(enabled=True)
+                await app.toggle_forum_topics(is_forum=True)
         """
         try:
             r = await self.invoke(
                 raw.functions.channels.ToggleForum(
                     channel=await self.resolve_peer(chat_id),
-                    enabled=enabled
+                    enabled=is_forum,
+                    tabs=has_forum_tabs
                 )
             )
 

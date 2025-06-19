@@ -32,6 +32,8 @@ class OnUserStatus:
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
         :obj:`~pyrogram.handlers.UserStatusHandler`.
 
+        .. include:: /_includes/usable-by/users.rst
+
         Parameters:
             filters (:obj:`~pyrogram.filters`, *optional*):
                 Pass one or more filters to allow only a subset of UserStatus updated to be passed in your function.

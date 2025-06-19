@@ -44,7 +44,7 @@ class HideChatStories:
             .. code-block:: python
 
                 # Hide stories from specific chat
-                app.hide_chat_stories(chat_id)
+                await app.hide_chat_stories(chat_id)
         """
         r = await self.invoke(
             raw.functions.stories.TogglePeerStoriesHidden(

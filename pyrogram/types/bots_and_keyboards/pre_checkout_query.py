@@ -96,13 +96,8 @@ class PreCheckoutQuery(Object, Update):
                 name=pre_checkout_query.info.name,
                 phone_number=pre_checkout_query.info.phone,
                 email=pre_checkout_query.info.email,
-                shipping_address=types.ShippingAddress(
-                    street_line1=pre_checkout_query.info.shipping_address.street_line1,
-                    street_line2=pre_checkout_query.info.shipping_address.street_line2,
-                    city=pre_checkout_query.info.shipping_address.city,
-                    state=pre_checkout_query.info.shipping_address.state,
-                    post_code=pre_checkout_query.info.shipping_address.post_code,
-                    country_code=pre_checkout_query.info.shipping_address.country_iso2
+                shipping_address=types.ShippingAddress._parse(
+                    pre_checkout_query.info.shipping_address
                 )
             ) if pre_checkout_query.info else None,
             client=client

@@ -16,40 +16,38 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import os
 import re
 from datetime import datetime
-from typing import Union, BinaryIO, Optional, Callable, List
+from typing import BinaryIO, Callable, List, Optional, Union
 
 import pyrogram
-from pyrogram import StopTransmission
-from pyrogram import raw
-from pyrogram import types
-from pyrogram import utils
-from pyrogram import enums
+from pyrogram import StopTransmission, enums, raw, types, utils
 from pyrogram.errors import FilePartMissing
 from pyrogram.file_id import FileType
 
+log = logging.getLogger(__name__)
 
 class SendSticker:
     async def send_sticker(
         self: "pyrogram.Client",
         chat_id: Union[int, str],
         sticker: Union[str, BinaryIO],
+        emoji: str = "",
+        caption: str = "",
+        parse_mode: Optional["enums.ParseMode"] = None,
+        caption_entities: List["types.MessageEntity"] = None,
         disable_notification: bool = None,
         message_thread_id: int = None,
+        direct_messages_chat_topic_id: int = None,
         effect_id: int = None,
-        reply_to_message_id: int = None,
-        reply_to_chat_id: Union[int, str] = None,
-        reply_to_story_id: int = None,
-        quote_text: str = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: List["types.MessageEntity"] = None,
-        quote_offset: int = None,
+        reply_parameters: "types.ReplyParameters" = None,
         schedule_date: datetime = None,
         protect_content: bool = None,
         business_connection_id: str = None,
         allow_paid_broadcast: bool = None,
+        paid_message_star_count: int = None,
         reply_markup: Union[
             "types.InlineKeyboardMarkup",
             "types.ReplyKeyboardMarkup",
@@ -57,7 +55,14 @@ class SendSticker:
             "types.ForceReply"
         ] = None,
         progress: Callable = None,
-        progress_args: tuple = ()
+        progress_args: tuple = (),
+
+        reply_to_message_id: int = None,
+        reply_to_chat_id: Union[int, str] = None,
+        reply_to_story_id: int = None,
+        quote_text: str = None,
+        quote_entities: List["types.MessageEntity"] = None,
+        quote_offset: int = None,
     ) -> Optional["types.Message"]:
         """Send static .webp or animated .tgs stickers.
 
@@ -76,39 +81,37 @@ class SendSticker:
                 pass a file path as string to upload a new sticker that exists on your local machine, or
                 pass a binary file-like object with its attribute ".name" set for in-memory uploads.
 
+            emoji (``str``, *optional*):
+                Emoji associated with this sticker.
+
+            caption (``str``, *optional*):
+                Sticker caption, 0-1024 characters.
+
+            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
+                By default, texts are parsed using both Markdown and HTML styles.
+                You can combine both syntaxes together.
+
+            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`):
+                List of special entities that appear in the caption, which can be specified instead of *parse_mode*.
+
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
             message_thread_id (``int``, *optional*):
                 Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
+                For forums only.
+
+            direct_messages_chat_topic_id (``int``, *optional*):
+                Unique identifier of the topic in a channel direct messages chat administered by the current user.
+                For directs only only.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
 
-            reply_to_message_id (``int``, *optional*):
-                If the message is a reply, ID of the original message.
-
-            reply_to_chat_id (``int``, *optional*):
-                If the message is a reply, ID of the original chat.
-
-            reply_to_story_id (``int``, *optional*):
-                If the message is a reply, ID of the target story.
-
-            quote_text (``str``, *optional*):
-                Text of the quote to be sent.
-
-            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
-                By default, texts are parsed using both Markdown and HTML styles.
-                You can combine both syntaxes together.
-
-            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
-                List of special entities that appear in quote text, which can be specified instead of *parse_mode*.
-
-            quote_offset (``int``, *optional*):
-                Offset for quote in original message.
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -124,6 +127,9 @@ class SendSticker:
                 Ignoring broadcasting limits for a fee of 0.1 Telegram Stars per message.
                 The relevant Stars will be withdrawn from the bot's balance.
                 For bots only.
+
+            paid_message_star_count (``int``, *optional*):
+                The number of Telegram Stars the user agreed to pay to send the messages.
 
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
                 Additional interface options. An object for an inline keyboard, custom reply keyboard,
@@ -165,6 +171,56 @@ class SendSticker:
                 # Send sticker using file_id
                 await app.send_sticker("me", file_id)
         """
+        if any(
+            (
+                reply_to_message_id is not None,
+                reply_to_chat_id is not None,
+                reply_to_story_id is not None,
+                quote_text is not None,
+                quote_entities is not None,
+                quote_offset is not None,
+            )
+        ):
+            if reply_to_message_id is not None:
+                log.warning(
+                    "`reply_to_message_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if reply_to_chat_id is not None:
+                log.warning(
+                    "`reply_to_chat_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if reply_to_story_id is not None:
+                log.warning(
+                    "`reply_to_story_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_text is not None:
+                log.warning(
+                    "`quote_text` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_entities is not None:
+                log.warning(
+                    "`quote_entities` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_offset is not None:
+                log.warning(
+                    "`quote_offset` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            reply_parameters = types.ReplyParameters(
+                message_id=reply_to_message_id,
+                chat_id=reply_to_chat_id,
+                story_id=reply_to_story_id,
+                quote=quote_text,
+                quote_parse_mode=parse_mode,
+                quote_entities=quote_entities,
+                quote_position=quote_offset
+            )
+
         file = None
 
         try:
@@ -175,7 +231,11 @@ class SendSticker:
                         mime_type=self.guess_mime_type(sticker) or "image/webp",
                         file=file,
                         attributes=[
-                            raw.types.DocumentAttributeFilename(file_name=os.path.basename(sticker))
+                            raw.types.DocumentAttributeFilename(file_name=os.path.basename(sticker)),
+                            raw.types.DocumentAttributeSticker(
+                                alt=emoji,
+                                stickerset=raw.types.InputStickerSetEmpty()
+                            ),
                         ]
                     )
                 elif re.match("^https?://", sticker):
@@ -190,11 +250,13 @@ class SendSticker:
                     mime_type=self.guess_mime_type(sticker.name) or "image/webp",
                     file=file,
                     attributes=[
-                        raw.types.DocumentAttributeFilename(file_name=sticker.name)
+                        raw.types.DocumentAttributeFilename(file_name=sticker.name),
+                        raw.types.DocumentAttributeSticker(
+                            alt=emoji,
+                            stickerset=raw.types.InputStickerSetEmpty()
+                        ),
                     ]
                 )
-
-            quote_text, quote_entities = (await utils.parse_text_entities(self, quote_text, parse_mode, quote_entities)).values()
 
             while True:
                 try:
@@ -204,39 +266,28 @@ class SendSticker:
                             peer=peer,
                             media=media,
                             silent=disable_notification or None,
-                            reply_to=utils.get_reply_to(
-                                reply_to_message_id=reply_to_message_id,
-                                message_thread_id=message_thread_id,
-                                reply_to_peer=await self.resolve_peer(reply_to_chat_id) if reply_to_chat_id else None,
-                                reply_to_story_id=reply_to_story_id,
-                                quote_text=quote_text,
-                                quote_entities=quote_entities,
-                                quote_offset=quote_offset,
+                            reply_to=await utils.get_reply_to(
+                                self,
+                                reply_parameters,
+                                message_thread_id,
+                                direct_messages_chat_topic_id
                             ),
                             random_id=self.rnd_id(),
                             schedule_date=utils.datetime_to_timestamp(schedule_date),
                             noforwards=protect_content,
                             allow_paid_floodskip=allow_paid_broadcast,
+                            allow_paid_stars=paid_message_star_count,
                             reply_markup=await reply_markup.write(self) if reply_markup else None,
-                            message="",
-                            effect=effect_id
+                            effect=effect_id,
+                            **await utils.parse_text_entities(self, caption, parse_mode, caption_entities)
                         ),
                         business_connection_id=business_connection_id
                     )
                 except FilePartMissing as e:
                     await self.save_file(sticker, file_id=file.id, file_part=e.value)
                 else:
-                    for i in r.updates:
-                        if isinstance(i, (raw.types.UpdateNewMessage,
-                                          raw.types.UpdateNewChannelMessage,
-                                          raw.types.UpdateNewScheduledMessage,
-                                          raw.types.UpdateBotNewBusinessMessage)):
-                            return await types.Message._parse(
-                                self, i.message,
-                                {i.id: i for i in r.users},
-                                {i.id: i for i in r.chats},
-                                is_scheduled=isinstance(i, raw.types.UpdateNewScheduledMessage),
-                                business_connection_id=getattr(i, "connection_id", None)
-                            )
+                    messages = await utils.parse_messages(client=self, messages=r)
+
+                    return messages[0] if messages else None
         except StopTransmission:
             return None

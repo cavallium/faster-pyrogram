@@ -44,7 +44,7 @@ class ApplyGiftCode:
             .. code-block:: python
 
                 # apply a gift code
-                app.apply_gift_code("t.me/giftcode/abc1234567def")
+                await app.apply_gift_code("t.me/giftcode/abc1234567def")
         """
         match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:giftcode/|\+))([\w-]+)$", link)
 

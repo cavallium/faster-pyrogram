@@ -16,10 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from typing import Union, List, Optional
 
 import pyrogram
-from pyrogram import raw, types
+from pyrogram import utils, raw, types
 
 
 class CreateInvoiceLink:
@@ -31,6 +32,7 @@ class CreateInvoiceLink:
         currency: str,
         prices: List["types.LabeledPrice"],
         provider_token: Optional[str] = None,
+        subscription_period: datetime = None,
         max_tip_amount: Optional[int] = None,
         suggested_tip_amounts: Optional[List[int]] = None,
         start_parameter: Optional[str] = None,
@@ -72,6 +74,11 @@ class CreateInvoiceLink:
 
             provider_token (``str``, *optional*):
                 Payment provider token, obtained via `@BotFather <https://t.me/botfather>`_. Pass an empty string for payments in `Telegram Stars <https://t.me/BotNews/90>`_.
+
+            subscription_period (:py:obj:`~datetime.datetime`, *optional*):
+                The number of seconds the subscription will be active for before the next payment.
+                The currency must be set to “XTR” (Telegram Stars) if the parameter is used.
+                Currently, it must always be 2592000 (30 days) if specified.
 
             max_tip_amount (``int``, *optional*):
                 The maximum accepted amount for tips in the smallest units of the currency (integer, **not** float/double). For example, for a maximum tip of ``US$ 1.45`` pass ``max_tip_amount = 145``. See the exp parameter in `currencies.json <https://core.telegram.org/bots/payments/currencies.json>`_, it shows the number of digits past the decimal point for each currency (2 for the majority of currencies). Defaults to 0. Not supported for payments in `Telegram Stars <https://t.me/BotNews/90>`_.
@@ -148,7 +155,8 @@ class CreateInvoiceLink:
                 phone_to_provider=send_phone_number_to_provider,
                 email_to_provider=send_email_to_provider,
                 max_tip_amount=max_tip_amount,
-                suggested_tip_amounts=suggested_tip_amounts
+                suggested_tip_amounts=suggested_tip_amounts,
+                subscription_period=utils.datetime_to_timestamp(subscription_period)
             ),
             payload=payload.encode() if isinstance(payload, str) else payload,
             provider=provider_token,

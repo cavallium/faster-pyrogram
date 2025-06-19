@@ -56,7 +56,6 @@ class SetProfilePhoto:
             is_public (``bool``, *optional*):
                 If set to True, the chosen profile photo will be shown to users that can't display
                 your main profile photo due to your privacy settings.
-                Defaults to None.
 
         Returns:
             ``bool``: True on success.

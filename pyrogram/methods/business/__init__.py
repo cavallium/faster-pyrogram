@@ -16,10 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from .delete_business_messages import DeleteBusinessMessages
+from .get_business_account_gifts import GetBusinessAccountGifts
+from .get_business_account_star_balance import GetBusinessAccountStarBalance
 from .get_business_connection import GetBusinessConnection
+from .transfer_business_account_stars import TransferBusinessAccountStars
 
 
 class Business(
-    GetBusinessConnection
+    DeleteBusinessMessages,
+    GetBusinessAccountGifts,
+    GetBusinessAccountStarBalance,
+    GetBusinessConnection,
+    TransferBusinessAccountStars,
 ):
     pass

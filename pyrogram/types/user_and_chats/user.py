@@ -17,15 +17,17 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 import html
+import logging
 from datetime import datetime
 from typing import List, Optional, Union
 
 import pyrogram
-from pyrogram import enums, utils
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import enums, raw, types, utils
+
 from ..object import Object
 from ..update import Update
+
+log = logging.getLogger(__name__)
 
 
 class Link(str):
@@ -81,18 +83,9 @@ class User(Object, Update):
         is_bot (``bool``, *optional*):
             True, if this user is a bot.
 
-        is_verified (``bool``, *optional*):
-            True, if this user has been verified by Telegram.
-
         is_restricted (``bool``, *optional*):
             True, if this user has been restricted. Bots only.
             See *restriction_reason* for details.
-
-        is_scam (``bool``, *optional*):
-            True, if this user has been flagged for scam.
-
-        is_fake (``bool``, *optional*):
-            True, if this user has been flagged for impersonation.
 
         is_support (``bool``, *optional*):
             True, if this user is part of the Telegram support team.
@@ -114,6 +107,12 @@ class User(Object, Update):
 
         is_business_bot (``bool``, *optional*):
             True, if this bot can connect to business account.
+
+        is_min (``bool``, *optional*):
+            True, if this user have reduced set of fields.
+
+        verification_status (:obj:`~pyrogram.types.VerificationStatus`, *optional*):
+            Information about verification status of the user.
 
         first_name (``str``, *optional*):
             User's or bot's first name.
@@ -191,6 +190,9 @@ class User(Object, Update):
         has_main_web_app (``bool``, *optional*):
             True, if the bot has a main Web App. Returned only in get_me.
 
+        paid_message_star_count (``int``, *optional*):
+            Number of Telegram Stars that must be paid by user for each sent message to the user.
+
         raw (:obj:`~pyrogram.raw.base.User` | :obj:`~pyrogram.raw.base.UserStatus`, *optional*):
             The raw user or user status object, as received from the Telegram API.
 
@@ -209,47 +211,47 @@ class User(Object, Update):
         *,
         client: "pyrogram.Client" = None,
         id: int,
-        is_self: bool = None,
-        is_contact: bool = None,
-        is_mutual_contact: bool = None,
-        is_deleted: bool = None,
-        is_bot: bool = None,
-        is_verified: bool = None,
-        is_restricted: bool = None,
-        is_scam: bool = None,
-        is_fake: bool = None,
-        is_support: bool = None,
-        is_premium: bool = None,
-        is_contact_require_premium: bool = None,
-        is_close_friend: bool = None,
-        is_stories_hidden: bool = None,
-        is_stories_unavailable: bool = None,
-        is_business_bot: bool = None,
-        first_name: str = None,
-        last_name: str = None,
-        status: "enums.UserStatus" = None,
-        last_online_date: datetime = None,
-        next_offline_date: datetime = None,
-        username: str = None,
-        usernames: List["types.Username"] = None,
-        language_code: str = None,
+        is_self: Optional[bool] = None,
+        is_contact: Optional[bool] = None,
+        is_mutual_contact: Optional[bool] = None,
+        is_deleted: Optional[bool] = None,
+        is_bot: Optional[bool] = None,
+        is_restricted: Optional[bool] = None,
+        is_support: Optional[bool] = None,
+        is_premium: Optional[bool] = None,
+        is_contact_require_premium: Optional[bool] = None,
+        is_close_friend: Optional[bool] = None,
+        is_stories_hidden: Optional[bool] = None,
+        is_stories_unavailable: Optional[bool] = None,
+        is_business_bot: Optional[bool] = None,
+        is_min: Optional[bool] = None,
+        verification_status: Optional["types.VerificationStatus"] = None,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        status: Optional["enums.UserStatus"] = None,
+        last_online_date: Optional[datetime] = None,
+        next_offline_date: Optional[datetime] = None,
+        username: Optional[str] = None,
+        usernames: Optional[List["types.Username"]] = None,
+        language_code: Optional[str] = None,
         emoji_status: Optional["types.EmojiStatus"] = None,
-        dc_id: int = None,
-        phone_number: str = None,
-        photo: "types.ChatPhoto" = None,
-        restrictions: List["types.Restriction"] = None,
-        reply_color: "types.ChatColor" = None,
-        profile_color: "types.ChatColor" = None,
-        added_to_attachment_menu: bool = None,
-        active_users_count: int = None,
-        inline_need_location: bool = None,
-        inline_query_placeholder: str = None,
-        can_be_edited: bool = None,
-        can_be_added_to_attachment_menu: bool = None,
-        can_join_groups: bool = None,
-        can_read_all_group_messages: bool = None,
-        has_main_web_app: bool = None,
-        raw: Union["raw.base.User", "raw.base.UserStatus"] = None
+        dc_id: Optional[int] = None,
+        phone_number: Optional[str] = None,
+        photo: Optional["types.ChatPhoto"] = None,
+        restrictions: Optional[List["types.Restriction"]] = None,
+        reply_color: Optional["types.ChatColor"] = None,
+        profile_color: Optional["types.ChatColor"] = None,
+        added_to_attachment_menu: Optional[bool] = None,
+        active_users_count: Optional[int] = None,
+        inline_need_location: Optional[bool] = None,
+        inline_query_placeholder: Optional[str] = None,
+        can_be_edited: Optional[bool] = None,
+        can_be_added_to_attachment_menu: Optional[bool] = None,
+        can_join_groups: Optional[bool] = None,
+        can_read_all_group_messages: Optional[bool] = None,
+        has_main_web_app: Optional[bool] = None,
+        paid_message_star_count: Optional[int] = None,
+        raw: Optional[Union["raw.base.User", "raw.base.UserStatus"]] = None
     ):
         super().__init__(client)
 
@@ -259,10 +261,7 @@ class User(Object, Update):
         self.is_mutual_contact = is_mutual_contact
         self.is_deleted = is_deleted
         self.is_bot = is_bot
-        self.is_verified = is_verified
         self.is_restricted = is_restricted
-        self.is_scam = is_scam
-        self.is_fake = is_fake
         self.is_support = is_support
         self.is_premium = is_premium
         self.is_contact_require_premium = is_contact_require_premium
@@ -270,6 +269,8 @@ class User(Object, Update):
         self.is_stories_hidden = is_stories_hidden
         self.is_stories_unavailable = is_stories_unavailable
         self.is_business_bot = is_business_bot
+        self.verification_status = verification_status
+        self.is_min = is_min
         self.first_name = first_name
         self.last_name = last_name
         self.status = status
@@ -294,6 +295,7 @@ class User(Object, Update):
         self.can_join_groups = can_join_groups
         self.can_read_all_group_messages = can_read_all_group_messages
         self.has_main_web_app = has_main_web_app
+        self.paid_message_star_count = paid_message_star_count
         self.raw = raw
 
     @property
@@ -308,6 +310,32 @@ class User(Object, Update):
             self._client.parse_mode
         )
 
+    # region Deprecated
+    # TODO: Remove later
+
+    @property
+    def is_verified(self) -> Optional[bool]:
+        log.warning(
+            "`user.is_verified` is deprecated and will be removed in future updates. Use `user.verification_status.is_verified` instead."
+        )
+        return getattr(self.verification_status, "is_verified", None)
+
+    @property
+    def is_scam(self) -> Optional[bool]:
+        log.warning(
+            "`user.is_scam` is deprecated and will be removed in future updates. Use `user.verification_status.is_scam` instead."
+        )
+        return getattr(self.verification_status, "is_scam", None)
+
+    @property
+    def is_fake(self) -> Optional[bool]:
+        log.warning(
+            "`user.is_fake` is deprecated and will be removed in future updates. Use `user.verification_status.is_fake` instead."
+        )
+        return getattr(self.verification_status, "is_fake", None)
+
+    # endregion
+
     @staticmethod
     def _parse(client, user: "raw.base.User") -> Optional["User"]:
         if user is None or isinstance(user, raw.types.UserEmpty):
@@ -320,10 +348,7 @@ class User(Object, Update):
             is_mutual_contact=user.mutual_contact,
             is_deleted=user.deleted,
             is_bot=user.bot,
-            is_verified=user.verified,
             is_restricted=user.restricted,
-            is_scam=user.scam,
-            is_fake=user.fake,
             is_support=user.support,
             is_premium=user.premium,
             is_contact_require_premium=user.contact_require_premium,
@@ -331,6 +356,8 @@ class User(Object, Update):
             is_stories_hidden=user.stories_hidden,
             is_stories_unavailable=user.stories_unavailable,
             is_business_bot=user.bot_business,
+            is_min=user.min,
+            verification_status=types.VerificationStatus._parse(user),
             first_name=user.first_name,
             last_name=user.last_name,
             **User._parse_status(user.status, user.bot),
@@ -353,6 +380,7 @@ class User(Object, Update):
             can_join_groups=getattr(user, "bot_nochats", None),
             can_read_all_group_messages=getattr(user, "bot_chat_history", None),
             has_main_web_app=getattr(user, "bot_has_main_app", None),
+            paid_message_star_count=getattr(user, "send_paid_messages_stars", None),
             raw=user,
             client=client
         )
@@ -445,7 +473,7 @@ class User(Object, Update):
 
         return await self._client.unarchive_chats(self.id)
 
-    def block(self):
+    async def block(self):
         """Bound method *block* of :obj:`~pyrogram.types.User`.
 
         Use as a shortcut for:
@@ -466,21 +494,21 @@ class User(Object, Update):
             RPCError: In case of a Telegram RPC error.
         """
 
-        return self._client.block_user(self.id)
+        return await self._client.block_user(self.id)
 
-    def unblock(self):
+    async def unblock(self):
         """Bound method *unblock* of :obj:`~pyrogram.types.User`.
 
         Use as a shortcut for:
 
         .. code-block:: python
 
-            client.unblock_user(123456789)
+            await client.unblock_user(123456789)
 
         Example:
             .. code-block:: python
 
-                user.unblock()
+                await user.unblock()
 
         Returns:
             True on success.
@@ -489,27 +517,27 @@ class User(Object, Update):
             RPCError: In case of a Telegram RPC error.
         """
 
-        return self._client.unblock_user(self.id)
+        return await self._client.unblock_user(self.id)
 
-    def get_common_chats(self):
+    async def get_common_chats(self):
         """Bound method *get_common_chats* of :obj:`~pyrogram.types.User`.
 
         Use as a shortcut for:
 
         .. code-block:: python
 
-            client.get_common_chats(123456789)
+            await client.get_common_chats(123456789)
 
         Example:
             .. code-block:: python
 
-                user.get_common_chats()
+                await user.get_common_chats()
 
         Returns:
-            True on success.
+            List of :obj:`~pyrogram.types.Chat`: On success, a list of the common chats is returned.
 
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
 
-        return self._client.get_common_chats(self.id)
+        return await self._client.get_common_chats(self.id)

@@ -36,18 +36,25 @@ from pyrogram.types.messages_and_media.message import Str
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES, DOCUMENT_TYPES
 
 
-async def ainput(prompt: str = "", *, hide: bool = False):
+async def ainput(prompt: str = "", *, hide: bool = False, loop: Optional[asyncio.AbstractEventLoop] = None):
     """Just like the built-in input, but async"""
+    if isinstance(loop, asyncio.AbstractEventLoop):
+        loop = loop
+    else:
+        loop = asyncio.get_event_loop()
+
     with ThreadPoolExecutor(1) as executor:
         func = functools.partial(getpass if hide else input, prompt)
-        return await asyncio.get_event_loop().run_in_executor(executor, func)
+        return await loop.run_in_executor(executor, func)
 
 
 def get_input_media_from_file_id(
     file_id: str,
     expected_file_type: FileType = None,
     ttl_seconds: int = None,
-    has_spoiler: bool = None
+    has_spoiler: bool = None,
+    video_cover: "raw.types.InputPhoto" = None,
+    video_start_timestamp: int = None,
 ) -> Union["raw.types.InputMediaPhoto", "raw.types.InputMediaDocument"]:
     try:
         decoded = FileId.decode(file_id)
@@ -84,7 +91,9 @@ def get_input_media_from_file_id(
                 file_reference=decoded.file_reference
             ),
             spoiler=has_spoiler,
-            ttl_seconds=ttl_seconds
+            ttl_seconds=ttl_seconds,
+            video_cover=video_cover,
+            video_timestamp=video_start_timestamp
         )
 
     raise ValueError(f"Unknown file id: {file_id}")
@@ -93,8 +102,7 @@ def get_input_media_from_file_id(
 async def parse_messages(
     client: "pyrogram.Client",
     messages: Union["raw.base.messages.Messages", "raw.base.Updates"],
-    replies: int = 1,
-    business_connection_id: str = None
+    replies: int = 1
 ) -> List["types.Message"]:
     users = {i.id: i for i in getattr(messages, "users", [])}
     chats = {i.id: i for i in getattr(messages, "chats", [])}
@@ -122,8 +130,7 @@ async def parse_messages(
                     users=users,
                     chats=chats,
                     topics=topics,
-                    replies=0,
-                    business_connection_id=business_connection_id
+                    replies=0
                 )
             )
 
@@ -151,8 +158,9 @@ async def parse_messages(
 
                 if is_all_replies_in_same_chat:
                     reply_messages = await client.get_messages(
-                        chat_id,
-                        reply_to_message_ids=list(messages_with_replies.keys()),
+                        chat_id=chat_id,
+                        message_ids=list(messages_with_replies.keys()),
+                        reply=True,
                         replies=replies - 1
                     )
                 else:
@@ -192,9 +200,9 @@ async def parse_messages(
                         users,
                         chats,
                         is_scheduled=isinstance(u, raw.types.UpdateNewScheduledMessage),
-                        business_connection_id=getattr(u, "connection_id", business_connection_id),
+                        business_connection_id=getattr(u, "connection_id", None),
                         raw_reply_to_message=getattr(u, "reply_to_message", None),
-                        replies=0
+                        replies=replies
                     )
                 )
 
@@ -286,11 +294,11 @@ def unpack_inline_message_id(inline_message_id: str) -> "raw.base.InputBotInline
         )
 
 
-MIN_CHANNEL_ID_OLD = -1002147483647
 MIN_CHANNEL_ID = -100999999999999
 MAX_CHANNEL_ID = -1000000000000
+MIN_MONOFORUM_CHANNEL_ID = 1070000000000
+MAX_MONOFORUM_CHANNEL_ID = 107999999999999
 MIN_CHAT_ID = -999999999999
-MAX_USER_ID_OLD = 2147483647
 MAX_USER_ID = 999999999999
 
 
@@ -317,6 +325,9 @@ def get_peer_id(peer: Union[raw.base.Peer, raw.base.InputPeer, raw.base.Requeste
         return -peer.chat_id
 
     if isinstance(peer, (raw.types.PeerChannel, raw.types.InputPeerChannel, raw.types.RequestedPeerChannel)):
+        if MIN_MONOFORUM_CHANNEL_ID <= peer.channel_id < MAX_MONOFORUM_CHANNEL_ID:
+            return peer.channel_id
+
         return MAX_CHANNEL_ID - peer.channel_id
 
     raise ValueError(f"Peer type invalid: {peer}")
@@ -329,39 +340,72 @@ def get_peer_type(peer_id: int) -> str:
 
         if MIN_CHANNEL_ID <= peer_id < MAX_CHANNEL_ID:
             return "channel"
+
     elif 0 < peer_id <= MAX_USER_ID:
         return "user"
+
+    elif MIN_MONOFORUM_CHANNEL_ID <= peer_id < MAX_MONOFORUM_CHANNEL_ID:
+        return "monoforum"
 
     raise ValueError(f"Peer id invalid: {peer_id}")
 
 
-def get_reply_to(
-    reply_to_message_id: Optional[int] = None,
+async def get_reply_to(
+    client: "pyrogram.Client",
+    reply_parameters: Optional["types.ReplyParameters"] = None,
     message_thread_id: Optional[int] = None,
-    reply_to_peer: Optional[raw.base.InputPeer] = None,
-    quote_text: Optional[str] = None,
-    quote_entities: Optional[List[raw.base.MessageEntity]] = None,
-    quote_offset: Optional[int] = None,
-    reply_to_story_id: Optional[int] = None
-) -> Optional[Union[raw.types.InputReplyToMessage, raw.types.InputReplyToStory]]:
+    direct_messages_chat_topic_id: Optional[int] = None
+) -> Optional[Union[raw.types.InputReplyToMessage, raw.types.InputReplyToStory, raw.types.InputReplyToMonoForum]]:
     """Get InputReply for reply_to argument"""
-    if all((reply_to_peer, reply_to_story_id)):
-        return raw.types.InputReplyToStory(peer=reply_to_peer, story_id=reply_to_story_id)  # type: ignore[arg-type]
+    if reply_parameters:
+        if reply_parameters.chat_id and reply_parameters.story_id:
+            return raw.types.InputReplyToStory(
+                peer=await client.resolve_peer(reply_parameters.chat_id),
+                story_id=reply_parameters.story_id
+            )
 
-    if any((reply_to_message_id, message_thread_id)):
+        if reply_parameters.message_id:
+            message = None
+            entities = None
+
+            if reply_parameters.quote:
+                message, entities = (
+                    await parse_text_entities(
+                        client,
+                        reply_parameters.quote,
+                        reply_parameters.quote_parse_mode,
+                        reply_parameters.quote_entities
+                    )
+                ).values()
+
+            return raw.types.InputReplyToMessage(
+                reply_to_msg_id=reply_parameters.message_id,
+                top_msg_id=message_thread_id,
+                reply_to_peer_id=await client.resolve_peer(reply_parameters.chat_id),
+                quote_text=message,
+                quote_entities=entities,
+                quote_offset=reply_parameters.quote_position,
+                monoforum_peer_id=await client.resolve_peer(direct_messages_chat_topic_id)
+            )
+
+
+    if message_thread_id:
         return raw.types.InputReplyToMessage(
-            reply_to_msg_id=reply_to_message_id or message_thread_id,  # type: ignore[arg-type]
-            top_msg_id=message_thread_id if reply_to_message_id else None,
-            reply_to_peer_id=reply_to_peer,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
-            quote_offset=quote_offset,
+            reply_to_msg_id=message_thread_id
+        )
+
+    if direct_messages_chat_topic_id:
+        return raw.types.InputReplyToMonoForum(
+            monoforum_peer_id=await client.resolve_peer(direct_messages_chat_topic_id)
         )
 
     return None
 
 
 def get_channel_id(peer_id: int) -> int:
+    if MIN_MONOFORUM_CHANNEL_ID <= peer_id < MAX_MONOFORUM_CHANNEL_ID:
+        return peer_id
+
     return MAX_CHANNEL_ID - peer_id
 
 

@@ -29,12 +29,20 @@ from pyrogram import raw
 from pyrogram.connection import Connection
 from pyrogram.crypto import mtproto
 from pyrogram.errors import (
-    RPCError, InternalServerError, AuthKeyDuplicated, FloodWait, FloodPremiumWait, ServiceUnavailable, BadMsgNotification,
-    SecurityCheckMismatch, Unauthorized
+    AuthKeyDuplicated,
+    BadMsgNotification,
+    FloodPremiumWait,
+    FloodWait,
+    InternalServerError,
+    RPCError,
+    SecurityCheckMismatch,
+    ServiceUnavailable,
+    Unauthorized,
 )
 from pyrogram.raw.all import layer
-from pyrogram.raw.core import TLObject, MsgContainer, Int, FutureSalts
-from .internals import MsgId, MsgFactory
+from pyrogram.raw.core import FutureSalts, Int, MsgContainer, TLObject
+
+from .internals import MsgFactory, MsgId
 
 log = logging.getLogger(__name__)
 
@@ -98,8 +106,6 @@ class Session:
 
         self.is_started = asyncio.Event()
 
-        self.loop = asyncio.get_event_loop()
-
     async def start(self):
         while True:
             self.connection = self.client.connection_factory(
@@ -108,13 +114,14 @@ class Session:
                 ipv6=self.client.ipv6,
                 proxy=self.client.proxy,
                 media=self.is_media,
-                protocol_factory=self.client.protocol_factory
+                protocol_factory=self.client.protocol_factory,
+                loop=self.client.loop
             )
 
             try:
                 await self.connection.connect()
 
-                self.recv_task = self.loop.create_task(self.recv_worker())
+                self.recv_task = self.client.loop.create_task(self.recv_worker())
 
                 await self.send(raw.functions.Ping(ping_id=0), timeout=self.START_TIMEOUT)
 
@@ -137,14 +144,17 @@ class Session:
                         timeout=self.START_TIMEOUT
                     )
 
-                self.ping_task = self.loop.create_task(self.ping_worker())
+                self.ping_task = self.client.loop.create_task(self.ping_worker())
 
-                log.info("Session initialized: Layer %s", layer)
+                log.info("Session initialized: Pyrogram v%s (Layer %s)", pyrogram.__version__, layer)
                 log.info("Device: %s - %s", self.client.device_model, self.client.app_version)
                 log.info("System: %s (%s)", self.client.system_version, self.client.lang_code)
             except (AuthKeyDuplicated, Unauthorized) as e:
                 await self.stop()
                 raise e
+            except ConnectionError as e:
+                await self.stop()
+                # raise e
             except (OSError, RPCError):
                 await self.stop()
             except Exception as e:
@@ -157,7 +167,19 @@ class Session:
 
         log.info("Session started")
 
+        if callable(self.client.connect_handler):
+            try:
+                await self.client.connect_handler(self.client, self)
+            except Exception as e:
+                log.exception(e)
+
     async def stop(self):
+        if callable(self.client.disconnect_handler):
+            try:
+                await self.client.disconnect_handler(self.client, self)
+            except Exception as e:
+                log.exception(e)
+
         self.is_started.clear()
 
         self.stored_msg_ids.clear()
@@ -174,12 +196,6 @@ class Session:
         if self.recv_task:
             await self.recv_task
 
-        if not self.is_media and callable(self.client.disconnect_handler):
-            try:
-                await self.client.disconnect_handler(self.client)
-            except Exception as e:
-                log.exception(e)
-
         log.info("Session stopped")
 
     async def restart(self):
@@ -188,7 +204,7 @@ class Session:
 
     async def handle_packet(self, packet):
         try:
-            data = await self.loop.run_in_executor(
+            data = await self.client.loop.run_in_executor(
                 pyrogram.crypto_executor,
                 mtproto.unpack,
                 BytesIO(packet),
@@ -198,7 +214,7 @@ class Session:
             )
         except ValueError as e:
             log.debug(e)
-            self.loop.create_task(self.restart())
+            self.client.loop.create_task(self.restart())
             return
 
         messages = (
@@ -260,7 +276,7 @@ class Session:
                 msg_id = msg.body.msg_id
             else:
                 if self.client is not None:
-                    self.loop.create_task(self.client.handle_updates(msg.body))
+                    self.client.loop.create_task(self.client.handle_updates(msg.body))
 
             if msg_id in self.results:
                 self.results[msg_id].value = getattr(msg.body, "result", msg.body)
@@ -294,7 +310,7 @@ class Session:
                     ), False
                 )
             except OSError:
-                self.loop.create_task(self.restart())
+                self.client.loop.create_task(self.restart())
                 break
             except RPCError:
                 pass
@@ -323,11 +339,11 @@ class Session:
                     )
 
                 if self.is_started.is_set():
-                    self.loop.create_task(self.restart())
+                    self.client.loop.create_task(self.restart())
 
                 break
 
-            self.loop.create_task(self.handle_packet(packet))
+            self.client.loop.create_task(self.handle_packet(packet))
 
         log.info("NetworkTask stopped")
 
@@ -340,7 +356,7 @@ class Session:
 
         log.debug("Sent: %s", message)
 
-        payload = await self.loop.run_in_executor(
+        payload = await self.client.loop.run_in_executor(
             pyrogram.crypto_executor,
             mtproto.pack,
             message,

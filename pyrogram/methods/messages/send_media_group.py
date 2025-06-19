@@ -20,13 +20,10 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import Union, List, Optional
+from typing import List, Optional, Union
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
-from pyrogram import utils
-from pyrogram import enums
+from pyrogram import enums, raw, types, utils
 from pyrogram.file_id import FileType
 
 log = logging.getLogger(__name__)
@@ -45,7 +42,16 @@ class SendMediaGroup:
         ]],
         disable_notification: bool = None,
         message_thread_id: int = None,
+        direct_messages_chat_topic_id: int = None,
         effect_id: int = None,
+        reply_parameters: "types.ReplyParameters" = None,
+        schedule_date: datetime = None,
+        protect_content: bool = None,
+        show_caption_above_media: bool = None,
+        business_connection_id: str = None,
+        allow_paid_broadcast: bool = None,
+        paid_message_star_count: int = None,
+
         reply_to_message_id: int = None,
         reply_to_chat_id: Union[int, str] = None,
         reply_to_story_id: int = None,
@@ -53,11 +59,6 @@ class SendMediaGroup:
         parse_mode: Optional["enums.ParseMode"] = None,
         quote_entities: List["types.MessageEntity"] = None,
         quote_offset: int = None,
-        schedule_date: datetime = None,
-        protect_content: bool = None,
-        show_caption_above_media: bool = None,
-        business_connection_id: str = None,
-        allow_paid_broadcast: bool = None
     ) -> List["types.Message"]:
         """Send a group of photos or videos as an album.
 
@@ -78,33 +79,18 @@ class SendMediaGroup:
 
             message_thread_id (``int``, *optional*):
                 Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
+                For forums only.
+
+            direct_messages_chat_topic_id (``int``, *optional*):
+                Unique identifier of the topic in a channel direct messages chat administered by the current user.
+                For directs only only.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
 
-            reply_to_message_id (``int``, *optional*):
-                If the message is a reply, ID of the original message.
-
-            reply_to_chat_id (``int``, *optional*):
-                If the message is a reply, ID of the original chat.
-
-            reply_to_story_id (``int``, *optional*):
-                If the message is a reply, ID of the target story.
-
-            quote_text (``str``, *optional*):
-                Text of the quote to be sent.
-
-            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
-                By default, texts are parsed using both Markdown and HTML styles.
-                You can combine both syntaxes together.
-
-            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
-                List of special entities that appear in quote text, which can be specified instead of *parse_mode*.
-
-            quote_offset (``int``, *optional*):
-                Offset for quote in original message.
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -124,6 +110,9 @@ class SendMediaGroup:
                 The relevant Stars will be withdrawn from the bot's balance.
                 For bots only.
 
+            paid_message_star_count (``int``, *optional*):
+                The number of Telegram Stars the user agreed to pay to send the messages.
+
         Returns:
             List of :obj:`~pyrogram.types.Message`: On success, a list of the sent messages is returned.
 
@@ -141,6 +130,62 @@ class SendMediaGroup:
                     ]
                 )
         """
+        if any(
+            (
+                reply_to_message_id is not None,
+                reply_to_chat_id is not None,
+                reply_to_story_id is not None,
+                quote_text is not None,
+                parse_mode is not None,
+                quote_entities is not None,
+                quote_offset is not None,
+            )
+        ):
+            if reply_to_message_id is not None:
+                log.warning(
+                    "`reply_to_message_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if reply_to_chat_id is not None:
+                log.warning(
+                    "`reply_to_chat_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if reply_to_story_id is not None:
+                log.warning(
+                    "`reply_to_story_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_text is not None:
+                log.warning(
+                    "`quote_text` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if parse_mode is not None:
+                log.warning(
+                    "`parse_mode` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_entities is not None:
+                log.warning(
+                    "`quote_entities` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_offset is not None:
+                log.warning(
+                    "`quote_offset` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            reply_parameters = types.ReplyParameters(
+                message_id=reply_to_message_id,
+                chat_id=reply_to_chat_id,
+                story_id=reply_to_story_id,
+                quote=quote_text,
+                quote_parse_mode=parse_mode,
+                quote_entities=quote_entities,
+                quote_position=quote_offset
+            )
+
         multi_media = []
 
         for i in media:
@@ -455,53 +500,27 @@ class SendMediaGroup:
                 )
             )
 
-        quote_text, quote_entities = (await utils.parse_text_entities(self, quote_text, parse_mode, quote_entities)).values()
-
         peer = await self.resolve_peer(chat_id)
         r = await self.invoke(
             raw.functions.messages.SendMultiMedia(
                 peer=peer,
                 multi_media=multi_media,
                 silent=disable_notification or None,
-                reply_to=utils.get_reply_to(
-                    reply_to_message_id=reply_to_message_id,
-                    message_thread_id=message_thread_id,
-                    reply_to_peer=await self.resolve_peer(reply_to_chat_id) if reply_to_chat_id else None,
-                    reply_to_story_id=reply_to_story_id,
-                    quote_text=quote_text,
-                    quote_entities=quote_entities,
-                    quote_offset=quote_offset,
+                reply_to=await utils.get_reply_to(
+                    self,
+                    reply_parameters,
+                    message_thread_id,
+                    direct_messages_chat_topic_id
                 ),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
                 noforwards=protect_content,
                 invert_media=show_caption_above_media,
                 allow_paid_floodskip=allow_paid_broadcast,
+                allow_paid_stars=paid_message_star_count,
                 effect=effect_id,
             ),
             sleep_threshold=60,
             business_connection_id=business_connection_id
         )
 
-        conn_id = None
-
-        for u in r.updates:
-            if getattr(u, "connection_id", None):
-                conn_id = u.connection_id
-                break
-
-
-        return await utils.parse_messages(
-            self,
-            raw.types.messages.Messages(
-                messages=[m.message for m in filter(
-                    lambda u: isinstance(u, (raw.types.UpdateNewMessage,
-                                             raw.types.UpdateNewChannelMessage,
-                                             raw.types.UpdateNewScheduledMessage,
-                                             raw.types.UpdateBotNewBusinessMessage)),
-                    r.updates
-                )],
-                users=r.users,
-                chats=r.chats
-            ),
-            business_connection_id=conn_id
-        )
+        return await utils.parse_messages(client=self, messages=r)

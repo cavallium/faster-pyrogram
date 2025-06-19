@@ -44,7 +44,7 @@ class CheckGiftCode:
             .. code-block:: python
 
                 # get information about a gift code
-                app.check_gift_code("t.me/giftcode/abc1234567def")
+                await app.check_gift_code("t.me/giftcode/abc1234567def")
         """
         match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:giftcode/|\+))([\w-]+)$", link)
 

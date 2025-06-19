@@ -38,7 +38,7 @@ class GetBoosts:
             .. code-block:: python
 
                 # get boosts list
-                app.get_boosts()
+                await app.get_boosts()
         """
         r = await self.invoke(
             raw.functions.premium.GetMyBoosts()

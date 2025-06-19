@@ -1,5 +1,5 @@
 {title}
 {title_markup}
 
-.. autoclass:: {full_class_path}()
-    :members:
+.. {directive_type}:: {full_class_path}{directive_suffix}
+    :{directive_option}:

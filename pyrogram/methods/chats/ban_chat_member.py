@@ -36,7 +36,8 @@ class BanChatMember:
         invite links, etc., unless unbanned first. You must be an administrator in the chat for this to work and must
         have the appropriate admin rights.
 
-        Note:
+        .. note::
+
             In regular groups (non-supergroups), this method will only work if the "All Members Are Admins" setting is
             off in the target group. Otherwise members may only be removed by the group's creator or by the member
             that added them.
@@ -100,12 +101,6 @@ class BanChatMember:
                 )
             )
 
-        for i in r.updates:
-            if isinstance(i, (raw.types.UpdateNewMessage, raw.types.UpdateNewChannelMessage)):
-                return await types.Message._parse(
-                    self, i.message,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats}
-                )
-        else:
-            return True
+        messages = await utils.parse_messages(client=self, messages=r)
+
+        return messages[0] if messages else True

@@ -29,6 +29,10 @@ class ResetSession:
 
         .. include:: /_includes/usable-by/users.rst
 
+        Parameters:
+            id (``int``):
+                Session hash to reset.
+
         Returns:
             ``bool``: On success, in case the session is destroyed, True is returned. Otherwise, False is returned.
 

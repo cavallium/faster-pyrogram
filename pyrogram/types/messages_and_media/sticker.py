@@ -153,19 +153,23 @@ class Sticker(Object):
         sticker: "raw.types.Document",
         document_attributes: Dict[Type["raw.base.DocumentAttribute"], "raw.base.DocumentAttribute"],
     ) -> "Sticker":
-        sticker_attributes = (
-            document_attributes[raw.types.DocumentAttributeSticker]
-            if raw.types.DocumentAttributeSticker in document_attributes
-            else document_attributes[raw.types.DocumentAttributeCustomEmoji]
-        )
+        sticker_attribute = None
+        set_name = None
+
+        if document_attributes.get(raw.types.DocumentAttributeSticker):
+            sticker_attribute = document_attributes[raw.types.DocumentAttributeSticker]
+        elif document_attributes.get(raw.types.DocumentAttributeCustomEmoji):
+            sticker_attribute = document_attributes[raw.types.DocumentAttributeCustomEmoji]
 
         image_size_attributes = document_attributes.get(raw.types.DocumentAttributeImageSize, None)
         file_name = getattr(document_attributes.get(raw.types.DocumentAttributeFilename, None), "file_name", None)
         video_attributes = document_attributes.get(raw.types.DocumentAttributeVideo, None)
 
-        sticker_set = sticker_attributes.stickerset
+        if sticker_attribute:
+            sticker_set = sticker_attribute.stickerset
 
         if isinstance(sticker_set, raw.types.InputStickerSetID):
+            # TODO: disabled to make it faster
             # input_sticker_set_id = (sticker_set.id, sticker_set.access_hash)
             set_name = None # set_name = await Sticker._get_sticker_set_name(client.invoke, input_sticker_set_id)
         else:
@@ -202,7 +206,7 @@ class Sticker(Object):
             is_premium=bool(sticker.video_thumbs),
             # TODO: mask_position
             set_name=set_name,
-            emoji=sticker_attributes.alt or None,
+            emoji=getattr(sticker_attribute, "alt", None) or None,
             file_size=sticker.size,
             mime_type=sticker.mime_type,
             file_name=file_name,

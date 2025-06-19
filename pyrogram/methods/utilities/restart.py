@@ -44,20 +44,21 @@ class Restart:
         Example:
             .. code-block:: python
 
-                from pyrogram import Client
+                import asyncio
 
-                app = Client("my_account")
+                from pyrogram import Client
 
 
                 async def main():
+                    app = Client("my_account")
+
                     await app.start()
                     ...  # Invoke API methods
                     await app.restart()
                     ...  # Invoke other API methods
                     await app.stop()
 
-
-                app.run(main())
+                asyncio.run(main())
         """
 
         async def do_it():

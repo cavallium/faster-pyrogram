@@ -42,8 +42,10 @@ class CopyMessage:
         schedule_date: datetime = None,
         protect_content: bool = None,
         has_spoiler: bool = None,
+        show_caption_above_media: bool = None,
         business_connection_id: str = None,
         allow_paid_broadcast: bool = None,
+        paid_message_star_count: int = None,
         reply_markup: Union[
             "types.InlineKeyboardMarkup",
             "types.ReplyKeyboardMarkup",
@@ -107,12 +109,24 @@ class CopyMessage:
             has_spoiler (``bool``, *optional*):
                 True, if the message media is covered by a spoiler animation.
 
+            show_caption_above_media (``bool``, *optional*):
+                If True, caption must be shown above the message media.
+
             business_connection_id (``str``, *optional*):
                 Unique identifier of the business connection on behalf of which the message will be sent.
 
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
                 Additional interface options. An object for an inline keyboard, custom reply keyboard,
                 instructions to remove reply keyboard or to force a reply from the user.
+
+            allow_paid_broadcast (``bool``, *optional*):
+                If True, you will be allowed to send up to 1000 messages per second.
+                Ignoring broadcasting limits for a fee of 0.1 Telegram Stars per message.
+                The relevant Stars will be withdrawn from the bot's balance.
+                For bots only.
+
+            paid_message_star_count (``int``, *optional*):
+                The number of Telegram Stars the user agreed to pay to send the messages.
 
         Returns:
             :obj:`~pyrogram.types.Message`: On success, the copied message is returned.
@@ -124,7 +138,7 @@ class CopyMessage:
                 await app.copy_message(to_chat, from_chat, 123)
 
         """
-        message: types.Message = await self.get_messages(from_chat_id, message_id)
+        message: types.Message = await self.get_messages(chat_id=from_chat_id, message_ids=message_id)
 
         return await message.copy(
             chat_id=chat_id,
@@ -138,7 +152,9 @@ class CopyMessage:
             schedule_date=schedule_date,
             protect_content=protect_content,
             has_spoiler=has_spoiler,
+            show_caption_above_media=show_caption_above_media,
             allow_paid_broadcast=allow_paid_broadcast,
+            paid_message_star_count=paid_message_star_count,
             reply_markup=reply_markup,
             business_connection_id=business_connection_id
         )

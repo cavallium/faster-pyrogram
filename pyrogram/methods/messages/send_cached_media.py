@@ -16,13 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 from datetime import datetime
-from typing import Union, List, Optional
+from typing import List, Optional, Union
 
 import pyrogram
-from pyrogram import raw, enums, types
-from pyrogram import utils
+from pyrogram import enums, raw, types, utils
 
+log = logging.getLogger(__name__)
 
 class SendCachedMedia:
     async def send_cached_media(
@@ -34,24 +35,29 @@ class SendCachedMedia:
         caption_entities: List["types.MessageEntity"] = None,
         disable_notification: bool = None,
         message_thread_id: int = None,
+        direct_messages_chat_topic_id: int = None,
+        reply_parameters: "types.ReplyParameters" = None,
+        schedule_date: datetime = None,
+        protect_content: bool = None,
+        has_spoiler: bool = None,
+        effect_id: int = None,
+        show_caption_above_media: bool = None,
+        business_connection_id: str = None,
+        allow_paid_broadcast: bool = None,
+        paid_message_star_count: int = None,
+        reply_markup: Union[
+            "types.InlineKeyboardMarkup",
+            "types.ReplyKeyboardMarkup",
+            "types.ReplyKeyboardRemove",
+            "types.ForceReply"
+        ] = None,
+
         reply_to_message_id: int = None,
         reply_to_chat_id: Union[int, str] = None,
         reply_to_story_id: int = None,
         quote_text: str = None,
         quote_offset: int = None,
         quote_entities: List["types.MessageEntity"] = None,
-        schedule_date: datetime = None,
-        protect_content: bool = None,
-        has_spoiler: bool = None,
-        show_caption_above_media: bool = None,
-        business_connection_id: str = None,
-        allow_paid_broadcast: bool = None,
-        reply_markup: Union[
-            "types.InlineKeyboardMarkup",
-            "types.ReplyKeyboardMarkup",
-            "types.ReplyKeyboardRemove",
-            "types.ForceReply"
-        ] = None
     ) -> Optional["types.Message"]:
         """Send any media stored on the Telegram servers using a file_id.
 
@@ -87,22 +93,14 @@ class SendCachedMedia:
 
             message_thread_id (``int``, *optional*):
                 Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
+                For forums only.
 
-            reply_to_message_id (``int``, *optional*):
-                If the message is a reply, ID of the original message.
+            direct_messages_chat_topic_id (``int``, *optional*):
+                Unique identifier of the topic in a channel direct messages chat administered by the current user.
+                For directs only only.
 
-            reply_to_story_id (``int``, *optional*):
-                If the message is a reply, ID of the target story.
-
-            quote_text (``str``, *optional*):
-                Text of the quote to be sent.
-
-            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
-                List of special entities that appear in quote text, which can be specified instead of *parse_mode*.
-
-            quote_offset (``int``, *optional*):
-                Offset for quote in original message.
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -112,6 +110,10 @@ class SendCachedMedia:
 
             has_spoiler (``bool``, *optional*):
                 True, if the message media is covered by a spoiler animation.
+
+            effect_id (``int``, *optional*):
+                Unique identifier of the message effect.
+                For private chats only.
 
             show_caption_above_media (``bool``, *optional*):
                 Pass True, if the caption must be shown above the message media.
@@ -125,6 +127,9 @@ class SendCachedMedia:
                 The relevant Stars will be withdrawn from the bot's balance.
                 For bots only.
 
+            paid_message_star_count (``int``, *optional*):
+                The number of Telegram Stars the user agreed to pay to send the messages.
+
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
                 Additional interface options. An object for an inline keyboard, custom reply keyboard,
                 instructions to remove reply keyboard or to force a reply from the user.
@@ -137,44 +142,80 @@ class SendCachedMedia:
 
                 await app.send_cached_media("me", file_id)
         """
-        quote_text, quote_entities = (await utils.parse_text_entities(self, quote_text, parse_mode, quote_entities)).values()
+        if any(
+            (
+                reply_to_message_id is not None,
+                reply_to_chat_id is not None,
+                reply_to_story_id is not None,
+                quote_text is not None,
+                quote_entities is not None,
+                quote_offset is not None,
+            )
+        ):
+            if reply_to_message_id is not None:
+                log.warning(
+                    "`reply_to_message_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
 
-        peer = await self.resolve_peer(chat_id)
+            if reply_to_chat_id is not None:
+                log.warning(
+                    "`reply_to_chat_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if reply_to_story_id is not None:
+                log.warning(
+                    "`reply_to_story_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_text is not None:
+                log.warning(
+                    "`quote_text` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_entities is not None:
+                log.warning(
+                    "`quote_entities` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_offset is not None:
+                log.warning(
+                    "`quote_offset` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            reply_parameters = types.ReplyParameters(
+                message_id=reply_to_message_id,
+                chat_id=reply_to_chat_id,
+                story_id=reply_to_story_id,
+                quote=quote_text,
+                quote_parse_mode=parse_mode,
+                quote_entities=quote_entities,
+                quote_position=quote_offset
+            )
+
         r = await self.invoke(
             raw.functions.messages.SendMedia(
-                peer=peer,
+                peer=await self.resolve_peer(chat_id),
                 media=utils.get_input_media_from_file_id(file_id, has_spoiler=has_spoiler),
                 silent=disable_notification or None,
                 invert_media=show_caption_above_media,
-                reply_to=utils.get_reply_to(
-                    reply_to_message_id=reply_to_message_id,
-                    message_thread_id=message_thread_id,
-                    reply_to_peer=await self.resolve_peer(reply_to_chat_id) if reply_to_chat_id else None,
-                    reply_to_story_id=reply_to_story_id,
-                    quote_text=quote_text,
-                    quote_entities=quote_entities,
-                    quote_offset=quote_offset,
+                reply_to=await utils.get_reply_to(
+                    self,
+                    reply_parameters,
+                    message_thread_id,
+                    direct_messages_chat_topic_id
                 ),
                 random_id=self.rnd_id(),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
                 noforwards=protect_content,
                 allow_paid_floodskip=allow_paid_broadcast,
                 reply_markup=await reply_markup.write(self) if reply_markup else None,
+                effect=effect_id,
+                allow_paid_stars=paid_message_star_count,
                 **await utils.parse_text_entities(self, caption, parse_mode, caption_entities)
             ),
             business_connection_id=business_connection_id
         )
 
-        for i in r.updates:
-            if isinstance(i, (raw.types.UpdateNewMessage,
-                              raw.types.UpdateNewChannelMessage,
-                              raw.types.UpdateNewScheduledMessage,
-                              raw.types.UpdateBotNewBusinessMessage)):
-                return await types.Message._parse(
-                    self, i.message,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats},
-                    is_scheduled=isinstance(i, raw.types.UpdateNewScheduledMessage),
-                    business_connection_id=getattr(i, "connection_id", None),
-                    raw_reply_to_message=getattr(i, "reply_to_message", None)
-                )
+        messages = await utils.parse_messages(client=self, messages=r)
+
+        return messages[0] if messages else None

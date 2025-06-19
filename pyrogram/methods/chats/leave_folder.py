@@ -51,7 +51,7 @@ class LeaveFolder:
             .. code-block:: python
 
                 # leave folder
-                app.leave_folder("t.me/addlist/ebXQ0Q0I3RnGQ")
+                await app.leave_folder("t.me/addlist/ebXQ0Q0I3RnGQ")
         """
         match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:addlist/|\+))([\w-]+)$", link)
 

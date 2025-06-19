@@ -17,12 +17,12 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 import pyrogram
-from pyrogram import raw, utils
-from pyrogram import types
+from pyrogram import raw, types, utils
 from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType
+
 from ..object import Object
 
 
@@ -69,8 +69,16 @@ class Video(Object):
 
         thumbs (List of :obj:`~pyrogram.types.Thumbnail`, *optional*):
             Video thumbnails.
-    """
 
+        video_cover (:obj:`~pyrogram.types.Photo`, *optional*):
+            Video cover.
+
+        video_start_timestamp (``int``, *optional*):
+            Video startpoint, in seconds.
+
+        alternative_videos (List of :obj:`~pyrogram.types.Video`, *optional*):
+            Alternative qualities of the video in MPEG4 format, encoded with H.264 codec.
+    """
     def __init__(
         self,
         *,
@@ -81,13 +89,16 @@ class Video(Object):
         height: int,
         codec: str,
         duration: int,
-        file_name: str = None,
-        mime_type: str = None,
-        file_size: int = None,
-        supports_streaming: bool = None,
-        ttl_seconds: int = None,
-        date: datetime = None,
-        thumbs: List["types.Thumbnail"] = None
+        file_name: Optional[str] = None,
+        mime_type: Optional[str] = None,
+        file_size: Optional[int] = None,
+        supports_streaming: Optional[bool] = None,
+        ttl_seconds: Optional[int] = None,
+        date: Optional[datetime] = None,
+        thumbs: Optional[List["types.Thumbnail"]] = None,
+        video_cover: Optional["types.Photo"] = None,
+        video_start_timestamp: Optional[int] = None,
+        alternative_videos: Optional[List["types.Video"]] = []
     ):
         super().__init__(client)
 
@@ -104,15 +115,35 @@ class Video(Object):
         self.ttl_seconds = ttl_seconds
         self.date = date
         self.thumbs = thumbs
+        self.video_cover = video_cover
+        self.video_start_timestamp = video_start_timestamp
+        self.alternative_videos = alternative_videos
 
     @staticmethod
     def _parse(
         client,
         video: "raw.types.Document",
         video_attributes: "raw.types.DocumentAttributeVideo",
-        file_name: str,
-        ttl_seconds: int = None
+        file_name: str = None,
+        ttl_seconds: int = None,
+        video_cover = None,
+        video_start_timestamp: int = None,
+        alternative_videos: List["raw.types.Document"] = []
     ) -> "Video":
+        _alt_videos = types.List()
+
+        for alt_doc in alternative_videos:
+            alt_attrs = {type(i): i for i in alt_doc.attributes}
+            alt_file_name = getattr(
+                alt_attrs.get(raw.types.DocumentAttributeFilename), "file_name", None
+            )
+            alt_video_attr = alt_attrs.get(raw.types.DocumentAttributeVideo)
+
+            if alt_video_attr:
+                _alt_videos.append(
+                    types.Video._parse(client, alt_doc, alt_video_attr, alt_file_name)
+                )
+
         return Video(
             file_id=FileId(
                 file_type=FileType.VIDEO,
@@ -129,12 +160,15 @@ class Video(Object):
             height=getattr(video_attributes, "h", None),
             codec=getattr(video_attributes, "video_codec", None),
             duration=video_attributes.duration,
-            file_name=file_name,
+            file_name=file_name or f"video_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4",
             mime_type=video.mime_type,
             supports_streaming=video_attributes.supports_streaming,
             file_size=video.size,
             date=utils.timestamp_to_datetime(video.date),
             ttl_seconds=ttl_seconds,
             thumbs=types.Thumbnail._parse(client, video),
+            video_cover=types.Photo._parse(client, video_cover),
+            video_start_timestamp=video_start_timestamp,
+            alternative_videos=_alt_videos or None,
             client=client
         )

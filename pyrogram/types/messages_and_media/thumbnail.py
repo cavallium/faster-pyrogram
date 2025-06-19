@@ -67,7 +67,7 @@ class Thumbnail(Object):
     def _parse(client, media: Union["raw.types.Photo", "raw.types.Document"]) -> Optional[List["Thumbnail"]]:
         if isinstance(media, raw.types.Photo):
             raw_thumbs = [i for i in media.sizes if isinstance(i, raw.types.PhotoSize)]
-            raw_thumbs.sort(key=lambda p: p.size)
+            raw_thumbs.sort(key=lambda p: p.w * p.h)
             raw_thumbs = raw_thumbs[:-1]
 
             file_type = FileType.PHOTO

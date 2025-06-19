@@ -18,10 +18,11 @@
 
 import html
 import re
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 
 import pyrogram
 from pyrogram.enums import MessageEntityType
+
 from . import utils
 from .html import HTML
 
@@ -33,6 +34,8 @@ SPOILER_DELIM = "||"
 CODE_DELIM = "`"
 PRE_DELIM = "```"
 BLOCKQUOTE_DELIM = ">"
+BLOCKQUOTE_EXPANDABLE_DELIM = "**>"
+BLOCKQUOTE_EXPANDABLE_END_DELIM = "||"
 
 MARKDOWN_RE = re.compile(r"({d})|(!?)\[(.+?)\]\((.+?)\)".format(
     d="|".join(
@@ -53,7 +56,7 @@ MARKDOWN_RE = re.compile(r"({d})|(!?)\[(.+?)\]\((.+?)\)".format(
 OPENING_TAG = "<{}>"
 CLOSING_TAG = "</{}>"
 URL_MARKUP = '<a href="{}">{}</a>'
-EMOJI_MARKUP = '<emoji id={}>{}</emoji>'
+EMOJI_MARKUP = "<emoji id={}>{}</emoji>"
 FIXED_WIDTH_DELIMS = [CODE_DELIM, PRE_DELIM]
 
 
@@ -61,35 +64,105 @@ class Markdown:
     def __init__(self, client: Optional["pyrogram.Client"]):
         self.html = HTML(client)
 
-    def _parse_blockquotes(self, text: str):
-        text = html.unescape(text)
-        lines = text.split('\n')
-        result = []
-        in_blockquote = False
-        current_blockquote = []
+    @staticmethod
+    def escape_and_create_quotes(text: str, strict: bool):
+        text_lines: List[Union[str, None]] = text.splitlines()
 
-        for line in lines:
+        # Indexes of Already escaped lines
+        html_escaped_list: List[int] = []
+
+        # Temporary Queue to hold lines to be quoted
+        to_quote_list: List[Tuple[int, str]] = []
+
+        def create_blockquote(expandable: bool = False) -> None:
+            """
+            Merges all lines in quote_queue into first line of queue
+            Encloses that line in html quote
+            Replaces rest of the lines with None placeholders to preserve indexes
+            """
+            if len(to_quote_list) == 0:
+                return
+
+            joined_lines = "\n".join([i[1] for i in to_quote_list])
+
+            first_line_index, _ = to_quote_list[0]
+            text_lines[first_line_index] = (
+                f"<blockquote{' expandable' if expandable else ''}>{joined_lines}</blockquote>"
+            )
+
+            for line_to_remove in to_quote_list[1:]:
+                text_lines[line_to_remove[0]] = None
+
+            to_quote_list.clear()
+
+        # Handle Expandable Quote
+        inside_blockquote = False
+        for index, line in enumerate(text_lines):
+            if line.startswith(BLOCKQUOTE_EXPANDABLE_DELIM) and not inside_blockquote:
+                delim_stripped_line = line[len(BLOCKQUOTE_EXPANDABLE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_EXPANDABLE_DELIM} ") else 0) :]
+                parsed_line = (
+                    html.escape(delim_stripped_line) if strict else delim_stripped_line
+                )
+
+                to_quote_list.append((index, parsed_line))
+                html_escaped_list.append(index)
+
+                inside_blockquote = True
+                continue
+
+            elif line.endswith(BLOCKQUOTE_EXPANDABLE_END_DELIM) and inside_blockquote:
+                if line.startswith(BLOCKQUOTE_DELIM):
+                    line = line[len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :]
+
+                delim_stripped_line = line[:-len(BLOCKQUOTE_EXPANDABLE_END_DELIM)]
+
+                parsed_line = (
+                    html.escape(delim_stripped_line) if strict else delim_stripped_line
+                )
+
+                to_quote_list.append((index, parsed_line))
+                html_escaped_list.append(index)
+
+                inside_blockquote = False
+
+                create_blockquote(expandable=True)
+
+            if inside_blockquote:
+                parsed_line = line[len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :]
+                parsed_line = html.escape(parsed_line) if strict else parsed_line
+                to_quote_list.append((index, parsed_line))
+                html_escaped_list.append(index)
+
+        # Handle Single line/Continued Quote
+        for index, line in enumerate(text_lines):
+            if line is None:
+                continue
+
             if line.startswith(BLOCKQUOTE_DELIM):
-                in_blockquote = True
-                current_blockquote.append(line[1:].strip())
-            else:
-                if in_blockquote:
-                    in_blockquote = False
-                    result.append(OPENING_TAG.format("blockquote") + '\n'.join(current_blockquote) + CLOSING_TAG.format("blockquote"))
-                    current_blockquote = []
-                result.append(line)
+                delim_stripped_line = line[len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :]
+                parsed_line = (
+                    html.escape(delim_stripped_line) if strict else delim_stripped_line
+                )
 
-        if in_blockquote:
-            result.append(OPENING_TAG.format("blockquote") + '\n'.join(current_blockquote) + CLOSING_TAG.format("blockquote"))
+                to_quote_list.append((index, parsed_line))
+                html_escaped_list.append(index)
 
-        return '\n'.join(result)
+            elif len(to_quote_list) > 0:
+                create_blockquote()
+        else:
+            create_blockquote()
+
+        if strict:
+            for idx, line in enumerate(text_lines):
+                if idx not in html_escaped_list:
+                    text_lines[idx] = html.escape(line)
+
+        return "\n".join(
+            [valid_line for valid_line in text_lines if valid_line is not None]
+        )
 
     async def parse(self, text: str, strict: bool = False):
-        if strict:
-            text = html.escape(text)
-
-        text = self._parse_blockquotes(text)
-
+        text = self.escape_and_create_quotes(text, strict=strict)
         delims = set()
         is_fixed_width = False
 

@@ -91,9 +91,9 @@ class GetPinnedStories:
                 yield await types.Story._parse(
                     self,
                     story,
+                    peer,
                     users,
-                    chats,
-                    peer
+                    chats
                 )
 
                 current += 1

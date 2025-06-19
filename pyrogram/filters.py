@@ -241,7 +241,7 @@ reply = create(reply_filter)
 
 # region forwarded_filter
 async def forwarded_filter(_, __, m: Message):
-    return bool(m.forward_date)
+    return bool(m.forward_origin)
 
 
 forwarded = create(forwarded_filter)
@@ -371,24 +371,35 @@ gift_code = create(gift_code_filter)
 
 # endregion
 
-# region star_gift_filter
-async def star_gift_filter(_, __, m: Message):
-    return bool(m.star_gift)
+# region gift_filter
+async def gift_filter(_, __, m: Message):
+    return bool(m.gift)
 
 
-star_gift = create(star_gift_filter)
-"""Filter messages that contain :obj:`~pyrogram.types.StarGift` objects."""
+gift = create(gift_filter)
+"""Filter messages that contain :obj:`~pyrogram.types.Gift` objects."""
 
 
 # endregion
 
-# region requested_chats_filter
-async def requested_chats_filter(_, __, m: Message):
-    return bool(m.requested_chats)
+# region users_shared_filter
+async def users_shared_filter(_, __, m: Message):
+    return bool(m.users_shared)
 
 
-requested_chats = create(requested_chats_filter)
-"""Filter service messages for request chats."""
+users_shared = create(users_shared_filter)
+"""Filter service messages for shared users."""
+
+
+# endregion
+
+# region chat_shared_filter
+async def chat_shared_filter(_, __, m: Message):
+    return bool(m.chat_shared)
+
+
+chat_shared = create(chat_shared_filter)
+"""Filter service messages for shared chat."""
 
 
 # endregion
@@ -538,7 +549,7 @@ private = create(private_filter)
 
 # region group_filter
 async def group_filter(_, __, m: Message):
-    return bool(m.chat and m.chat.type in {enums.ChatType.GROUP, enums.ChatType.SUPERGROUP})
+    return bool(m.chat and m.chat.type in {enums.ChatType.GROUP, enums.ChatType.SUPERGROUP, enums.ChatType.FORUM})
 
 
 group = create(group_filter)
@@ -554,6 +565,17 @@ async def channel_filter(_, __, m: Message):
 
 channel = create(channel_filter)
 """Filter messages sent in channels."""
+
+
+# endregion
+
+# region direct_filter
+async def direct_filter(_, __, m: Message):
+    return bool(m.chat and m.chat.type == enums.ChatType.DIRECT)
+
+
+direct = create(direct_filter)
+"""Filter messages sent in direct."""
 
 
 # endregion
@@ -876,9 +898,24 @@ from_scheduled = create(from_scheduled_filter)
 
 # endregion
 
+# region paid_message_filter
+async def paid_message_filter(_, __, m: Message):
+    return bool(m.send_paid_messages_stars)
+
+
+paid_message = create(paid_message_filter)
+"""Filter paid messages."""
+
+
+# endregion
+
 # region linked_channel_filter
 async def linked_channel_filter(_, __, m: Message):
-    return bool(m.forward_from_chat and not m.from_user)
+    return bool(
+        m.forward_origin and
+        m.forward_origin.type == enums.MessageOriginType.CHANNEL and
+        m.forward_origin.chat == m.sender_chat
+    )
 
 
 linked_channel = create(linked_channel_filter)

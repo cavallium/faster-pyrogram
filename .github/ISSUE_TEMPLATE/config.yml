@@ -4,5 +4,8 @@ contact_links:
     url: https://stackoverflow.com/questions/tagged/pyrogram
     about: This place is only for reporting issues about Pyrogram. You can ask questions at StackOverflow.
   - name: Join the Telegram channel
-    url: https://t.me/pyrogram
+    url: https://t.me/kurigram_news
     about: Join the official channel and stay tuned for news, updates and announcements.
+  - name: Join the Telegram chat
+    url: https://t.me/kurigram_chat
+    about: Join the official chat and discuss with other users and developers.

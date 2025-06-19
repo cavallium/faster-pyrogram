@@ -45,14 +45,14 @@ class OnPurchasedPaidMedia:
 
         def decorator(func: Callable) -> Callable:
             if isinstance(self, pyrogram.Client):
-                self.add_handler(pyrogram.handlers.MessageReactionHandler(func, filters), group)
+                self.add_handler(pyrogram.handlers.PurchasedPaidMediaHandler(func, filters), group)
             elif isinstance(self, Filter) or self is None:
                 if not hasattr(func, "handlers"):
                     func.handlers = []
 
                 func.handlers.append(
                     (
-                        pyrogram.handlers.MessageReactionHandler(func, self),
+                        pyrogram.handlers.PurchasedPaidMediaHandler(func, self),
                         group if filters is None else filters
                     )
                 )

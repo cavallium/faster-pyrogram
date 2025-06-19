@@ -42,7 +42,7 @@ class LogOut:
             .. code-block:: python
 
                 # Log out.
-                app.log_out()
+                await app.log_out()
         """
         await self.invoke(raw.functions.auth.LogOut())
         await self.stop()

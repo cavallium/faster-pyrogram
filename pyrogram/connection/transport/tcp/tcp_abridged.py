@@ -16,6 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import logging
 from typing import Optional, Tuple
 
@@ -25,8 +26,8 @@ log = logging.getLogger(__name__)
 
 
 class TCPAbridged(TCP):
-    def __init__(self, ipv6: bool, proxy: Proxy) -> None:
-        super().__init__(ipv6, proxy)
+    def __init__(self, ipv6: bool, proxy: Proxy, loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+        super().__init__(ipv6, proxy, loop)
 
     async def connect(self, address: Tuple[str, int]) -> None:
         await super().connect(address)

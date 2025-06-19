@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union, Iterable
+from typing import Iterable, Union
 
 import pyrogram
 from pyrogram import raw
@@ -33,6 +33,17 @@ class DeleteMessages:
         """Delete messages, including service messages.
 
         .. include:: /_includes/usable-by/users-bots.rst
+
+        .. note::
+
+            - **For BOTS Only**: A message can only be deleted if it was sent less than 48 hours ago.
+            - Service messages about a supergroup, channel, or forum topic creation can't be deleted.
+            - A dice message in a private chat can only be deleted if it was sent more than 24 hours ago.
+            - :obj:`~pyrogram.Client` can delete outgoing messages in private chats, groups, and supergroups.
+            - :obj:`~pyrogram.Client` can delete incoming messages in private chats.
+            - :obj:`~pyrogram.Client` granted can_post_messages permissions can delete outgoing messages in channels.
+            - If the :obj:`~pyrogram.Client` is an administrator of a group, it can delete any message there.
+            - If the :obj:`~pyrogram.Client` has can_delete_messages permission in a supergroup or a channel, it can delete any message there.
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -52,7 +63,6 @@ class DeleteMessages:
             is_scheduled (``bool``, *optional*):
                 If True, the message will be deleted from the scheduled messages.
                 For userbots only.
-                Defaults to None.
 
         Returns:
             ``int``: Amount of affected messages

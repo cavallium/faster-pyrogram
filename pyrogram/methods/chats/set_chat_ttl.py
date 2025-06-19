@@ -19,8 +19,7 @@
 from typing import Union
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types, utils
 
 
 class SetChatTTL:
@@ -30,6 +29,8 @@ class SetChatTTL:
         ttl_seconds: int
     ) -> "types.Message":
         """Set the time-to-live for the chat.
+
+        .. include:: /_includes/usable-by/users.rst
 
         Parameters:
             chat_id (``int`` | ``str``):
@@ -46,13 +47,13 @@ class SetChatTTL:
             .. code-block:: python
 
                 # Set TTL for a chat to 1 day
-                app.set_chat_ttl(chat_id, 86400)
+                await app.set_chat_ttl(chat_id, 86400)
 
                 # Set TTL for a chat to 1 week
-                app.set_chat_ttl(chat_id, 604800)
+                await app.set_chat_ttl(chat_id, 604800)
 
                 # Disable TTL for this chat
-                app.set_chat_ttl(chat_id, 0)
+                await app.set_chat_ttl(chat_id, 0)
         """
         r = await self.invoke(
             raw.functions.messages.SetHistoryTTL(
@@ -61,12 +62,6 @@ class SetChatTTL:
             )
         )
 
-        for i in r.updates:
-            if isinstance(i, (raw.types.UpdateNewMessage,
-                              raw.types.UpdateNewChannelMessage)):
-                return await types.Message._parse(
-                    self,
-                    i.message,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats},
-                )
+        messages = await utils.parse_messages(client=self, messages=r)
+
+        return messages[0] if messages else None

@@ -40,7 +40,7 @@ class DeleteFolder:
             .. code-block:: python
 
                 # Delete folder
-                app.delete_folder(folder_id)
+                await app.delete_folder(folder_id)
         """
         r = await self.invoke(
             raw.functions.messages.UpdateDialogFilter(

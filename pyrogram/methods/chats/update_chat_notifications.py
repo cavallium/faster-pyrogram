@@ -16,13 +16,12 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Union
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
-from pyrogram import utils
+from pyrogram import raw, utils
+
 
 class UpdateChatNotifications:
     async def update_chat_notifications(
@@ -33,7 +32,7 @@ class UpdateChatNotifications:
         stories_muted: bool = None,
         stories_hide_sender: bool = None,
         show_previews: bool = None
-    ) -> "types.Chat":
+    ) -> bool:
         """Update the notification settings for the selected chat
 
         Parameters:
@@ -62,17 +61,17 @@ class UpdateChatNotifications:
             .. code-block:: python
 
                 # Mute a chat permanently
-                app.update_chat_notifications(chat_id, mute=True)
+                await app.update_chat_notifications(chat_id, mute=True)
 
                 # Mute a chat for 10 minutes
-                app.update_chat_notifications(
+                await app.update_chat_notifications(
                     chat_id,
                     mute=True
                     mute_until=datetime.timedelta(minutes=10)
                 )
 
                 # Unmute a chat
-                app.update_chat_notifications(chat_id, mute=False)
+                await app.update_chat_notifications(chat_id, mute=False)
         """
         if not mute_until:
             mute_until = utils.max_datetime() if mute else utils.zero_datetime()

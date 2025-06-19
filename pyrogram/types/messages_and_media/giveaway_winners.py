@@ -124,8 +124,8 @@ class GiveawayWinners(Object):
 
         try:
             giveaway_message = await client.get_messages(
-                utils.get_channel_id(giveaway_media.channel_id),
-                giveaway_media.launch_msg_id,
+                chat_id=utils.get_channel_id(giveaway_media.channel_id),
+                message_ids=giveaway_media.launch_msg_id,
                 replies=0
             )
         except (errors.ChannelPrivate, errors.ChannelInvalid):

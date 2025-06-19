@@ -26,8 +26,10 @@ class Username(Object):
     Parameters:
         username (``str``):
             User's or chat's username.
+
         editable (``bool``, *optional*):
             True, if it's a basic username; False, if it's a collectible username.
+
         active (``bool``, *optional*):
             True, if the collectible username is active.
     """

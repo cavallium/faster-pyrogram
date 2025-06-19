@@ -40,7 +40,7 @@ class ExportFolderLink:
             .. code-block:: python
 
                 # Export folder link
-                app.export_folder_link(folder_id)
+                await app.export_folder_link(folder_id)
         """
         folder = await self.get_folders(folder_id)
 

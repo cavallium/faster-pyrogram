@@ -18,14 +18,12 @@
 
 import logging
 import os
+import re
 from datetime import datetime
-from typing import Union, List, Optional
+from typing import List, Optional, Union
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
-from pyrogram import utils
-from pyrogram import enums
+from pyrogram import enums, raw, types, utils
 from pyrogram.file_id import FileType
 
 log = logging.getLogger(__name__)
@@ -46,14 +44,16 @@ class SendPaidMedia:
         parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: List["types.MessageEntity"] = None,
         disable_notification: bool = None,
+        reply_parameters: "types.ReplyParameters" = None,
+        schedule_date: datetime = None,
+        protect_content: bool = None,
+        show_caption_above_media: bool = None,
+        business_connection_id: str = None,
+
         reply_to_message_id: int = None,
         quote_text: str = None,
         quote_entities: List["types.MessageEntity"] = None,
         quote_offset: int = None,
-        schedule_date: datetime = None,
-        protect_content: bool = None,
-        show_caption_above_media: bool = None,
-        business_connection_id: str = None
     ) -> List["types.Message"]:
         """Send a group or one paid photo/video.
 
@@ -85,21 +85,8 @@ class SendPaidMedia:
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            reply_to_message_id (``int``, *optional*):
-                If the message is a reply, ID of the original message.
-
-            quote_text (``str``, *optional*):
-                Text of the quote to be sent.
-
-            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
-                By default, texts are parsed using both Markdown and HTML styles.
-                You can combine both syntaxes together.
-
-            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
-                List of special entities that appear in quote text, which can be specified instead of *parse_mode*.
-
-            quote_offset (``int``, *optional*):
-                Offset for quote in original message.
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -132,7 +119,44 @@ class SendPaidMedia:
                     ]
                 )
         """
+        if any(
+            (
+                reply_to_message_id is not None,
+                quote_text is not None,
+                quote_entities is not None,
+                quote_offset is not None,
+            )
+        ):
+            if reply_to_message_id is not None:
+                log.warning(
+                    "`reply_to_message_id` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_text is not None:
+                log.warning(
+                    "`quote_text` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_entities is not None:
+                log.warning(
+                    "`quote_entities` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            if quote_offset is not None:
+                log.warning(
+                    "`quote_offset` is deprecated and will be removed in future updates. Use `reply_parameters` instead."
+                )
+
+            reply_parameters = types.ReplyParameters(
+                message_id=reply_to_message_id,
+                quote=quote_text,
+                quote_parse_mode=parse_mode,
+                quote_entities=quote_entities,
+                quote_position=quote_offset
+            )
+
         multi_media = []
+        peer = await self.resolve_peer(chat_id)
 
         for i in media:
             if isinstance(i, types.InputMediaPhoto):
@@ -140,7 +164,7 @@ class SendPaidMedia:
                     if os.path.isfile(i.media):
                         media = await self.invoke(
                             raw.functions.messages.UploadMedia(
-                                peer=await self.resolve_peer(chat_id),
+                                peer=peer,
                                 media=raw.types.InputMediaUploadedPhoto(
                                     file=await self.save_file(i.media),
                                     spoiler=i.has_spoiler
@@ -156,12 +180,21 @@ class SendPaidMedia:
                             ),
                             spoiler=i.has_spoiler
                         )
+                    elif re.match("^https?://", i.media):
+                        media = await self.invoke(
+                            raw.functions.messages.UploadMedia(
+                                peer=await self.resolve_peer(chat_id),
+                                media=raw.types.InputMediaPhotoExternal(
+                                    url=i.media
+                                )
+                            )
+                        )
                     else:
                         media = utils.get_input_media_from_file_id(i.media, FileType.PHOTO, has_spoiler=i.has_spoiler)
                 else:
                     media = await self.invoke(
                         raw.functions.messages.UploadMedia(
-                            peer=await self.resolve_peer(chat_id),
+                            peer=peer,
                             media=raw.types.InputMediaUploadedPhoto(
                                 file=await self.save_file(i.media),
                                 spoiler=i.has_spoiler
@@ -178,17 +211,61 @@ class SendPaidMedia:
                         spoiler=i.has_spoiler
                     )
             elif isinstance(i, types.InputMediaVideo):
+                vcover_file = None
+                vcover_media = None
+
+                if i.video_cover is not None:
+                    if isinstance(i.video_cover, str):
+                        if os.path.isfile(i.video_cover):
+                            vcover_media = await self.invoke(
+                                raw.functions.messages.UploadMedia(
+                                    peer=peer,
+                                    media=raw.types.InputMediaUploadedPhoto(
+                                        file=await self.save_file(i.video_cover)
+                                    )
+                                )
+                            )
+                        elif re.match("^https?://", i.video_cover):
+                            vcover_media = await self.invoke(
+                                raw.functions.messages.UploadMedia(
+                                    peer=peer,
+                                    media=raw.types.InputMediaPhotoExternal(
+                                        url=i.video_cover
+                                    )
+                                )
+                            )
+                        else:
+                            vcover_file = utils.get_input_media_from_file_id(i.video_cover, FileType.PHOTO).id
+                    else:
+                        vcover_media = await self.invoke(
+                            raw.functions.messages.UploadMedia(
+                                peer=peer,
+                                media=raw.types.InputMediaUploadedPhoto(
+                                    file=await self.save_file(i.video_cover)
+                                )
+                            )
+                        )
+
+                    if vcover_media:
+                        vcover_file = raw.types.InputPhoto(
+                            id=vcover_media.photo.id,
+                            access_hash=vcover_media.photo.access_hash,
+                            file_reference=vcover_media.photo.file_reference
+                        )
+
                 if isinstance(i.media, str):
                     if os.path.isfile(i.media):
                         media = await self.invoke(
                             raw.functions.messages.UploadMedia(
-                                peer=await self.resolve_peer(chat_id),
+                                peer=peer,
                                 media=raw.types.InputMediaUploadedDocument(
                                     file=await self.save_file(i.media),
                                     thumb=await self.save_file(i.thumb),
                                     spoiler=i.has_spoiler,
                                     mime_type=self.guess_mime_type(i.media) or "video/mp4",
                                     nosound_video=True,
+                                    video_cover=vcover_file,
+                                    video_timestamp=i.video_start_timestamp,
                                     attributes=[
                                         raw.types.DocumentAttributeVideo(
                                             supports_streaming=i.supports_streaming or None,
@@ -206,22 +283,43 @@ class SendPaidMedia:
                             id=raw.types.InputDocument(
                                 id=media.document.id,
                                 access_hash=media.document.access_hash,
-                                file_reference=media.document.file_reference
+                                file_reference=media.document.file_reference,
                             ),
-                            spoiler=i.has_spoiler
+                            spoiler=i.has_spoiler,
+                            video_cover=vcover_file,
+                            video_timestamp=i.video_start_timestamp
+                        )
+                    elif re.match("^https?://", i.media):
+                        media = await self.invoke(
+                            raw.functions.messages.UploadMedia(
+                                peer=await self.resolve_peer(chat_id),
+                                media=raw.types.InputMediaDocumentExternal(
+                                    url=i.media,
+                                    video_cover=vcover_file,
+                                    video_timestamp=i.video_start_timestamp
+                                )
+                            )
                         )
                     else:
-                        media = utils.get_input_media_from_file_id(i.media, FileType.VIDEO, has_spoiler=i.has_spoiler)
+                        media = utils.get_input_media_from_file_id(
+                            i.media,
+                            FileType.VIDEO,
+                            has_spoiler=i.has_spoiler,
+                            video_cover=vcover_file,
+                            video_start_timestamp=i.video_start_timestamp
+                        )
                 else:
                     media = await self.invoke(
                         raw.functions.messages.UploadMedia(
-                            peer=await self.resolve_peer(chat_id),
+                            peer=peer,
                             media=raw.types.InputMediaUploadedDocument(
                                 file=await self.save_file(i.media),
                                 thumb=await self.save_file(i.thumb),
                                 spoiler=i.has_spoiler,
                                 mime_type=self.guess_mime_type(getattr(i.media, "name", "video.mp4")) or "video/mp4",
                                 nosound_video=True,
+                                video_cover=vcover_file,
+                                video_timestamp=i.video_start_timestamp,
                                 attributes=[
                                     raw.types.DocumentAttributeVideo(
                                         supports_streaming=i.supports_streaming or None,
@@ -241,6 +339,8 @@ class SendPaidMedia:
                             access_hash=media.document.access_hash,
                             file_reference=media.document.file_reference
                         ),
+                        video_cover=vcover_file,
+                        video_timestamp=i.video_start_timestamp,
                         spoiler=i.has_spoiler
                     )
             else:
@@ -248,22 +348,18 @@ class SendPaidMedia:
 
             multi_media.append(media)
 
-        quote_text, quote_entities = (await utils.parse_text_entities(self, quote_text, parse_mode, quote_entities)).values()
-
         r = await self.invoke(
             raw.functions.messages.SendMedia(
-                peer=await self.resolve_peer(chat_id),
+                peer=peer,
                 media=raw.types.InputMediaPaidMedia(
                     stars_amount=stars_amount,
                     extended_media=multi_media,
                     payload=payload
                 ),
                 silent=disable_notification or None,
-                reply_to=utils.get_reply_to(
-                    reply_to_message_id=reply_to_message_id,
-                    quote_text=quote_text,
-                    quote_entities=quote_entities,
-                    quote_offset=quote_offset,
+                reply_to=await utils.get_reply_to(
+                    self,
+                    reply_parameters
                 ),
                 random_id=self.rnd_id(),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
@@ -294,6 +390,5 @@ class SendPaidMedia:
                 )],
                 users=r.users,
                 chats=r.chats
-            ),
-            business_connection_id=conn_id
+            )
         )

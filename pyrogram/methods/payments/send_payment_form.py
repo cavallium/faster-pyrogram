@@ -56,10 +56,10 @@ class SendPaymentForm:
             .. code-block:: python
 
                 # Pay invoice from message
-                app.send_payment_form(chat_id=chat_id, message_id=123)
+                await app.send_payment_form(chat_id=chat_id, message_id=123)
 
                 # Pay invoice form from link
-                app.send_payment_form(invoice_link="https://t.me/$xvbzUtt5sUlJCAAATqZrWRy9Yzk")
+                await app.send_payment_form(invoice_link="https://t.me/$xvbzUtt5sUlJCAAATqZrWRy9Yzk")
         """
         if not any((all((chat_id, message_id)), invoice_link)):
             raise ValueError("You should pass at least one parameter to this method.")

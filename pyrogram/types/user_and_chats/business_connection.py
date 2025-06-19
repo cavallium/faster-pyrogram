@@ -17,7 +17,7 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from pyrogram import types, raw, utils
 from ..object import Object
@@ -31,19 +31,19 @@ class BusinessConnection(Object):
             Unique identifier of the business connection that belongs to the user.
 
         user (:obj:`~pyrogram.types.User`):
-            User that connected to the business connection.
+            Business account user that created the business connection.
 
         dc_id (``int``):
             Datacenter identifier of the user.
 
-        date (``datetime``):
-            Date when the user connected to the business.
+        date (:py:obj:`~datetime.datetime`):
+            Date the connection was established in Unix time.
 
-        can_reply (``bool``, *optional*):
-            Whether the user can reply to the business.
+        is_enabled (``bool``, *optional*):
+            True, if the connection is active.
 
-        disabled (``bool``, *optional*):
-            Whether the business connection is disabled.
+        permissions (:obj:`~pyrogram.types.BusinessBotPermissions`, *optional*):
+            Permissions for the business bot.
     """
 
     def __init__(
@@ -53,30 +53,33 @@ class BusinessConnection(Object):
         user: "types.User",
         dc_id: int,
         date: datetime,
-        can_reply: bool = None,
-        disabled: bool = None
+        is_enabled: bool = None,
+        rights: "types.BusinessBotRights" = None
     ):
         self.id = id
         self.user = user
         self.dc_id = dc_id
         self.date = date
-        self.can_reply = can_reply
-        self.disabled = disabled
+        self.is_enabled = is_enabled
+        self.rights = rights
 
     @staticmethod
     def _parse(
         client,
-        connection: "raw.types.BotBusinessConnection" = None,
+        connection: Union["raw.types.BotBusinessConnection", "raw.types.UpdateBotBusinessConnect"] = None,
         users = {}
     ) -> Optional["BusinessConnection"]:
         if not connection:
             return None
+
+        if isinstance(connection, raw.types.UpdateBotBusinessConnect):
+            connection = connection.connection
 
         return BusinessConnection(
             id=connection.connection_id,
             user=types.User._parse(client, users.get(connection.user_id)),
             dc_id=connection.dc_id,
             date=utils.timestamp_to_datetime(connection.date),
-            can_reply=getattr(connection, "can_reply", None),
-            disabled=getattr(connection, "disabled", None)
+            is_enabled=not connection.disabled,
+            rights=types.BusinessBotRights._parse(connection.rights)
         )

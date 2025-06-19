@@ -28,14 +28,17 @@ class SetPrivacy:
         key: "enums.PrivacyKey",
         rules: List[Union[
             "types.InputPrivacyRuleAllowAll",
+            "types.InputPrivacyRuleAllowBots",
+            "types.InputPrivacyRuleAllowChats",
+            "types.InputPrivacyRuleAllowCloseFriends",
             "types.InputPrivacyRuleAllowContacts",
             "types.InputPrivacyRuleAllowPremium",
             "types.InputPrivacyRuleAllowUsers",
-            "types.InputPrivacyRuleAllowChats",
             "types.InputPrivacyRuleDisallowAll",
-            "types.InputPrivacyRuleDisallowContacts",
-            "types.InputPrivacyRuleDisallowUsers",
+            "types.InputPrivacyRuleDisallowBots",
             "types.InputPrivacyRuleDisallowChats",
+            "types.InputPrivacyRuleDisallowContacts",
+            "types.InputPrivacyRuleDisallowUsers"
         ]],
     ):
         """Set account privacy rules.
