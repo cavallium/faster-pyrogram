@@ -80,6 +80,9 @@ class ExternalReplyInfo(Object):
         has_media_spoiler (``bool``, *optional*):
             True, if the message media is covered by a spoiler animation.
 
+        checklist (:obj:`~pyrogram.types.Checklist`, *optional*):
+            Message is a checklist.
+
         contact (:obj:`~pyrogram.types.Contact`, *optional*):
             Message is a shared contact, information about the contact.
 
@@ -129,6 +132,7 @@ class ExternalReplyInfo(Object):
         video_note: Optional["types.VideoNote"] = None,
         voice: Optional["types.Voice"] = None,
         has_media_spoiler: Optional[bool] = None,
+        checklist: Optional["types.Checklist"] = None,
         contact: Optional["types.Contact"] = None,
         dice: Optional["types.Dice"] = None,
         game: Optional["types.Game"] = None,
@@ -157,6 +161,7 @@ class ExternalReplyInfo(Object):
         self.video_note = video_note
         self.voice = voice
         self.has_media_spoiler = has_media_spoiler
+        self.checklist = checklist
         self.contact = contact
         self.dice = dice
         self.game = game
@@ -189,7 +194,9 @@ class ExternalReplyInfo(Object):
         story = None
         video = None
         video_note = None
+        has_media_spoiler = None
         voice = None
+        checklist = None
         contact = None
         dice = None
         game = None
@@ -202,7 +209,6 @@ class ExternalReplyInfo(Object):
 
         media = reply.reply_media
         media_type = None
-        has_media_spoiler = None
 
         if media:
             if isinstance(media, raw.types.MessageMediaPhoto):
@@ -284,6 +290,9 @@ class ExternalReplyInfo(Object):
             elif isinstance(media, raw.types.MessageMediaPaidMedia):
                 paid_media = types.PaidMediaInfo._parse(client, media)
                 media_type = enums.MessageMediaType.PAID_MEDIA
+            elif isinstance(media, raw.types.MessageMediaToDo):
+                checklist = types.Checklist._parse(client, media, users)
+                media_type = enums.MessageMediaType.CHECKLIST
             else:
                 media = None
 
@@ -320,5 +329,6 @@ class ExternalReplyInfo(Object):
             invoice=invoice,
             location=location,
             poll=poll,
-            venue=venue
+            venue=venue,
+            checklist=checklist
         )

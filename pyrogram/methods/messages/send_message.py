@@ -99,9 +99,6 @@ class SendMessage:
                 Unique identifier of the message effect.
                 For private chats only.
 
-            show_caption_above_media (``bool``, *optional*):
-                Pass True, if the caption must be shown above the message media.
-
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
@@ -218,11 +215,27 @@ class SendMessage:
                 quote_position=quote_offset
             )
 
-        if disable_web_page_preview is not None:
-            log.warning(
-                "`disable_web_page_preview` is deprecated and will be removed in future updates. Use `link_preview_options` instead."
+
+        if any(
+            (
+                disable_web_page_preview is not None,
+                show_caption_above_media is not None,
             )
-            link_preview_options = types.LinkPreviewOptions(is_disabled=disable_web_page_preview)
+        ):
+            if disable_web_page_preview is not None:
+                log.warning(
+                    "`disable_web_page_preview` is deprecated and will be removed in future updates. Use `link_preview_options` instead."
+                )
+
+            if show_caption_above_media is not None:
+                log.warning(
+                    "`show_caption_above_media` is deprecated and will be removed in future updates. Use `link_preview_options` instead."
+                )
+
+            link_preview_options = types.LinkPreviewOptions(
+                is_disabled=disable_web_page_preview,
+                show_above_text=show_caption_above_media
+            )
 
         message, entities = (await utils.parse_text_entities(self, text, parse_mode, entities)).values()
 
@@ -232,7 +245,7 @@ class SendMessage:
                 peer=peer,
                 no_webpage=getattr(link_preview_options, "is_disabled", None) or None,
                 silent=disable_notification or None,
-                invert_media=show_caption_above_media or None,
+                invert_media=getattr(link_preview_options, "show_above_text", None),
                 reply_to=await utils.get_reply_to(
                     self,
                     reply_parameters,

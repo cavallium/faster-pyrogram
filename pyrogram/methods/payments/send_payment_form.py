@@ -16,117 +16,81 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import re
-from typing import Union, List
-
 import pyrogram
 from pyrogram import raw, types
 
 
 class SendPaymentForm:
     async def send_payment_form(
-        self: "pyrogram.Client", *,
-        chat_id: Union[int, str] = None,
-        message_id: int = None,
-        invoice_link: str = None
-    ) -> List[Union["types.Photo", "types.Video"]]:
-        """Pay an invoice.
-
-        .. note::
-
-            For now only stars invoices are supported.
+        self: "pyrogram.Client",
+        payment_form_id: int,
+        input_invoice: "types.InputInvoice",
+        credentials: "types.InputCredentials" = None
+    ) -> "types.PaymentResult":
+        """Send a filled-out payment form to the bot for final verification.
 
         .. include:: /_includes/usable-by/users.rst
 
         Parameters:
-            chat_id (``int`` | ``str``):
-                Unique identifier (int) or username (str) of the target chat.
-                of the target channel/supergroup (in the format @username).
+            payment_form_id (``int``):
+                Payment form identifier returned by :meth:`~pyrogram.Client.get_payment_form`.
 
-            message_id (``int``):
-                Pass a message identifier or to get the invoice from message.
+            input_invoice (:obj:`~pyrogram.types.InputInvoice`):
+                The invoice.
 
-            invoice_link (``str``):
-                Pass a invoice link in form of a *t.me/$...* link or slug itself to pay this invoice.
+            credentials (:obj:`~pyrogram.types.InputCredentials`, *optional*):
+                The credentials chosen by user for payment.
+                Pass None for a payment in Telegram Stars.
 
         Returns:
-            List of :obj:`~pyrogram.types.Photo` | :obj:`~pyrogram.types.Video`: On success, the list of bought photos and videos is returned.
+            :obj:`~pyrogram.types.PaymentResult`: On success, the payment result is returned.
 
         Example:
             .. code-block:: python
 
-                # Pay invoice from message
-                await app.send_payment_form(chat_id=chat_id, message_id=123)
+                # Pay regular invoice from message
+                invoice = types.InputInvoiceMessage(
+                    chat_id=chat_id,
+                    message_id=123
+                )
 
-                # Pay invoice form from link
-                await app.send_payment_form(invoice_link="https://t.me/$xvbzUtt5sUlJCAAATqZrWRy9Yzk")
+                form = await app.get_payment_form(invoice)
+
+                await app.send_payment_form(
+                    payment_form_id=form.id,
+                    input_invoice=invoice,
+                    credentials=types.InputCredentialsNew(
+                        data=json.dumps({"token": "...", "type": "card"}), # Pass the token received from the payment provider
+                    )
+                )
+
+                # Pay star invoice from message
+                invoice = types.InputInvoiceMessage(
+                    chat_id=chat_id,
+                    message_id=123
+                )
+
+                form = await app.get_payment_form(invoice)
+
+                await app.send_payment_form(
+                    payment_form_id=form.id,
+                    input_invoice=invoice
+                )
         """
-        if not any((all((chat_id, message_id)), invoice_link)):
-            raise ValueError("You should pass at least one parameter to this method.")
-
-        form = None
-        invoice = None
-
-        if message_id:
-            invoice = raw.types.InputInvoiceMessage(
-                peer=await self.resolve_peer(chat_id),
-                msg_id=message_id
+        if credentials is None:
+            r = await self.invoke(
+                raw.functions.payments.SendStarsForm(
+                    form_id=payment_form_id,
+                    invoice=await input_invoice.write(self),
+                )
             )
-        elif invoice_link:
-            match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/\$)([\w-]+)$", invoice_link)
-
-            if match:
-                slug = match.group(1)
-            else:
-                slug = invoice_link
-
-            invoice = raw.types.InputInvoiceSlug(
-                slug=slug
+        else:
+            r = await self.invoke(
+                raw.functions.payments.SendPaymentForm(
+                    form_id=payment_form_id,
+                    invoice=await input_invoice.write(self),
+                    credentials=await credentials.write(self)
+                )
             )
 
-        form = await self.get_payment_form(chat_id=chat_id, message_id=message_id, invoice_link=invoice_link)
-
-        # if form.invoice.currency == "XTR":
-        r = await self.invoke(
-            raw.functions.payments.SendStarsForm(
-                form_id=form.id,
-                invoice=invoice
-            )
-        )
-        # TODO: Add support for regular invoices (credentials)
-        # else:
-        #     r = await self.invoke(
-        #         raw.functions.payments.SendPaymentForm(
-        #             form_id=form.id,
-        #             invoice=invoice,
-        #             credentials=raw.types.InputPaymentCredentials(data=raw.types.DataJSON(data={}))
-        #         )
-        #     )
-
-        medias = []
-
-        if isinstance(r, raw.types.payments.PaymentResult):
-            for i in r.updates.updates:
-                if isinstance(i, raw.types.UpdateMessageExtendedMedia):
-                    for ext_media in i.extended_media:
-                        media = ext_media.media
-
-                        if isinstance(media, raw.types.MessageMediaPhoto):
-                            medias.append(types.Photo._parse(self, media.photo))
-                        elif isinstance(media, raw.types.MessageMediaDocument):
-                            doc = media.document
-
-                            attributes = {type(i): i for i in doc.attributes}
-
-                            file_name = getattr(
-                                attributes.get(
-                                    raw.types.DocumentAttributeFilename, None
-                                ), "file_name", None
-                            )
-
-                            video_attributes = attributes[raw.types.DocumentAttributeVideo]
-
-                            medias.append(types.Video._parse(self, doc, video_attributes, file_name))
-
-                    return types.List(medias)
-        # elif isinstance(r, raw.types.payments.PaymentVerificationNeeded):
+        return types.PaymentResult._parse(r)

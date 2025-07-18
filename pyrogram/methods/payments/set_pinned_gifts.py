@@ -53,7 +53,10 @@ class SetPinnedGifts:
             .. code-block:: python
 
                 # Set pinned gifts in user profile
-                await app.set_pinned_gifts(received_gift_ids=["123", "456"])
+                await app.set_pinned_gifts(owner_id="me", received_gift_ids=["123", "456"])
+
+                # Set pinned gifts in channel
+                await app.set_pinned_gifts(owner_id="pyrogram", received_gift_ids=["-1001292933413_123", "-1001292933413_456"])
         """
         stargifts = []
 

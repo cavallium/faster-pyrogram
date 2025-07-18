@@ -25,6 +25,10 @@ from .chat_background import ChatBackground
 from .chat_boost import ChatBoost
 from .chat_theme import ChatTheme
 from .checked_gift_code import CheckedGiftCode
+from .checklist_task import ChecklistTask
+from .checklist_tasks_added import ChecklistTasksAdded
+from .checklist_tasks_done import ChecklistTasksDone
+from .checklist import Checklist
 from .contact_registered import ContactRegistered
 from .contact import Contact
 from .dice import Dice
@@ -47,11 +51,13 @@ from .gift_upgrade_preview import GiftUpgradePreview
 from .invoice import Invoice
 from .link_preview_options import LinkPreviewOptions
 from .giveaway import Giveaway
+from .input_checklist_task import InputChecklistTask
 from .giveaway_completed import GiveawayCompleted
 from .giveaway_created import GiveawayCreated
 from .giveaway_prize_stars import GiveawayPrizeStars
 from .giveaway_winners import GiveawayWinners
 from .location import Location
+from .mask_position import MaskPosition
 from .media_area import MediaArea
 from .message import Message
 from .message_entity import MessageEntity
@@ -67,7 +73,10 @@ from .paid_media_info import PaidMediaInfo
 from .paid_media_preview import PaidMediaPreview
 from .paid_messages_price_changed import PaidMessagesPriceChanged
 from .paid_messages_refunded import PaidMessagesRefunded
+from .paid_reactor import PaidReactor
 from .payment_form import PaymentForm
+from .payment_option import PaymentOption
+from .payment_result import PaymentResult
 from .photo import Photo
 from .poll import Poll
 from .proximity_alert_triggered import ProximityAlertTriggered
@@ -76,6 +85,7 @@ from .reaction import Reaction
 from .refunded_payment import RefundedPayment
 from .reply_parameters import ReplyParameters
 from .restriction_reason import RestrictionReason
+from .saved_credentials import SavedCredentials
 from .screenshot_taken import ScreenshotTaken
 from .gift_attribute import GiftAttribute
 from .gift import Gift
@@ -110,6 +120,10 @@ __all__ = [
     "ChatBoost",
     "ChatTheme",
     "CheckedGiftCode",
+    "ChecklistTask",
+    "ChecklistTasksAdded",
+    "ChecklistTasksDone",
+    "Checklist",
     "ContactRegistered",
     "Contact",
     "Dice",
@@ -130,6 +144,7 @@ __all__ = [
     "GiftCode",
     "GiftUpgradePreview",
     "Giveaway",
+    "InputChecklistTask",
     "Invoice",
     "LinkPreviewOptions",
     "GiveawayCompleted",
@@ -137,6 +152,7 @@ __all__ = [
     "GiveawayPrizeStars",
     "GiveawayWinners",
     "Location",
+    "MaskPosition",
     "MediaArea",
     "Message",
     "MessageEntity",
@@ -152,7 +168,10 @@ __all__ = [
     "PaidMediaPreview",
     "PaidMessagesPriceChanged",
     "PaidMessagesRefunded",
+    "PaidReactor",
     "PaymentForm",
+    "PaymentOption",
+    "PaymentResult",
     "Photo",
     "Poll",
     "ProximityAlertTriggered",
@@ -161,6 +180,7 @@ __all__ = [
     "RefundedPayment",
     "ReplyParameters",
     "RestrictionReason",
+    "SavedCredentials",
     "ScreenshotTaken",
     "GiftAttribute",
     "Gift",

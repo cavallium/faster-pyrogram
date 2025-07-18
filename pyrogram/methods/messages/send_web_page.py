@@ -35,6 +35,7 @@ class SendWebPage:
         prefer_small_media: bool = None,
         parse_mode: Optional["enums.ParseMode"] = None,
         entities: List["types.MessageEntity"] = None,
+        link_preview_options: "types.LinkPreviewOptions" = None,
         disable_notification: bool = None,
         message_thread_id: int = None,
         direct_messages_chat_topic_id: int = None,
@@ -84,16 +85,8 @@ class SendWebPage:
             entities (List of :obj:`~pyrogram.types.MessageEntity`):
                 List of special entities that appear in message text, which can be specified instead of *parse_mode*.
 
-            prefer_large_media (``bool``, *optional*):
-                If True, media in the link preview will be larger.
-                Ignored if the URL isn't explicitly specified or media size change isn't supported for the preview.
-
-            prefer_small_media (``bool``, *optional*):
-                If True, media in the link preview will be smaller.
-                Ignored if the URL isn't explicitly specified or media size change isn't supported for the preview.
-
-            show_caption_above_media (``bool``, *optional*):
-                Pass True, if the caption must be shown above the message media.
+            link_preview_options (:obj:`~pyrogram.types.LinkPreviewOptions`, *optional*):
+                Options used for link preview generation for the message.
 
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
@@ -149,9 +142,13 @@ class SendWebPage:
                 await app.send_web_page("me", "https://docs.pyrogram.org")
 
                 # Make web preview image larger
-                await app.send_web_page("me", "https://docs.pyrogram.org", prefer_large_media=True)
+                await app.send_web_page("me", "https://docs.pyrogram.org", link_preview_options=types.LinkPreviewOptions(
+                    prefer_large_media=True
+                ))
 
         """
+        link_preview_options = link_preview_options or self.link_preview_options
+
         if any(
             (
                 reply_to_message_id is not None,
@@ -202,6 +199,34 @@ class SendWebPage:
                 quote_position=quote_offset
             )
 
+        if any(
+            (
+                prefer_large_media is not None,
+                prefer_small_media is not None,
+                show_caption_above_media is not None,
+            )
+        ):
+            if prefer_large_media is not None:
+                log.warning(
+                    "`prefer_large_media` is deprecated and will be removed in future updates. Use `link_preview_options` instead."
+                )
+
+            if prefer_small_media is not None:
+                log.warning(
+                    "`prefer_small_media` is deprecated and will be removed in future updates. Use `link_preview_options` instead."
+                )
+
+            if show_caption_above_media is not None:
+                log.warning(
+                    "`show_caption_above_media` is deprecated and will be removed in future updates. Use `link_preview_options` instead."
+                )
+
+            link_preview_options = types.LinkPreviewOptions(
+                prefer_large_media=prefer_large_media,
+                prefer_small_media=prefer_small_media,
+                show_above_text=show_caption_above_media
+            )
+
         message, entities = (await utils.parse_text_entities(self, text, parse_mode, entities)).values()
 
         if not url:
@@ -233,10 +258,10 @@ class SendWebPage:
                 message=message,
                 media=raw.types.InputMediaWebPage(
                     url=url,
-                    force_large_media=prefer_large_media,
-                    force_small_media=prefer_small_media
+                    force_large_media=getattr(link_preview_options, "prefer_large_media", None),
+                    force_small_media=getattr(link_preview_options, "prefer_small_media", None),
                 ),
-                invert_media=show_caption_above_media,
+                invert_media=getattr(link_preview_options, "show_above_text", None),
                 allow_paid_floodskip=allow_paid_broadcast,
                 allow_paid_stars=paid_message_star_count,
                 entities=entities,

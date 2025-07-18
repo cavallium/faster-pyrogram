@@ -431,6 +431,7 @@ class Client(Methods):
 
             if datetime.now() - self.last_update_time > timedelta(seconds=self.UPDATES_WATCHDOG_INTERVAL):
                 await self.invoke(raw.functions.updates.GetState())
+                await self.recover_gaps()
 
     async def authorize(self) -> User:
         if self.bot_token:
@@ -775,17 +776,23 @@ class Client(Methods):
             log.info(updates)
 
     async def recover_gaps(self) -> Tuple[int, int]:
+        if self.skip_updates:
+            log.info("Recover gaps disabled in client params. Skipping recovery")
+            return (0, 0)
+
         states = await self.storage.update_state()
+
+        if not states:
+            log.info("No states found, skipping recovery")
+            return (0, 0)
 
         message_updates_counter = 0
         other_updates_counter = 0
 
-        if not states:
-            log.info("No states found, skipping recovery.")
-            return (message_updates_counter, other_updates_counter)
+        log.info("Started gaps recovering...")
 
-        for state in states:
-            id, local_pts, _, local_date, _ = state
+        for local_state in states:
+            id, local_pts, local_qts, local_date, local_seq = local_state
 
             prev_pts = 0
 
@@ -809,23 +816,62 @@ class Client(Methods):
                     break
 
                 if isinstance(diff, raw.types.updates.DifferenceEmpty):
+                    await self.storage.update_state(
+                        (
+                            id,
+                            local_pts,
+                            None,
+                            diff.date,
+                            diff.seq
+                        )
+                    )
                     break
                 elif isinstance(diff, raw.types.updates.DifferenceTooLong):
-                    break
+                    await self.storage.update_state(
+                        (
+                            id,
+                            diff.pts,
+                            None,
+                            local_date,
+                            local_seq
+                        )
+                    )
+                    continue
                 elif isinstance(diff, raw.types.updates.Difference):
                     local_pts = diff.state.pts
+                    local_date = diff.state.date
+                    local_seq = diff.state.seq
                 elif isinstance(diff, raw.types.updates.DifferenceSlice):
                     local_pts = diff.intermediate_state.pts
                     local_date = diff.intermediate_state.date
+                    local_seq = diff.intermediate_state.seq
 
                     if prev_pts == local_pts:
                         break
 
                     prev_pts = local_pts
                 elif isinstance(diff, raw.types.updates.ChannelDifferenceEmpty):
+                    await self.storage.update_state(
+                        (
+                            id,
+                            diff.pts,
+                            None,
+                            local_date,
+                            local_seq
+                        )
+                    )
                     break
                 elif isinstance(diff, raw.types.updates.ChannelDifferenceTooLong):
-                    break
+                    await self.storage.update_state(
+                        (
+                            id,
+                            diff.dialog.pts,
+                            None,
+                            local_date,
+                            local_seq
+                        )
+                    )
+                    continue
                 elif isinstance(diff, raw.types.updates.ChannelDifference):
                     local_pts = diff.pts
 
@@ -855,9 +901,18 @@ class Client(Methods):
                 if isinstance(diff, (raw.types.updates.Difference, raw.types.updates.ChannelDifference)):
                     break
 
-            await self.storage.update_state(id)
+            await self.storage.update_state(
+                (
+                    id,
+                    local_pts,
+                    None,
+                    local_date,
+                    local_seq
+                )
+            )
 
-        log.info("Recovered %s messages and %s updates.", message_updates_counter, other_updates_counter)
+
+        log.info("Recovered %s messages and %s updates", message_updates_counter, other_updates_counter)
         return (message_updates_counter, other_updates_counter)
 
     async def load_session(self):

@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 
 import pyrogram
-from pyrogram import raw, types, utils
+from pyrogram import raw, types, utils, enums
 
 from ..object import Object
 
@@ -599,4 +599,42 @@ class Gift(Object):
         return await self._client.send_resold_gift(
             gift_link=self.link,
             new_owner_chat_id="me"
+        )
+
+    async def send(
+        self,
+        chat_id: Union[int, str],
+        text: Optional[str] = None,
+        parse_mode: Optional["enums.ParseMode"] = None,
+        entities: Optional[List["types.MessageEntity"]] = None,
+        is_private: Optional[bool] = None,
+        pay_for_upgrade: Optional[bool] = None,
+    ) -> Optional["types.Message"]:
+        """Bound method *send* of :obj:`~pyrogram.types.Gift`.
+
+        Use as a shortcut for:
+
+        .. code-block:: python
+
+            await client.send_gift(
+                chat_id="me",
+                gift_id=gift.id
+            )
+
+        Example:
+            .. code-block:: python
+
+                await gift.send("me")
+
+        Returns:
+            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+        """
+        return await self._client.send_gift(
+            chat_id=chat_id,
+            gift_id=self.id,
+            text=text,
+            parse_mode=parse_mode,
+            entities=entities,
+            is_private=is_private,
+            pay_for_upgrade=pay_for_upgrade
         )

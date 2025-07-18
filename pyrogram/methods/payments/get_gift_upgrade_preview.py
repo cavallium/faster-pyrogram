@@ -15,9 +15,6 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
-
-import re
-
 import pyrogram
 from pyrogram import raw, types
 
@@ -26,7 +23,7 @@ class GetGiftUpgradePreview:
     async def get_gift_upgrade_preview(
         self: "pyrogram.Client",
         gift_id: int
-    ):
+    ) -> "types.GiftUpgradePreview":
         """Return examples of possible upgraded gifts for a regular gift.
 
         .. include:: /_includes/usable-by/users.rst

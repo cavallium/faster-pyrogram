@@ -179,3 +179,9 @@ class MessageServiceType(AutoName):
 
     DIRECT_MESSAGE_PRICE_CHANGED = auto()
     "Direct message price"
+
+    CHECKLIST_TASKS_DONE = auto()
+    "Checklist tasks done"
+
+    CHECKLIST_TASKS_ADDED = auto()
+    "Checklist tasks added"

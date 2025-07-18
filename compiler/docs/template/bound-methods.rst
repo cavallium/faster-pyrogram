@@ -102,7 +102,7 @@ PreCheckoutQuery
     {pre_checkout_query_toctree}
 
 ShippingQuery
-----------------
+-------------
 
 .. hlist::
     :columns: 2
@@ -167,7 +167,7 @@ ActiveSession
     {active_session_toctree}
 
 Gift
---------
+----
 
 .. hlist::
     :columns: 2

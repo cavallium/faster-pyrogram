@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from typing import List, Optional
 
 import pyrogram
 from pyrogram import enums, raw, types
@@ -55,16 +55,22 @@ class PaymentForm(Object):
         payment_provider (:obj:`~pyrogram.types.User`, *optional*):
             Information about the payment provider.
 
-        invoice (``str``, *optional*):
-            Invoice.
+        additional_payment_options (List of :obj:`~pyrogram.types.PaymentOption`, *optional*):
+            The list of additional payment options.
+
+        saved_credentials (List of :obj:`~pyrogram.types.SavedCredentials`, *optional*):
+            The list of saved payment credentials.
+
+        invoice (:obj:`~pyrogram.types.Invoice`, *optional*):
+            Full information about the invoice.
 
         url (``str``, *optional*):
             Payment form URL.
 
-        can_save_credentials (``str``, *optional*):
+        can_save_credentials (``bool``, *optional*):
             True, if the user can choose to save credentials.
 
-        need_password (``str``, *optional*):
+        need_password (``bool``, *optional*):
             True, if the user will be able to save credentials, if sets up a 2-step verification password.
 
         native_provider (``str``, *optional*):
@@ -87,6 +93,8 @@ class PaymentForm(Object):
         seller_bot: Optional["types.User"] = None,
         payment_provider_user_id: Optional[int] = None,
         payment_provider: Optional["types.User"] = None,
+        additional_payment_options: Optional[List["types.PaymentOption"]] = None,
+        saved_credentials: Optional[List["types.SavedCredentials"]] = None,
         invoice: Optional["types.Invoice"] = None,
         url: Optional[str] = None,
         can_save_credentials: Optional[bool] = None,
@@ -102,6 +110,8 @@ class PaymentForm(Object):
         self.seller_bot = seller_bot
         self.payment_provider_user_id = payment_provider_user_id
         self.payment_provider = payment_provider
+        self.additional_payment_options = additional_payment_options
+        self.saved_credentials = saved_credentials
         self.title = title
         self.description = description
         self.photo = photo
@@ -133,9 +143,9 @@ class PaymentForm(Object):
                 need_password=form.password_missing,
                 native_provider=form.native_provider,
                 # native_params,
-                # additional_methods,
+                additional_payment_options=types.List([types.PaymentOption._parse(option) for option in getattr(form, "additional_methods", [])]) or None,
                 # saved_info,
-                # saved_credentials,
+                saved_credentials=types.List([types.SavedCredentials._parse(credential) for credential in getattr(form, "saved_credentials", [])]) or None,
                 raw=form
             )
         elif isinstance(form, raw.types.payments.PaymentFormStarGift):

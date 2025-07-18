@@ -16,18 +16,28 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from .input_message_content import InputMessageContent
-from .input_contact_message_content import InputContactMessageContent
-from .input_invoice_message_content import InputInvoiceMessageContent
-from .input_location_message_content import InputLocationMessageContent
-from .input_text_message_content import InputTextMessageContent
-from .input_venue_message_content import InputVenueMessageContent
+import pyrogram
+from pyrogram import raw
 
-__all__ = [
-    "InputMessageContent",
-    "InputContactMessageContent",
-    "InputInvoiceMessageContent",
-    "InputLocationMessageContent",
-    "InputTextMessageContent",
-    "InputVenueMessageContent"
-]
+from .input_credentials import InputCredentials
+
+
+class InputCredentialsGooglePay(InputCredentials):
+    """Applies if a user enters new credentials using Google Pay.
+
+    Parameters:
+        data (``str``):
+            JSON-encoded data with the credential identifier.
+    """
+    def __init__(
+        self,
+        data: str,
+    ):
+        super().__init__()
+
+        self.data = data
+
+    async def write(self, client: "pyrogram.Client"):
+        return raw.types.InputPaymentCredentialsGooglePay(
+            payment_token=raw.types.DataJSON(data=self.data)
+        )

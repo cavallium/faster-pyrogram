@@ -549,6 +549,7 @@ TIMEZONE_INVALID	The specified timezone does not exist.
 TITLE_INVALID	The specified stickerpack title is invalid.
 TMP_PASSWORD_DISABLED	The temporary password is disabled.
 TMP_PASSWORD_INVALID	The temporary password is invalid.
+TODO_ITEM_DUPLICATE	The provided ToDo task already exists.
 TOKEN_EMPTY	The specified token is empty.
 TOKEN_INVALID	The provided token is invalid.
 TOKEN_SECRET_INVALID	The specified token secret is invalid.
@@ -571,6 +572,7 @@ TTL_PERIOD_INVALID	The specified TTL period is invalid.
 TYPES_EMPTY	The types parameter is empty.
 TYPE_CONSTRUCTOR_INVALID	The type constructor is invalid.
 UNKNOWN_ERROR	Unknown error.
+UNSUPPORTED	This method is not supported.
 UNTIL_DATE_INVALID	That date parameter is invalid.
 URL_INVALID	The URL provided is invalid.
 USAGE_LIMIT_INVALID	The specified usage limit is invalid.

@@ -61,7 +61,7 @@ Bot keyboards
     {bot_keyboards}
 
 Bot commands
--------------
+------------
 
 .. autosummary::
     :nosignatures:
@@ -72,19 +72,6 @@ Bot commands
     :hidden:
 
     {bot_commands}
-
-Input Media
------------
-
-.. autosummary::
-    :nosignatures:
-
-    {input_media}
-
-.. toctree::
-    :hidden:
-
-    {input_media}
 
 Inline Mode
 -----------
@@ -99,19 +86,6 @@ Inline Mode
 
     {inline_mode}
 
-InputMessageContent
--------------------
-
-.. autosummary::
-    :nosignatures:
-
-    {input_message_content}
-
-.. toctree::
-    :hidden:
-
-    {input_message_content}
-
 Authorization
 -------------
 
@@ -125,15 +99,15 @@ Authorization
 
     {authorization}
 
-InputPrivacyRule
-----------------
+InputContent
+------------
 
 .. autosummary::
     :nosignatures:
 
-    {input_privacy_rule}
+    {input_content}
 
 .. toctree::
     :hidden:
 
-    {input_privacy_rule}
+    {input_content}

@@ -16,27 +16,37 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "2.2.7"
-__license__ = "GNU Lesser General Public License v3.0 (LGPL-3.0)"
-__copyright__ = "Copyright (C) 2017-present Dan <https://github.com/delivrance>"
+import re
 
-from concurrent.futures.thread import ThreadPoolExecutor
+import pyrogram
+from pyrogram import raw
 
-
-class StopTransmission(Exception):
-    pass
+from .input_invoice import InputInvoice
 
 
-class StopPropagation(StopAsyncIteration):
-    pass
+class InputInvoiceName(InputInvoice):
+    """An invoice from a link.
 
+    Parameters:
+        name (``str``):
+            The name of the invoice or link itself.
+    """
+    def __init__(
+        self,
+        name: str,
+    ):
+        super().__init__()
 
-class ContinuePropagation(StopAsyncIteration):
-    pass
+        self.name = name
 
+    async def write(self, client: "pyrogram.Client"):
+        match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/\$)([\w-]+)$", self.name)
 
-from . import raw, types, filters, handlers, enums
-from .client import Client
-from .sync import idle, compose
+        if match:
+            slug = match.group(1)
+        else:
+            slug = self.name
 
-crypto_executor = ThreadPoolExecutor(1, thread_name_prefix="CryptoWorker")
+        return raw.types.InputInvoiceSlug(
+            slug=slug
+        )

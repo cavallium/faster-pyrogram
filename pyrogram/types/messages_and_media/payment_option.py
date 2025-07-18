@@ -16,27 +16,35 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "2.2.7"
-__license__ = "GNU Lesser General Public License v3.0 (LGPL-3.0)"
-__copyright__ = "Copyright (C) 2017-present Dan <https://github.com/delivrance>"
+from pyrogram import raw
 
-from concurrent.futures.thread import ThreadPoolExecutor
+from ..object import Object
 
 
-class StopTransmission(Exception):
-    pass
+class PaymentOption(Object):
+    """Describes an additional payment option.
 
+    Parameters:
+        title (``str``):
+            Title for the payment option.
 
-class StopPropagation(StopAsyncIteration):
-    pass
+        url (``str``):
+            Payment form URL to be opened in a web view.
+    """
+    def __init__(
+        self,
+        *,
+        title: str,
+        url: str
+    ):
+        super().__init__()
 
+        self.title = title
+        self.url = url
 
-class ContinuePropagation(StopAsyncIteration):
-    pass
-
-
-from . import raw, types, filters, handlers, enums
-from .client import Client
-from .sync import idle, compose
-
-crypto_executor = ThreadPoolExecutor(1, thread_name_prefix="CryptoWorker")
+    @staticmethod
+    def _parse(option: "raw.base.PaymentFormMethod") -> "PaymentOption":
+        return PaymentOption(
+            title=option.title,
+            url=option.url
+        )

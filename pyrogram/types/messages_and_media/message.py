@@ -150,6 +150,9 @@ class Message(Object, Update):
         paid_media (:obj:`~pyrogram.types.PaidMediaInfo`, *optional*):
             The message is a paid media message.
 
+        checklist (:obj:`~pyrogram.types.Checklist`, *optional*):
+            The message is a checklist message.
+
         show_caption_above_media (``bool``, *optional*):
             If True, caption must be shown above the message media.
 
@@ -389,6 +392,12 @@ class Message(Object, Update):
         direct_message_price_changed (:obj:`~pyrogram.types.DirectMessagePriceChanged`, *optional*):
             Service message: direct messages price.
 
+        checklist_tasks_done (:obj:`~pyrogram.types.ChecklistTasksDone`, *optional*):
+            Service message: checklist tasks done.
+
+        checklist_tasks_added (:obj:`~pyrogram.types.ChecklistTasksAdded`, *optional*):
+            Service message: checklist tasks added.
+
         gift_code (:obj:`~pyrogram.types.GiftCode`, *optional*):
             Service message: gift code information.
 
@@ -465,8 +474,8 @@ class Message(Object, Update):
             Additional interface options. An object for an inline keyboard, custom reply keyboard,
             instructions to remove reply keyboard or to force a reply from the user.
 
-        reactions (List of :obj:`~pyrogram.types.Reaction`):
-            List of the reactions to this message.
+        reactions (:obj:`~pyrogram.types.MessageReactions`):
+            Reactions of this message.
 
         send_paid_messages_stars (``int``, *optional*):
             The number of Telegram Stars the sender paid to send the message.
@@ -537,6 +546,7 @@ class Message(Object, Update):
         from_scheduled: Optional[bool] = None,
         media: Optional["enums.MessageMediaType"] = None,
         paid_media: Optional["types.PaidMediaInfo"] = None,
+        checklist: Optional["types.Checklist"] = None,
         edit_date: Optional[datetime] = None,
         edit_hidden: Optional[bool] = None,
         media_group_id: Optional[int] = None,
@@ -605,6 +615,8 @@ class Message(Object, Update):
         paid_messages_refunded: Optional["types.PaidMessagesRefunded"] = None,
         paid_messages_price_changed: Optional["types.PaidMessagesPriceChanged"] = None,
         direct_message_price_changed: Optional["types.DirectMessagePriceChanged"] = None,
+        checklist_tasks_done: Optional[List["types.ChecklistTasksDone"]] = None,
+        checklist_tasks_added: Optional[List["types.ChecklistTasksAdded"]] = None,
         gift_code: Optional["types.GiftCode"] = None,
         gifted_premium: Optional["types.GiftedPremium"] = None,
         gifted_stars: Optional["types.GiftedStars"] = None,
@@ -634,7 +646,7 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-        reactions: Optional[List["types.Reaction"]] = None,
+        reactions: Optional["types.MessageReactions"] = None,
         send_paid_messages_stars: Optional[int] = None,
         unread_media: Optional[bool] = None,
         silent: Optional[bool] = None,
@@ -678,6 +690,7 @@ class Message(Object, Update):
         self.from_scheduled = from_scheduled
         self.media = media
         self.paid_media = paid_media
+        self.checklist = checklist
         self.edit_date = edit_date
         self.edit_hidden = edit_hidden
         self.media_group_id = media_group_id
@@ -750,6 +763,8 @@ class Message(Object, Update):
         self.paid_messages_refunded = paid_messages_refunded
         self.paid_messages_price_changed = paid_messages_price_changed
         self.direct_message_price_changed = direct_message_price_changed
+        self.checklist_tasks_done = checklist_tasks_done
+        self.checklist_tasks_added = checklist_tasks_added
         self.gift_code = gift_code
         self.gifted_premium = gifted_premium
         self.gifted_stars = gifted_stars
@@ -865,6 +880,8 @@ class Message(Object, Update):
         paid_messages_refunded = None
         paid_messages_price_changed = None
         direct_message_price_changed = None
+        checklist_tasks_done = None
+        checklist_tasks_added = None
 
         service_type = enums.MessageServiceType.UNSUPPORTED
 
@@ -1066,6 +1083,12 @@ class Message(Object, Update):
             else:
                 service_type = enums.MessageServiceType.PAID_MESSAGES_PRICE_CHANGED
                 paid_messages_price_changed = types.PaidMessagesPriceChanged._parse(action)
+        elif isinstance(action, raw.types.MessageActionTodoCompletions):
+            service_type = enums.MessageServiceType.CHECKLIST_TASKS_DONE
+            checklist_tasks_done = types.ChecklistTasksDone._parse(message)
+        elif isinstance(action, raw.types.MessageActionTodoAppendTasks):
+            service_type = enums.MessageServiceType.CHECKLIST_TASKS_ADDED
+            checklist_tasks_added = types.ChecklistTasksAdded._parse(client, message)
 
         parsed_message = Message(
             id=message.id,
@@ -1124,7 +1147,9 @@ class Message(Object, Update):
             paid_messages_refunded=paid_messages_refunded,
             paid_messages_price_changed=paid_messages_price_changed,
             direct_message_price_changed=direct_message_price_changed,
-            reactions=types.MessageReactions._parse(client, message.reactions),
+            checklist_tasks_done=checklist_tasks_done,
+            checklist_tasks_added=checklist_tasks_added,
+            reactions=types.MessageReactions._parse(client, message.reactions, users, chats),
             business_connection_id=business_connection_id,
             raw=message,
             client=client
@@ -1245,6 +1270,7 @@ class Message(Object, Update):
         poll = None
         dice = None
         paid_media = None
+        checklist = None
 
         media = message.media
         media_type = None
@@ -1333,7 +1359,11 @@ class Message(Object, Update):
             elif isinstance(media, raw.types.MessageMediaPaidMedia):
                 paid_media = types.PaidMediaInfo._parse(client, media)
                 media_type = enums.MessageMediaType.PAID_MEDIA
+            elif isinstance(media, raw.types.MessageMediaToDo):
+                media_type = enums.MessageMediaType.CHECKLIST
+                checklist = types.Checklist._parse(client, media, users)
             else:
+                media_type = enums.MessageMediaType.UNSUPPORTED
                 media = None
 
         link_preview_options = types.LinkPreviewOptions._parse(
@@ -1356,7 +1386,7 @@ class Message(Object, Update):
             else:
                 reply_markup = None
 
-        reactions = types.MessageReactions._parse(client, message.reactions)
+        reactions = types.MessageReactions._parse(client, message.reactions, users, chats)
 
         parsed_message = Message(
             id=message.id,
@@ -1398,6 +1428,7 @@ class Message(Object, Update):
             from_scheduled=message.from_scheduled,
             media=media_type,
             paid_media=paid_media,
+            checklist=checklist,
             show_caption_above_media=getattr(message, "invert_media", None),
             edit_date=utils.timestamp_to_datetime(message.edit_date),
             edit_hidden=message.edit_hide,
@@ -1775,7 +1806,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
@@ -1941,7 +1972,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             caption (``str``, *optional*):
@@ -2143,7 +2174,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             caption (``str``, *optional*):
@@ -2328,7 +2359,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             caption (``bool``, *optional*):
@@ -2516,7 +2547,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             last_name (``str``, *optional*):
@@ -2663,7 +2694,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             thumb (``str`` | ``BinaryIO``, *optional*):
@@ -2847,7 +2878,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             disable_notification (``bool``, *optional*):
@@ -2947,7 +2978,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             disable_notification (``bool``, *optional*):
@@ -3054,7 +3085,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             disable_notification (``bool``, *optional*):
@@ -3176,7 +3207,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             disable_notification (``bool``, *optional*):
@@ -3309,7 +3340,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             caption (``str``, *optional*):
@@ -3560,7 +3591,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             disable_notification (``bool``, *optional*):
@@ -3713,7 +3744,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             emoji (``str``, *optional*):
@@ -3898,7 +3929,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             foursquare_id (``str``, *optional*):
@@ -4054,7 +4085,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             caption (``str``, *optional*):
@@ -4282,7 +4313,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             duration (``int``, *optional*):
@@ -4467,7 +4498,7 @@ class Message(Object, Update):
 
             quote (``bool``, *optional*):
                 If ``True``, the message will be sent as a reply to this message.
-                If *reply_to_message_id* is passed, this parameter will be ignored.
+                If *reply_parameters* is passed, this parameter will be ignored.
                 Defaults to ``True`` in group chats and ``False`` in private chats.
 
             caption (``str``, *optional*):
@@ -4648,6 +4679,11 @@ class Message(Object, Update):
             text (``str``, *optional*):
                 Text of the message to be sent.
 
+            quote (``bool``, *optional*):
+                If ``True``, the message will be sent as a reply to this message.
+                If *reply_parameters* is passed, this parameter will be ignored.
+                Defaults to ``True`` in group chats and ``False`` in private chats.
+
             url (``str``, *optional*):
                 Link that will be previewed.
                 If url not specified, the first URL found in the text will be used.
@@ -4757,6 +4793,124 @@ class Message(Object, Update):
             quote_text=quote_text,
             quote_entities=quote_entities,
             quote_offset=quote_offset,
+        )
+
+    async def reply_checklist(
+        self,
+        checklist: "types.InputChecklist",
+        quote: bool = None,
+        disable_notification: Optional[bool] = None,
+        protect_content: Optional[bool] = None,
+        message_thread_id: Optional[int] = None,
+        effect_id: Optional[int] = None,
+        reply_parameters: Optional["types.ReplyParameters"] = None,
+        schedule_date: Optional[datetime] = None,
+        business_connection_id: Optional[str] = None,
+        paid_message_star_count: int = None,
+        reply_markup: Optional[
+            Union[
+                "types.InlineKeyboardMarkup",
+                "types.ReplyKeyboardMarkup",
+                "types.ReplyKeyboardRemove",
+                "types.ForceReply"
+            ]
+        ] = None,
+    ) -> "Message":
+        """Bound method *reply_checklist* of :obj:`~pyrogram.types.Message`.
+
+        Use as a shortcut for:
+
+        .. code-block:: python
+
+            await client.send_checklist(
+                chat_id=message.chat.id,
+                title="To do",
+                tasks=[
+                    types.InputChecklistTask(id=1, text="Task 1"),
+                    types.InputChecklistTask(id=2, text="Task 2")
+                ]
+            )
+
+        Example:
+            .. code-block:: python
+
+                await message.reply_checklist("To do", [
+                    types.InputChecklistTask(id=1, text="Task 1"),
+                    types.InputChecklistTask(id=2, text="Task 2")
+                ])
+
+        Parameters:
+            checklist (:obj:`~pyrogram.types.InputChecklist`):
+                Checklist to send.
+
+            quote (``bool``, *optional*):
+                If ``True``, the message will be sent as a reply to this message.
+                If *reply_parameters* is passed, this parameter will be ignored.
+                Defaults to ``True`` in group chats and ``False`` in private chats.
+
+            disable_notification (``bool``, *optional*):
+                Sends the message silently.
+                Users will receive a notification with no sound.
+
+            protect_content (``bool``, *optional*):
+                Protects the contents of the sent message from forwarding and saving.
+
+            message_thread_id (``int``, *optional*):
+                Unique identifier for the target message thread (topic) of the forum.
+                For supergroups only.
+
+            effect_id (``int``, *optional*):
+                Unique identifier of the message effect.
+                For private chats only.
+
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Describes reply parameters for the message that is being sent.
+
+            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+                Date when the message will be automatically sent.
+
+            business_connection_id (``str``, *optional*):
+                Unique identifier of the business connection on behalf of which the message will be sent.
+
+            paid_message_star_count (``int``, *optional*):
+                The number of Telegram Stars the user agreed to pay to send the messages.
+
+            reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
+                Additional interface options. An object for an inline keyboard, custom reply keyboard,
+                instructions to remove reply keyboard or to force a reply from the user.
+
+        Returns:
+            On success, the sent :obj:`~pyrogram.types.Message` is returned.
+
+        Raises:
+            RPCError: In case of a Telegram RPC error.
+        """
+        if quote is None:
+            quote = self.chat.type != enums.ChatType.PRIVATE
+
+        if reply_parameters is None and quote:
+            reply_parameters = types.ReplyParameters(
+                message_id=self.id
+            )
+
+        if message_thread_id is None:
+            message_thread_id = self.message_thread_id
+
+        if business_connection_id is None:
+            business_connection_id = self.business_connection_id
+
+        return await self._client.send_checklist(
+            chat_id=self.chat.id,
+            checklist=checklist,
+            disable_notification=disable_notification,
+            protect_content=protect_content,
+            message_thread_id=message_thread_id,
+            effect_id=effect_id,
+            reply_parameters=reply_parameters,
+            schedule_date=schedule_date,
+            business_connection_id=business_connection_id,
+            paid_message_star_count=paid_message_star_count,
+            reply_markup=reply_markup,
         )
 
     async def edit_text(
@@ -4922,6 +5076,62 @@ class Message(Object, Update):
             chat_id=self.chat.id,
             message_id=self.id,
             media=media,
+            reply_markup=reply_markup
+        )
+
+    async def edit_checklist(
+        self,
+        checklist: "types.InputChecklist",
+        business_connection_id: Optional[str] = None,
+        reply_markup: Optional["types.InlineKeyboardMarkup"] = None
+    ) -> "Message":
+        """Bound method *edit_checklist* of :obj:`~pyrogram.types.Message`.
+
+        Use as a shortcut for:
+
+        .. code-block:: python
+
+            await app.edit_message_checklist(
+                chat_id=chat_id,
+                message_id=message_id,
+                checklist=types.InputChecklist(
+                    title="Checklist",
+                    tasks=[
+                        types.InputChecklistTask(id=1, text="Task 1"),
+                        types.InputChecklistTask(id=2, text="Task 2")
+                    ]
+                )
+            )
+
+        Example:
+            .. code-block:: python
+
+                await message.edit_checklist(checklist)
+
+        Parameters:
+            checklist (:obj:`~pyrogram.types.InputChecklist`):
+                New checklist.
+
+            business_connection_id (``str``, *optional*):
+                Unique identifier of the business connection on behalf of which the message will be sent.
+
+            reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup`, *optional*):
+                An InlineKeyboardMarkup object.
+
+        Returns:
+            On success, the edited :obj:`~pyrogram.types.Message` is returned.
+
+        Raises:
+            RPCError: In case of a Telegram RPC error.
+        """
+        if business_connection_id is None:
+            business_connection_id = self.business_connection_id
+
+        return await self._client.edit_message_checklist(
+            chat_id=self.chat.id,
+            message_id=self.id,
+            checklist=checklist,
+            business_connection_id=business_connection_id,
             reply_markup=reply_markup
         )
 
@@ -5943,16 +6153,23 @@ class Message(Object, Update):
             message_id=self.id
         )
 
-    async def pay(self) -> List[Union["types.Photo", "types.Video"]]:
+    async def pay(self) -> "types.PaymentResult":
         """Bound method *pay* of :obj:`~pyrogram.types.Message`.
 
         Use as a shortcut for:
 
         .. code-block:: python
 
-            await client.send_payment_form(
-                chat_id=message.chat.id,
-                message_id=message_id
+            invoice = types.InputInvoiceMessage(
+                    chat_id=chat_id,
+                    message_id=123
+                )
+
+            form = await app.get_payment_form(invoice)
+
+            await app.send_payment_form(
+                payment_form_id=form.id,
+                input_invoice=invoice
             )
 
         Example:
@@ -5961,9 +6178,16 @@ class Message(Object, Update):
                 await message.pay()
 
         Returns:
-            List of :obj:`~pyrogram.types.Photo` | :obj:`~pyrogram.types.Video`: On success, the list of bought photos and videos is returned.
+            :obj:`~pyrogram.types.PaymentResult`: On success, the payment result is returned.
         """
-        return await self._client.send_payment_form(
+        invoice = types.InputInvoiceMessage(
             chat_id=self.chat.id,
             message_id=self.id
+        )
+
+        form = await self._client.get_payment_form(invoice)
+
+        return await self._client.send_payment_form(
+            payment_form_id=form.id,
+            input_invoice=invoice
         )

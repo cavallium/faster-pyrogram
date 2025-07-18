@@ -246,6 +246,7 @@ def pyrogram_api():
             send_reaction
             edit_message_text
             edit_message_caption
+            edit_message_checklist
             edit_message_media
             edit_message_reply_markup
             edit_inline_text
@@ -253,11 +254,13 @@ def pyrogram_api():
             edit_inline_media
             edit_inline_reply_markup
             send_chat_action
+            send_checklist
             delete_messages
             get_available_effects
             get_messages
             get_scheduled_messages
             get_stickers
+            mark_checklist_tasks_as_done
             get_media_group
             get_chat_history
             get_chat_history_count
@@ -291,6 +294,7 @@ def pyrogram_api():
             send_paid_media
             send_paid_reaction
             add_to_gifs
+            add_checklist_tasks
         """,
         chats="""
         Chats
@@ -661,6 +665,7 @@ def pyrogram_api():
             VideoNote
             Contact
             Location
+            MaskPosition
             MediaArea
             Venue
             Sticker
@@ -686,6 +691,7 @@ def pyrogram_api():
             MyBoost
             BoostsStatus
             Giveaway
+            InputChecklistTask
             GiveawayCreated
             GiveawayPrizeStars
             GiveawayCompleted
@@ -695,6 +701,10 @@ def pyrogram_api():
             GiftCode
             GiftUpgradePreview
             CheckedGiftCode
+            ChecklistTask
+            ChecklistTasksAdded
+            ChecklistTasksDone
+            Checklist
             RefundedPayment
             ReplyParameters
             SuccessfulPayment
@@ -702,10 +712,14 @@ def pyrogram_api():
             PaidMediaInfo
             PaidMediaPreview
             PaidMessagesRefunded
+            PaidReactor
             PaidMessagesPriceChanged
             DirectMessagePriceChanged
             DirectMessagesTopic
             PaymentForm
+            PaymentOption
+            SavedCredentials
+            PaymentResult
             ChatBoost
             ContactRegistered
             ScreenshotTaken
@@ -763,15 +777,43 @@ def pyrogram_api():
             BotCommandScopeChatAdministrators
             BotCommandScopeChatMember
         """,
-        input_media="""
-        Input Media
+        input_content="""
+        Input Content
+            InputChecklist
+            InputContactMessageContent
+            InputCredentials
+            InputCredentialsApplePay
+            InputCredentialsGooglePay
+            InputCredentialsNew
+            InputCredentialsSaved
+            InputInvoice
+            InputInvoiceMessage
+            InputInvoiceMessageContent
+            InputInvoiceName
+            InputLocationMessageContent
             InputMedia
+            InputMediaAnimation
+            InputMediaAudio
+            InputMediaDocument
             InputMediaPhoto
             InputMediaVideo
-            InputMediaAudio
-            InputMediaAnimation
-            InputMediaDocument
+            InputMessageContent
             InputPhoneContact
+            InputPrivacyRule
+            InputPrivacyRuleAllowAll
+            InputPrivacyRuleAllowBots
+            InputPrivacyRuleAllowChats
+            InputPrivacyRuleAllowCloseFriends
+            InputPrivacyRuleAllowContacts
+            InputPrivacyRuleAllowPremium
+            InputPrivacyRuleAllowUsers
+            InputPrivacyRuleDisallowAll
+            InputPrivacyRuleDisallowBots
+            InputPrivacyRuleDisallowChats
+            InputPrivacyRuleDisallowContacts
+            InputPrivacyRuleDisallowUsers
+            InputTextMessageContent
+            InputVenueMessageContent
         """,
         inline_mode="""
         Inline Mode
@@ -796,37 +838,12 @@ def pyrogram_api():
             InlineQueryResultVoice
             ChosenInlineResult
         """,
-        input_message_content="""
-        InputMessageContent
-            InputMessageContent
-            InputContactMessageContent
-            InputInvoiceMessageContent
-            InputLocationMessageContent
-            InputTextMessageContent
-            InputVenueMessageContent
-        """,
         authorization="""
         Authorization
             ActiveSession
             ActiveSessions
             SentCode
             TermsOfService
-        """,
-        input_privacy_rule="""
-        InputPrivacyRule
-            InputPrivacyRule
-            InputPrivacyRuleAllowAll
-            InputPrivacyRuleAllowBots
-            InputPrivacyRuleAllowChats
-            InputPrivacyRuleAllowCloseFriends
-            InputPrivacyRuleAllowContacts
-            InputPrivacyRuleAllowPremium
-            InputPrivacyRuleAllowUsers
-            InputPrivacyRuleDisallowAll
-            InputPrivacyRuleDisallowBots
-            InputPrivacyRuleDisallowChats
-            InputPrivacyRuleDisallowContacts
-            InputPrivacyRuleDisallowUsers
         """
     )
 
@@ -873,6 +890,7 @@ def pyrogram_api():
             Message.edit_text
             Message.edit_caption
             Message.edit_media
+            Message.edit_checklist
             Message.edit_reply_markup
             Message.reply
             Message.reply_text
@@ -894,6 +912,7 @@ def pyrogram_api():
             Message.reply_video_note
             Message.reply_voice
             Message.reply_web_page
+            Message.reply_checklist
             Message.get_media_group
             Message.react
             Message.read
@@ -1076,6 +1095,8 @@ def pyrogram_api():
             PrivacyRuleType
             GiftForResaleOrder
             PaymentFormType
+            StickerType
+            MaskPointType
         """,
     )
 

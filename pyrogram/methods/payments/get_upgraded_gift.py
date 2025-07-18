@@ -24,7 +24,7 @@ class GetUpgradedGift:
     async def get_upgraded_gift(
         self: "pyrogram.Client",
         link: str
-    ):
+    ) -> "types.Gift":
         """Get information about upgraded gift.
 
         .. include:: /_includes/usable-by/users.rst

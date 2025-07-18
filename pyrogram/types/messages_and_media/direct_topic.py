@@ -28,6 +28,9 @@ class DirectMessagesTopic(Object):
         id (``int``):
             Unique topic identifier inside this chat.
 
+        can_send_unpaid_messages (``bool``, *optional*):
+            True, if the other party can send unpaid messages even if the chat has paid messages enabled.
+
         is_marked_as_unread (``bool``):
             True, if the forum topic is marked as unread.
 
@@ -51,6 +54,7 @@ class DirectMessagesTopic(Object):
         self,
         *,
         id: int,
+        can_send_unpaid_messages: bool = None,
         is_marked_as_unread: bool = None,
         unread_count: int = None,
         last_read_inbox_message_id: int = None,
@@ -61,6 +65,7 @@ class DirectMessagesTopic(Object):
         super().__init__()
 
         self.id = id
+        self.can_send_unpaid_messages = can_send_unpaid_messages
         self.is_marked_as_unread = is_marked_as_unread
         self.unread_count = unread_count
         self.last_read_inbox_message_id = last_read_inbox_message_id
@@ -75,6 +80,7 @@ class DirectMessagesTopic(Object):
 
         return DirectMessagesTopic(
             id=topic.peer.user_id,
+            can_send_unpaid_messages=topic.nopaid_messages_exception,
             is_marked_as_unread=topic.unread_mark,
             unread_count=topic.unread_count,
             last_read_inbox_message_id=topic.read_inbox_max_id,

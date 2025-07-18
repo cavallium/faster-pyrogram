@@ -17,13 +17,13 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
-from typing import List, Dict, Type
+from typing import Dict, List, Type
 
 import pyrogram
-from pyrogram import raw, utils
-from pyrogram import types
+from pyrogram import enums, raw, types, utils
 from pyrogram.errors import StickersetInvalid
-from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType
+from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType, ThumbnailSource
+
 from ..object import Object
 
 
@@ -38,6 +38,9 @@ class Sticker(Object):
             Unique identifier for this file, which is supposed to be the same over time and for different accounts.
             Can't be used to download or reuse the file.
 
+        type (:obj:`~pyrogram.enums.StickerType`):
+            Type of the sticker.
+
         width (``int``):
             Sticker width.
 
@@ -49,9 +52,6 @@ class Sticker(Object):
 
         is_video (``bool``):
             True, if the sticker is a video sticker.
-
-        is_premium (``bool``):
-            True, if the sticker is a premium only.
 
         file_name (``str``, *optional*):
             Sticker file name.
@@ -71,35 +71,54 @@ class Sticker(Object):
         set_name (``str``, *optional*):
             Name of the sticker set to which the sticker belongs.
 
+        premium_animation (:obj:`~pyrogram.types.Animation`, *optional*):
+            For premium regular stickers, premium animation for the sticker.
+
+        mask_position (:obj:`~pyrogram.types.MaskPosition`, *optional*):
+            For mask stickers, the position where the mask should be placed.
+
+        custom_emoji_id (``int``, *optional*):
+            For custom emoji stickers, unique identifier of the custom emoji.
+
+        needs_repainting (``bool``, *optional*):
+            True, if the sticker must be repainted to a text color in messages,
+            the color of the Telegram Premium badge in emoji status,
+            white color on chat photos, or another appropriate color in other places.
+
         thumbs (List of :obj:`~pyrogram.types.Thumbnail`, *optional*):
             Sticker thumbnails in the .webp or .jpg format.
+
+        raw (:obj:`~pyrogram.raw.types.Document`, *optional*):
+            The raw sticker.
     """
-
-    # TODO: Add mask position
-
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
         file_id: str,
         file_unique_id: str,
+        type: "enums.StickerType",
         width: int,
         height: int,
         is_animated: bool,
         is_video: bool,
-        is_premium: bool,
         file_name: str = None,
         mime_type: str = None,
         file_size: int = None,
         date: datetime = None,
         emoji: str = None,
         set_name: str = None,
-        thumbs: List["types.Thumbnail"] = None
+        premium_animation: "types.Animation" = None,
+        mask_position: "types.MaskPosition" = None,
+        custom_emoji_id: int = None,
+        needs_repainting: bool = None,
+        thumbs: List["types.Thumbnail"] = None,
+        raw: "raw.types.Document" = None
     ):
-        super().__init__(client)
+        super().__init__()
 
         self.file_id = file_id
         self.file_unique_id = file_unique_id
+        self.type = type
         self.file_name = file_name
         self.mime_type = mime_type
         self.file_size = file_size
@@ -108,11 +127,14 @@ class Sticker(Object):
         self.height = height
         self.is_animated = is_animated
         self.is_video = is_video
-        self.is_premium = is_premium
         self.emoji = emoji
         self.set_name = set_name
+        self.premium_animation = premium_animation
+        self.mask_position = mask_position
+        self.custom_emoji_id = custom_emoji_id
+        self.needs_repainting = needs_repainting
         self.thumbs = thumbs
-        # self.mask_position = mask_position
+        self.raw = raw
 
     cache = {}
 
@@ -149,17 +171,32 @@ class Sticker(Object):
 
     @staticmethod
     async def _parse(
-        client,
+        client: "pyrogram.Client",
         sticker: "raw.types.Document",
         document_attributes: Dict[Type["raw.base.DocumentAttribute"], "raw.base.DocumentAttribute"],
     ) -> "Sticker":
         sticker_attribute = None
         set_name = None
 
+        custom_emoji_id = None
+        needs_repainting = None
+        premium_animation = None
+        mask_position = None
+
+        sticker_type = enums.StickerType.REGULAR
+
         if document_attributes.get(raw.types.DocumentAttributeSticker):
             sticker_attribute = document_attributes[raw.types.DocumentAttributeSticker]
+
+            if sticker_attribute.mask:
+                sticker_type = enums.StickerType.MASK
+                mask_position = types.MaskPosition._parse(sticker_attribute.mask_coords)
         elif document_attributes.get(raw.types.DocumentAttributeCustomEmoji):
             sticker_attribute = document_attributes[raw.types.DocumentAttributeCustomEmoji]
+
+            sticker_type = enums.StickerType.CUSTOM_EMOJI
+            custom_emoji_id = sticker.id
+            needs_repainting = sticker_attribute.text_color
 
         image_size_attributes = document_attributes.get(raw.types.DocumentAttributeImageSize, None)
         file_name = getattr(document_attributes.get(raw.types.DocumentAttributeFilename, None), "file_name", None)
@@ -175,6 +212,40 @@ class Sticker(Object):
         else:
             set_name = None
 
+        if sticker.video_thumbs:
+            videos: List["raw.types.VideoSize"] = []
+
+            for v in sticker.video_thumbs:
+                if isinstance(v, raw.types.VideoSize):
+                    videos.append(v)
+
+            videos.sort(key=lambda v: v.w * v.h)
+
+            main = videos[-1]
+
+            premium_animation = Sticker(
+                file_id=FileId(
+                    file_type=FileType.STICKER,
+                    dc_id=sticker.dc_id,
+                    media_id=sticker.id,
+                    access_hash=sticker.access_hash,
+                    file_reference=sticker.file_reference,
+                ).encode(),
+                file_unique_id=FileUniqueId(
+                    file_unique_type=FileUniqueType.DOCUMENT,
+                    media_id=sticker.id
+                ).encode(),
+                type=sticker_type,
+                width=main.w,
+                height=main.h,
+                is_animated=None,
+                is_video=None,
+                file_size=main.size,
+                file_name=f"Mask{file_name}",
+                mime_type="application/x-tgsticker",
+                raw=main
+            )
+
         return Sticker(
             file_id=FileId(
                 file_type=FileType.STICKER,
@@ -187,6 +258,7 @@ class Sticker(Object):
                 file_unique_type=FileUniqueType.DOCUMENT,
                 media_id=sticker.id
             ).encode(),
+            type=sticker_type,
             width=(
                 image_size_attributes.w
                 if image_size_attributes
@@ -203,14 +275,16 @@ class Sticker(Object):
             ),
             is_animated=sticker.mime_type == "application/x-tgsticker",
             is_video=sticker.mime_type == "video/webm",
-            is_premium=bool(sticker.video_thumbs),
-            # TODO: mask_position
             set_name=set_name,
             emoji=getattr(sticker_attribute, "alt", None) or None,
+            premium_animation=premium_animation,
+            mask_position=mask_position,
+            custom_emoji_id=custom_emoji_id,
+            needs_repainting=needs_repainting,
             file_size=sticker.size,
             mime_type=sticker.mime_type,
             file_name=file_name,
             date=utils.timestamp_to_datetime(sticker.date),
             thumbs=types.Thumbnail._parse(client, sticker),
-            client=client
+            raw=sticker
         )

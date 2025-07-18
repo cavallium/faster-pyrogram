@@ -60,9 +60,16 @@ class VerificationStatus(Object):
         if not isinstance(chat, (raw.types.User, raw.types.Channel, raw.types.ChatInvite)):
             return None
 
+        bot_verification_icon = None
+
+        if isinstance(chat, raw.types.ChatInvite):
+            bot_verification_icon = chat.bot_verification.icon
+        else:
+            bot_verification_icon = chat.bot_verification_icon
+
         return VerificationStatus(
             is_verified=chat.verified,
             is_scam=chat.scam,
             is_fake=chat.fake,
-            bot_verification_icon_custom_emoji_id=chat.bot_verification_icon
+            bot_verification_icon_custom_emoji_id=bot_verification_icon
         )

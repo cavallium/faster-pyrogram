@@ -16,27 +16,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "2.2.7"
-__license__ = "GNU Lesser General Public License v3.0 (LGPL-3.0)"
-__copyright__ = "Copyright (C) 2017-present Dan <https://github.com/delivrance>"
+import pyrogram
 
-from concurrent.futures.thread import ThreadPoolExecutor
+from ..object import Object
 
 
-class StopTransmission(Exception):
-    pass
+class InputInvoice(Object):
+    """Describes an invoice to process.
 
+    It should be one of:
 
-class StopPropagation(StopAsyncIteration):
-    pass
+    - :obj:`~pyrogram.types.InputInvoiceMessage`
+    - :obj:`~pyrogram.types.InputInvoiceName`
+    """
+    def __init__(self):
+        super().__init__()
 
-
-class ContinuePropagation(StopAsyncIteration):
-    pass
-
-
-from . import raw, types, filters, handlers, enums
-from .client import Client
-from .sync import idle, compose
-
-crypto_executor = ThreadPoolExecutor(1, thread_name_prefix="CryptoWorker")
+    async def write(self, client: "pyrogram.Client"):
+        raise NotImplementedError
