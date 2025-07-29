@@ -499,7 +499,7 @@ class Gift(Object):
             owned_gift_id=str(self.message_id)
         )
 
-    async def upgrade(self, keep_original_details: Optional[bool] = None) -> Optional["types.Message"]:
+    async def upgrade(self, keep_original_details: Optional[bool] = None, star_count: Optional[int] = None) -> Optional["types.Message"]:
         """Bound method *upgrade* of :obj:`~pyrogram.types.Gift`.
 
         Use as a shortcut for:
@@ -520,7 +520,8 @@ class Gift(Object):
         """
         return await self._client.upgrade_gift(
             owned_gift_id=str(self.message_id),
-            keep_original_details=keep_original_details
+            keep_original_details=keep_original_details,
+            star_count=star_count
         )
 
     async def transfer(self, to_chat_id: Union[int, str]) -> Optional["types.Message"]:
@@ -575,7 +576,7 @@ class Gift(Object):
             )
         )
 
-    async def buy(self) -> Optional["types.Message"]:
+    async def buy(self, star_count: Optional[int] = None) -> Optional["types.Message"]:
         """Bound method *buy* of :obj:`~pyrogram.types.Gift`.
 
         .. note::
@@ -598,7 +599,8 @@ class Gift(Object):
         """
         return await self._client.send_resold_gift(
             gift_link=self.link,
-            new_owner_chat_id="me"
+            new_owner_chat_id="me",
+            star_count=star_count
         )
 
     async def send(

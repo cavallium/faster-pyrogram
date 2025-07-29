@@ -28,6 +28,7 @@ class SendResoldGift:
         self: "pyrogram.Client",
         gift_link: str,
         new_owner_chat_id: Union[int, str],
+        star_count: int = None
     ) -> Optional["types.Message"]:
         """Send an upgraded gift that is available for resale to another user or channel chat.
 
@@ -45,6 +46,9 @@ class SendResoldGift:
                 Unique identifier (int) or username (str) of the target chat you want to transfer the star gift to.
                 For your personal cloud (Saved Messages) you can simply use "me" or "self".
                 For a contact that exists in your Telegram address book you can use his phone number (str).
+
+            star_count (``int``, *optional*):
+                The amount of Telegram Stars required to pay for the gift.
 
         Returns:
             :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
@@ -69,15 +73,24 @@ class SendResoldGift:
             to_id=peer
         )
 
+        form = await self.invoke(
+            raw.functions.payments.GetPaymentForm(
+                invoice=invoice
+            )
+        )
+
+        if star_count is not None:
+            if star_count < 0:
+                raise ValueError("Invalid amount of Telegram Stars specified.")
+
+            if form.invoice.prices[0].amount > star_count:
+                raise ValueError("Have not enough Telegram Stars.")
+
         r = await self.invoke(
             raw.functions.payments.SendStarsForm(
-                form_id=(await self.invoke(
-                    raw.functions.payments.GetPaymentForm(
-                        invoice=invoice
-                    ),
-                )).form_id,
+                form_id=form.form_id,
                 invoice=invoice
-            ),
+            )
         )
 
         messages = await utils.parse_messages(

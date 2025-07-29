@@ -9,7 +9,7 @@ CHAT_ACTION_FORBIDDEN	You cannot execute this action.
 CHAT_ADMIN_INVITE_REQUIRED	You don't have rights to invite other users.
 CHAT_ADMIN_REQUIRED	You must be an admin in this chat to do this.
 CHAT_FORBIDDEN	This chat is not available to the current user.
-CHAT_GUEST_SEND_FORBIDDEN	You need to join the discussion group before commenting, see [here &raquo;](https://core.telegram.org/api/discussion#requiring-users-to-join-the-group) for more info.
+CHAT_GUEST_SEND_FORBIDDEN	You need to join the discussion group before commenting, see [here »](https://core.telegram.org/api/discussion#requiring-users-to-join-the-group) for more info.
 CHAT_SEND_AUDIOS_FORBIDDEN	You can't send audio messages in this chat.
 CHAT_SEND_DOCS_FORBIDDEN	You can't send documents in this chat.
 CHAT_SEND_GAME_FORBIDDEN	You can't send a game to this chat.

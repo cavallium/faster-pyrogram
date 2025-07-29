@@ -28,7 +28,7 @@ class UpgradeGift:
         self: "pyrogram.Client",
         owned_gift_id: str,
         keep_original_details: Optional[bool] = None,
-        # star_count: int = None
+        star_count: int = None,
         business_connection_id: str = None
     ) -> Optional["types.Message"]:
         """Upgrade a given regular gift to a unique gift.
@@ -49,6 +49,9 @@ class UpgradeGift:
 
             keep_original_details (``bool``, *optional*):
                 Pass True to keep the original gift text, sender and receiver in the upgraded gift.
+
+            star_count (``int``, *optional*):
+                The amount of Telegram Stars required to pay for the upgrade.
 
             business_connection_id (``str``, *optional*):
                 Unique identifier of the business connection.
@@ -100,14 +103,23 @@ class UpgradeGift:
                 keep_original_details=keep_original_details
             )
 
+            form = await self.invoke(
+                raw.functions.payments.GetPaymentForm(
+                    invoice=invoice
+                ),
+                business_connection_id=business_connection_id
+            )
+
+            if star_count is not None:
+                if star_count < 0:
+                    raise ValueError("Invalid amount of Telegram Stars specified.")
+
+                if form.invoice.prices[0].amount > star_count:
+                    raise ValueError("Have not enough Telegram Stars.")
+
             r = await self.invoke(
                 raw.functions.payments.SendStarsForm(
-                    form_id=(await self.invoke(
-                        raw.functions.payments.GetPaymentForm(
-                            invoice=invoice
-                        ),
-                        business_connection_id=business_connection_id
-                    )).form_id,
+                    form_id=form.form_id,
                     invoice=invoice
                 ),
                 business_connection_id=business_connection_id

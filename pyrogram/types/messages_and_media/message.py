@@ -6030,7 +6030,7 @@ class Message(Object, Update):
             options=option
         )
 
-    async def pin(self, disable_notification: bool = False, both_sides: bool = False) -> "types.Message":
+    async def pin(self, disable_notification: bool = False, both_sides: bool = False) -> Optional["types.Message"]:
         """Bound method *pin* of :obj:`~pyrogram.types.Message`.
 
         Use as a shortcut for:

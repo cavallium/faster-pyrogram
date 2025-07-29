@@ -450,9 +450,9 @@ class Client(Methods):
                         if not value:
                             continue
 
-                        confirm = (await ainput(f'Is "{value}" correct? (y/N): ', loop=self.loop)).lower()
+                        confirm = await ainput(f'Is "{value}" correct? (y/N): ', loop=self.loop)
 
-                        if confirm == "y":
+                        if confirm.lower() == "y":
                             break
 
                     if ":" in value:
@@ -500,9 +500,9 @@ class Client(Methods):
 
                     try:
                         if not self.password:
-                            confirm = await ainput("Confirm password recovery (y/n): ", loop=self.loop)
+                            confirm = await ainput("Confirm password recovery (y/N): ", loop=self.loop)
 
-                            if confirm == "y":
+                            if confirm.lower() == "y":
                                 email_pattern = await self.send_recovery_code()
                                 print(f"The recovery code has been sent to {email_pattern}")
 
@@ -958,9 +958,9 @@ class Client(Methods):
                                 print("Invalid value")
                                 continue
 
-                            confirm = (await ainput(f'Is "{value}" correct? (y/N): ', loop=self.loop)).lower()
+                            confirm = await ainput(f'Is "{value}" correct? (y/N): ', loop=self.loop)
 
-                            if confirm == "y":
+                            if confirm.lower() == "y":
                                 await self.storage.api_id(value)
                                 break
                         except Exception as e:

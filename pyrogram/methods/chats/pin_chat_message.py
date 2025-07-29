@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from typing import Union, Optional
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -29,7 +29,7 @@ class PinChatMessage:
         message_id: int,
         disable_notification: bool = False,
         both_sides: bool = False,
-    ) -> "types.Message":
+    ) -> Optional["types.Message"]:
         """Pin a message in a group, channel or your own chat.
         You must be an administrator in the chat for this to work and must have the "can_pin_messages" admin right in
         the supergroup or "can_edit_messages" admin right in the channel.
