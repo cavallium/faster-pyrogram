@@ -564,9 +564,19 @@ class Session:
 
                 await asyncio.sleep(amount)
             except (OSError, InternalServerError, ServiceUnavailable) as e:
-                log.warning(
-                    '[%s] Retrying "%s" due to: %s', attempt, query_name, str(e) or repr(e)
+                if isinstance(e, InternalServerError) \
+                        and e.code == 500 \
+                        and (e.ID or e.NAME) == "HISTORY_GET_FAILED":
+                    raise e from None
+
+                (log.warning if attempt < retries else log.info)(
+                    '[%s] Retrying "%s" due to: %s',
+                    attempt,
+                    query_name, str(e) or repr(e)
                 )
+
+                if self.state == SessionState.STARTED and not self.restart_lock.locked():
+                    self.client.loop.create_task(self.restart())
 
                 await asyncio.sleep(retry_delay)
 

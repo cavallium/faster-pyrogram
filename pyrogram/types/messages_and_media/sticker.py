@@ -202,12 +202,13 @@ class Sticker(Object):
         file_name = getattr(document_attributes.get(raw.types.DocumentAttributeFilename, None), "file_name", None)
         video_attributes = document_attributes.get(raw.types.DocumentAttributeVideo, None)
 
-        if client.fetch_stickers and sticker_attribute:
+        if sticker_attribute:
             sticker_set = sticker_attribute.stickerset
 
             if isinstance(sticker_set, raw.types.InputStickerSetID):
-                input_sticker_set_id = (sticker_set.id, sticker_set.access_hash)
-                set_name = await Sticker._get_sticker_set_name(client.invoke, input_sticker_set_id)
+                # TODO: disabled to make it faster
+                # input_sticker_set_id = (sticker_set.id, sticker_set.access_hash)
+                set_name = None # set_name = await Sticker._get_sticker_set_name(client.invoke, input_sticker_set_id)
 
         if sticker.video_thumbs:
             videos: List["raw.types.VideoSize"] = []
