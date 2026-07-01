@@ -16,7 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from .file_storage import FileStorage
-from .memory_storage import MemoryStorage
+from pathlib import Path
+from typing import Optional
+
 from .sqlite_storage import SQLiteStorage
-from .storage import Storage
+
+
+class MemoryStorage(SQLiteStorage):
+    def __init__(self, name: str, session_string: Optional[str] = None):
+        super().__init__(
+            name,
+            workdir=Path.cwd(),
+            session_string=session_string,
+            in_memory=True
+        )

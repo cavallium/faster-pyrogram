@@ -21,6 +21,7 @@ import logging
 import sqlite3
 import struct
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
@@ -161,10 +162,12 @@ class SQLiteStorage(Storage):
         workdir: Path,
         session_string: Optional[str] = None,
         in_memory: Optional[bool] = False,
-        use_wal: Optional[bool] = False,
+        use_wal: Optional[bool] = True,
     ):
         super().__init__(name)
 
+        self.executor = ThreadPoolExecutor(1)
+        self.loop = utils.get_event_loop()
         self.conn = None # type: sqlite3.Connection
 
         self.session_string = session_string
@@ -176,8 +179,26 @@ class SQLiteStorage(Storage):
         else:
             self.database = workdir / (self.name + self.FILE_EXTENSION)
 
-    async def update(self):
-        version = await self.version()
+    async def _run(self, func, *args):
+        return await self.loop.run_in_executor(self.executor, func, *args)
+
+    def _connect_impl(self, path):
+        self.conn = sqlite3.connect(str(path), timeout=1, check_same_thread=False)
+
+        with self.conn:
+            if self.use_wal and path != ":memory:":
+                self.conn.execute("PRAGMA journal_mode=WAL").close()
+                self.conn.execute("PRAGMA synchronous=NORMAL").close()
+                self.conn.execute("PRAGMA temp_store=1").close()
+            else:
+                self.conn.execute("PRAGMA journal_mode=DELETE").close()
+
+    def _vacuum_impl(self):
+        with self.conn:
+            self.conn.execute("VACUUM")
+
+    def _update_impl(self):
+        version = self._get_impl("version", "number")
 
         if version == 1:
             with self.conn:
@@ -210,11 +231,13 @@ class SQLiteStorage(Storage):
             version += 1
 
         if version == 6:
-            if await self.test_mode():
-                address = TEST[await self.dc_id()]
+            dc_id = self._get_impl("sessions", "dc_id")
+
+            if self._get_impl("sessions", "test_mode"):
+                address = TEST[dc_id]
                 port = 80
             else:
-                address = PROD[await self.dc_id()]
+                address = PROD[dc_id]
                 port = 443
 
             with self.conn:
@@ -226,9 +249,12 @@ class SQLiteStorage(Storage):
 
             version += 1
 
-        await self.version(version)
+        self._set_impl("version", "number", version)
 
-    async def create(self):
+    async def update(self):
+        return await self._run(self._update_impl)
+
+    def _create_impl(self):
         with self.conn:
             self.conn.executescript(SCHEMA)
 
@@ -239,9 +265,12 @@ class SQLiteStorage(Storage):
                 (2, "149.154.167.51", 443, None, None, None, 0, None, None),
             )
 
+    async def create(self):
+        return await self._run(self._create_impl)
+
     async def open(self):
         if self.in_memory:
-            self.conn = sqlite3.connect(":memory:", timeout=1, check_same_thread=False)
+            await self._run(self._connect_impl, ":memory:")
             await self.create()
 
             if self.session_string:
@@ -301,77 +330,91 @@ class SQLiteStorage(Storage):
         path = self.database
         file_exists = isinstance(path, Path) and path.is_file()
 
-        self.conn = sqlite3.connect(str(path), timeout=1, check_same_thread=False)
-
-        if self.use_wal:
-            self.conn.execute("PRAGMA journal_mode=WAL")
-        else:
-            self.conn.execute("PRAGMA journal_mode=DELETE")
+        await self._run(self._connect_impl, path)
 
         if file_exists:
             await self.update()
         else:
             await self.create()
 
-        with self.conn:
-            self.conn.execute("VACUUM")
+        await self._run(self._vacuum_impl)
 
     async def save(self):
         await self.date(int(time.time()))
-        self.conn.commit()
+        await self._run(self.conn.commit)
 
     async def close(self):
-        self.conn.close()
+        await self._run(self.conn.close)
+        self.executor.shutdown()
 
     async def delete(self):
         if not self.in_memory:
             Path(self.database).unlink()
 
+    def _update_peers_impl(self, peers: List[Tuple[int, int, str, str]]):
+        with self.conn:
+            self.conn.executemany(
+                "REPLACE INTO peers (id, access_hash, type, phone_number) VALUES (?, ?, ?, ?)",
+                list(peers)
+            )
+
     async def update_peers(self, peers: List[Tuple[int, int, str, str]]):
-        self.conn.executemany(
-            "REPLACE INTO peers (id, access_hash, type, phone_number) VALUES (?, ?, ?, ?)", peers
-        )
+        return await self._run(self._update_peers_impl, peers)
+
+    def _update_usernames_impl(self, usernames: List[Tuple[int, List[str]]]):
+        with self.conn:
+            self.conn.executemany("DELETE FROM usernames WHERE id = ?", [(id,) for id, _ in usernames])
+
+            self.conn.executemany(
+                "REPLACE INTO usernames (id, username) VALUES (?, ?)",
+                [(id, username) for id, usernames in usernames for username in usernames],
+            )
 
     async def update_usernames(self, usernames: List[Tuple[int, List[str]]]):
-        self.conn.executemany("DELETE FROM usernames WHERE id = ?", [(id,) for id, _ in usernames])
+        return await self._run(self._update_usernames_impl, usernames)
 
-        self.conn.executemany(
-            "REPLACE INTO usernames (id, username) VALUES (?, ?)",
-            [(id, username) for id, usernames in usernames for username in usernames],
-        )
-
-    async def update_state(self, value: Tuple[int, int, int, int, int] = object):
+    def _update_state_impl(self, value: Tuple[int, int, int, int, int] = object):
         if value is object:
             return self.conn.execute(
                 "SELECT id, pts, qts, date, seq FROM update_state ORDER BY date ASC"
             ).fetchall()
         else:
-            if isinstance(value, int):
-                self.conn.execute("DELETE FROM update_state WHERE id = ?", (value,))
-            else:
-                self.conn.execute(
-                    "REPLACE INTO update_state (id, pts, qts, date, seq) VALUES (?, ?, ?, ?, ?)",
-                    value,
-                )
+            with self.conn:
+                if isinstance(value, int):
+                    self.conn.execute("DELETE FROM update_state WHERE id = ?", (value,))
+                else:
+                    self.conn.execute(
+                        "REPLACE INTO update_state (id, pts, qts, date, seq) VALUES (?, ?, ?, ?, ?)",
+                        value,
+                    )
 
-    async def get_peer_by_id(self, peer_id: int):
-        r = self.conn.execute(
+    async def update_state(self, value: Tuple[int, int, int, int, int] = object):
+        return await self._run(self._update_state_impl, value)
+
+    def _get_peer_by_id_impl(self, peer_id: int):
+        return self.conn.execute(
             "SELECT id, access_hash, type FROM peers WHERE id = ?", (peer_id,)
         ).fetchone()
+
+    async def get_peer_by_id(self, peer_id: int):
+        r = await self._run(self._get_peer_by_id_impl, peer_id)
 
         if r is None:
             raise KeyError(f"ID not found: {peer_id}")
 
         return get_input_peer(*r)
 
-    async def get_peer_by_username(self, username: str):
-        r = self.conn.execute(
+    def _get_peer_by_username_impl(self, username: str):
+        return self.conn.execute(
             "SELECT p.id, p.access_hash, p.type, p.last_update_on FROM peers p "
             "JOIN usernames u ON p.id = u.id "
             "WHERE u.username = ? "
             "ORDER BY p.last_update_on DESC",
             (username,),
         ).fetchone()
+
+    async def get_peer_by_username(self, username: str):
+        r = await self._run(self._get_peer_by_username_impl, username)
 
         if r is None:
             raise KeyError(f"Username not found: {username}")
@@ -381,22 +424,31 @@ class SQLiteStorage(Storage):
 
         return get_input_peer(*r[:3])
 
-    async def get_peer_by_phone_number(self, phone_number: str):
-        r = self.conn.execute(
+    def _get_peer_by_phone_number_impl(self, phone_number: str):
+        return self.conn.execute(
             "SELECT id, access_hash, type FROM peers WHERE phone_number = ?", (phone_number,)
         ).fetchone()
+
+    async def get_peer_by_phone_number(self, phone_number: str):
+        r = await self._run(self._get_peer_by_phone_number_impl, phone_number)
 
         if r is None:
             raise KeyError(f"Phone number not found: {phone_number}")
 
         return get_input_peer(*r)
 
-    async def _get(self, table: str, attr: str):
+    def _get_impl(self, table: str, attr: str):
         return self.conn.execute(f"SELECT {attr} FROM {table}").fetchone()[0]
 
-    async def _set(self, table: str, attr: str, value: Any):
+    def _set_impl(self, table: str, attr: str, value: Any):
         with self.conn:
             self.conn.execute(f"UPDATE {table} SET {attr} = ?", (value,))
+
+    async def _get(self, table: str, attr: str):
+        return await self._run(self._get_impl, table, attr)
+
+    async def _set(self, table: str, attr: str, value: Any):
+        return await self._run(self._set_impl, table, attr, value)
 
     async def _accessor(self, table: str, attr: str, value: Any = object):
         return await self._get(table, attr) if value is object else await self._set(table, attr, value)
