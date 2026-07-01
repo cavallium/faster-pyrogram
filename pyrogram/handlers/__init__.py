@@ -30,6 +30,7 @@ from .disconnect_handler import DisconnectHandler
 from .edited_business_message_handler import EditedBusinessMessageHandler
 from .edited_message_handler import EditedMessageHandler
 from .error_handler import ErrorHandler
+from .guest_message_handler import GuestMessageHandler
 from .handler import Handler
 from .inline_query_handler import InlineQueryHandler
 from .managed_bot_updated_handler import ManagedBotUpdatedHandler

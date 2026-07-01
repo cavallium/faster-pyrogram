@@ -45,7 +45,7 @@ class BotAccessSettings(Object):
     @staticmethod
     def _parse(client, bot_access_settings: "raw.base.bots.AccessSettings"):
         return BotAccessSettings(
-            is_access_restricted=bot_access_settings.access_restricted,
+            is_access_restricted=bot_access_settings.restricted,
             added_users=types.List(
                 [types.User._parse(client, i) for i in bot_access_settings.add_users]
             )

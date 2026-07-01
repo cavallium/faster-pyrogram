@@ -896,17 +896,6 @@ A media message contains any of the following fields set: *audio*, *document*, *
 
 # endregion
 
-# region guest_message_filter
-async def guest_message_filter(_, __, m: Message):
-    return bool(m.guest_query_id)
-
-
-guest_message = create(guest_message_filter)
-"""Filter messages that has been sent by a guest bot."""
-
-
-# endregion
-
 # region scheduled_filter
 async def scheduled_filter(_, __, m: Message):
     return bool(m.scheduled)

@@ -37,7 +37,7 @@ class GetUserPersonalChatMessages:
 
         The messages are returned in reverse chronological order.
 
-        .. include:: /_includes/usable-by/users-bots.rst
+        .. include:: /_includes/usable-by/bots.rst
 
         Parameters:
             user_id (``int`` | ``str``):
@@ -62,7 +62,7 @@ class GetUserPersonalChatMessages:
         """
         current = 0
         total = limit or (1 << 31) - 1
-        limit = min(100, total)
+        limit = min(20, total)
 
         min_id = (min_id - 1) if min_id else 0
         max_id = (max_id + 1) if max_id else 0

@@ -79,7 +79,9 @@ class PhoneNumberAuthenticationSettings(Object):
             current_number=self.is_current_phone_number,
             allow_app_hash=self.allow_sms_retriever_api,
             allow_missed_call=self.allow_missed_call,
-            allow_firebase=bool(self.firebase_authentication_settings),
+            allow_firebase=bool(self.firebase_authentication_settings)
+            if self.firebase_authentication_settings is not None
+            else None,
             unknown_number=self.has_unknown_phone_number,
             logout_tokens=self.authentication_tokens,
             token=getattr(self.firebase_authentication_settings, "device_token", None),

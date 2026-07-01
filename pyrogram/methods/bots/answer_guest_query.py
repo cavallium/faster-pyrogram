@@ -16,8 +16,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Iterable
-
 import pyrogram
 from pyrogram import raw, types
 
@@ -47,10 +45,11 @@ class AnswerGuestQuery:
 
                 await app.answer_guest_query(
                     guest_query_id,
-                    results=[
-                        InlineQueryResultArticle(
-                            "Title",
-                            InputTextMessageContent("Message content"))])
+                    result=InlineQueryResultArticle(
+                        "Title",
+                        InputTextMessageContent("Message content")
+                    ),
+                )
         """
         r = await self.invoke(
             raw.functions.messages.SetBotGuestChatResult(
@@ -59,4 +58,4 @@ class AnswerGuestQuery:
             )
         )
 
-        return types.SentGuestMessage._parse(r)
+        return await types.SentGuestMessage._parse(r)

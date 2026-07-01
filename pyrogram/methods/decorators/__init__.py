@@ -30,6 +30,7 @@ from .on_disconnect import OnDisconnect
 from .on_edited_business_message import OnEditedBusinessMessage
 from .on_edited_message import OnEditedMessage
 from .on_error import OnError
+from .on_guest_message import OnGuestMessage
 from .on_inline_query import OnInlineQuery
 from .on_managed_bot import OnManagedBot
 from .on_message import OnMessage
@@ -61,6 +62,7 @@ class Decorators(
     OnEditedBusinessMessage,
     OnEditedMessage,
     OnError,
+    OnGuestMessage,
     OnInlineQuery,
     OnManagedBot,
     OnMessage,

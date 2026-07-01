@@ -943,7 +943,6 @@ def pyrogram_api():
             InputPollOption
             InputPollMedia
             InputPollOptionMedia
-            InputPollOption
             InputPrivacyRule
             InputPrivacyRuleAllowAll
             InputPrivacyRuleAllowBots

@@ -26,7 +26,7 @@ class ComposeTextWithAI:
     async def compose_text_with_ai(
         self: "pyrogram.Client",
         text: Union[str, "types.FormattedText"],
-        translate_to_language_code: Optional[str],
+        translate_to_language_code: Optional[str] = None,
         style_name: Optional[str] = None,
         add_emojis: Optional[bool] = None,
     ) -> "types.FormattedText":
@@ -44,6 +44,7 @@ class ComposeTextWithAI:
                 "fi", "fr", "fy", "gl", "ka", "de", "el", "gu", "ht", "ha", "haw", "he", "iw", "hi", "hmn", "hu", "is", "ig", "id", "in", "ga", "it", "ja", "jv", "kn", "kk", "km", "rw", "ko",
                 "ku", "ky", "lo", "la", "lv", "lt", "lb", "mk", "mg", "ms", "ml", "mt", "mi", "mr", "mn", "my", "ne", "no", "ny", "or", "ps", "fa", "pl", "pt", "pa", "ro", "ru", "sm", "gd", "sr",
                 "st", "sn", "sd", "si", "sk", "sl", "so", "es", "su", "sw", "sv", "tl", "tg", "ta", "tt", "te", "th", "tr", "tk", "uk", "ur", "ug", "uz", "vi", "cy", "xh", "yi", "ji", "yo", "zu"
+                Defaults to the client's language code.
 
             style_name (``str``, *optional*):
                 Name of the style of the resulted text.
@@ -53,6 +54,16 @@ class ComposeTextWithAI:
 
         Returns:
             :obj:`~pyrogram.types.FormattedText`: On success, information about the composed text is returned.
+
+        Example:
+            .. code-block:: python
+
+                await app.compose_text_with_ai(
+                    "hello, how are you?",
+                    translate_to_language_code="ru",
+                    style_name="formal",
+                    add_emojis=True
+                )
         """
         if isinstance(text, str):
             text = types.FormattedText(text=text)
@@ -60,7 +71,7 @@ class ComposeTextWithAI:
         r = await self.invoke(
             raw.functions.messages.ComposeMessageWithAI(
                 text=await text.write(self),
-                translate_to_lang=translate_to_language_code,
+                translate_to_lang=translate_to_language_code or self.lang_code,
                 tone=raw.types.InputAiComposeToneDefault(tone=style_name) if style_name else None,
                 emojify=add_emojis,
             )
