@@ -474,34 +474,39 @@ class Session:
         msg_id = message.msg_id
 
         if wait_response:
-            self.results[msg_id] = Result()
-
-        log.debug("Sent: %s", message)
-
-        payload = await self.client.loop.run_in_executor(
-            self.connection.protocol.crypto_executor,
-            mtproto.pack,
-            message,
-            self.salt,
-            self.session_id,
-            self.auth_key,
-            self.auth_key_id
-        )
+            pending_result = self.results[msg_id] = Result()
 
         try:
-            await self.connection.send(payload)
-        except OSError as e:
-            self.results.pop(msg_id, None)
-            raise e
+            log.debug("Sent: %s", message)
+
+            payload = await self.client.loop.run_in_executor(
+                self.connection.protocol.crypto_executor,
+                mtproto.pack,
+                message,
+                self.salt,
+                self.session_id,
+                self.auth_key,
+                self.auth_key_id
+            )
+
+            try:
+                await self.connection.send(payload)
+            except OSError as e:
+                self.results.pop(msg_id, None)
+                raise e
+
+            if wait_response:
+                try:
+                    await asyncio.wait_for(self.results[msg_id].event.wait(), timeout)
+                except asyncio.TimeoutError:
+                    pass
+
+                result = self.results.pop(msg_id).value
+        finally:
+            if wait_response and self.results.get(msg_id) is pending_result:
+                self.results.pop(msg_id)
 
         if wait_response:
-            try:
-                await asyncio.wait_for(self.results[msg_id].event.wait(), timeout)
-            except asyncio.TimeoutError:
-                pass
-
-            result = self.results.pop(msg_id).value
-
             if result is None:
                 raise TimeoutError("Request timed out")
 
