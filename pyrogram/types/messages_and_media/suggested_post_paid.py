@@ -89,7 +89,7 @@ class SuggestedPostPaid(Object):
                     pass
 
         if isinstance(action.price, raw.types.StarsTonAmount):
-            amount = action.price.ton_amount
+            amount = action.price.amount
         elif isinstance(action.price, raw.types.StarsAmount):
             star_amount = types.StarAmount._parse(action.price)
 
