@@ -139,6 +139,8 @@ class Session:
 
         self.is_started = asyncio.Event()
         self.restart_lock = asyncio.Lock()
+        self.transport_send_failures = 0
+        self.restart_requests_ignored = 0
 
     @property
     def state(self) -> SessionState:
@@ -268,18 +270,26 @@ class Session:
             except Exception as e:
                 log.exception(e)
 
-    async def restart(self):
+    async def restart(self, expected_connection: Optional[Connection] = None):
         async with self.restart_lock:
+            if expected_connection is not None and (
+                self.connection is not expected_connection or self.state != SessionState.STARTED
+            ):
+                self.restart_requests_ignored += 1
+                return
             if self.stored_msg_ids:
                self.recent_msg_ids = self.stored_msg_ids[:30]
 
             await self.stop()
             await self.start()
 
-    async def handle_packet(self, packet):
+    async def handle_packet(self, packet, connection: Optional[Connection] = None):
+        connection = self.connection if connection is None else connection
+        if connection is not self.connection:
+            return
         try:
             data = await self.client.loop.run_in_executor(
-                self.connection.protocol.crypto_executor,
+                connection.protocol.crypto_executor,
                 mtproto.unpack,
                 BytesIO(packet),
                 self.session_id,
@@ -287,9 +297,12 @@ class Session:
                 self.auth_key_id
             )
         except ValueError as e:
-            log.debug(e)
-            log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
-            self.client.loop.create_task(self.restart())
+            if connection is self.connection:
+                log.debug(e)
+                log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
+                self.client.loop.create_task(self.restart(connection))
+            return
+        if connection is not self.connection:
             return
 
         messages = (
@@ -331,7 +344,10 @@ class Session:
                             "The msg_id is equal to any of the stored values"
                         )
 
-                    time_diff = (msg.msg_id - (await self.msg_factory.allocate_message_identity())) / 2 ** 32
+                    current_msg_id = await self.msg_factory.allocate_message_identity()
+                    if connection is not self.connection:
+                        return
+                    time_diff = (msg.msg_id - current_msg_id) / 2 ** 32
 
                     if time_diff > 30:
                         raise SecurityCheckMismatch(
@@ -353,7 +369,7 @@ class Session:
 
                 if self.ignore_count >= self.MAX_CONSECUTIVE_IGNORED:
                     log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
-                    self.client.loop.create_task(self.restart())
+                    self.client.loop.create_task(self.restart(connection))
 
                 return
             else:
@@ -390,7 +406,8 @@ class Session:
             except OSError:
                 pass
             else:
-                self.pending_acks.clear()
+                if connection is self.connection:
+                    self.pending_acks.clear()
 
     async def ping_worker(self):
         log.info("PingTask started")
@@ -403,17 +420,19 @@ class Session:
             else:
                 break
 
+            ping_id = await self.msg_factory.allocate_message_identity()
+            connection = self.connection
             try:
                 await self.send(
                     raw.functions.PingDelayDisconnect(
-                        ping_id=await self.msg_factory.allocate_message_identity(),
+                        ping_id=ping_id,
                         disconnect_delay=self.WAIT_TIMEOUT + 10
                     ),
                     wait_response=False
                 )
             except OSError as e:
                 log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
-                self.client.loop.create_task(self.restart())
+                self.client.loop.create_task(self.restart(connection))
                 break
             except RPCError:
                 pass
@@ -424,7 +443,10 @@ class Session:
         log.info("NetworkTask started")
 
         while True:
-            packet = await self.connection.recv()
+            connection = self.connection
+            packet = await connection.recv()
+            if connection is not self.connection:
+                break
 
             if packet is None or len(packet) == 4:
                 if packet:
@@ -452,24 +474,25 @@ class Session:
                     log.warning("Server sent transport error: %s (%s)", error_code, error_msg)
 
 
-                if self.is_started.is_set():
+                if self.state == SessionState.STARTED:
                     if packet:
                         error = f"Server sent transport error - {error_code} - ({error_msg})."
                     else:
                         error = "Server sent a null packet."
 
                     log.info("Restarting session due to - %s", error)
-                    self.client.loop.create_task(self.restart())
+                    self.client.loop.create_task(self.restart(connection))
 
                 break
 
-            self.client.loop.create_task(self.handle_packet(packet))
+            self.client.loop.create_task(self.handle_packet(packet, connection))
 
         log.info("NetworkTask stopped")
 
     async def send(
         self, data: TLObject, wait_response: bool = True, timeout: float = WAIT_TIMEOUT
     ):
+        connection = self.connection
         message = await self.msg_factory.create(data)
         msg_id = message.msg_id
 
@@ -480,7 +503,7 @@ class Session:
             log.debug("Sent: %s", message)
 
             payload = await self.client.loop.run_in_executor(
-                self.connection.protocol.crypto_executor,
+                connection.protocol.crypto_executor,
                 mtproto.pack,
                 message,
                 self.salt,
@@ -490,10 +513,16 @@ class Session:
             )
 
             try:
-                await self.connection.send(payload)
-            except OSError as e:
-                self.results.pop(msg_id, None)
-                raise e
+                await connection.send(payload)
+            except OSError:
+                self.transport_send_failures += 1
+                if self.connection is connection and self.state == SessionState.STARTED:
+                    self.is_started.clear()
+                try:
+                    await connection.close()
+                except Exception:
+                    pass
+                raise
 
             if wait_response:
                 try:
@@ -552,6 +581,7 @@ class Session:
         query_name = ".".join(inner_query.QUALNAME.split(".")[1:])
 
         for attempt in range(1, retries + 1):
+            connection = self.connection
             try:
                 return await self.send(query, timeout=timeout)
             except (FloodWait, FloodPremiumWait) as e:
@@ -570,7 +600,7 @@ class Session:
                 await asyncio.sleep(amount)
             except (OSError, InternalServerError, ServiceUnavailable) as e:
                 if isinstance(e, InternalServerError) \
-                        and e.code == 500 \
+                        and e.CODE == 500 \
                         and (e.ID or e.NAME) == "HISTORY_GET_FAILED":
                     raise e from None
 
@@ -581,7 +611,7 @@ class Session:
                 )
 
                 if self.state == SessionState.STARTED and not self.restart_lock.locked():
-                    self.client.loop.create_task(self.restart())
+                    self.client.loop.create_task(self.restart(connection))
 
                 await asyncio.sleep(retry_delay)
 

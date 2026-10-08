@@ -167,8 +167,8 @@ class TCP:
 
     async def close(self) -> None:
         async with self.lock:
-            if self.writer is None or self.writer.is_closing():
-                log.debug("Close called but writer is already None or closing, skipping")
+            if self.writer is None:
+                log.debug("Close called but writer is already None, skipping")
                 return None
 
             try:

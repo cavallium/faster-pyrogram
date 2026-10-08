@@ -37,6 +37,11 @@ class TCPSendTests(unittest.IsolatedAsyncioTestCase):
         session.client = SimpleNamespace(loop=asyncio.get_running_loop(), server_time=1790000000)
         session.msg_factory = MsgFactory(session.client)
         session.results = {}
+        session._state = session_module.SessionState.STARTED
+        session.is_started = asyncio.Event()
+        session.is_started.set()
+        session.transport_send_failures = 0
+        session.restart_requests_ignored = 0
         session.salt = 7
         session.session_id = 8
         session.auth_key = b'0' * 256
