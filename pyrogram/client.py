@@ -237,7 +237,8 @@ class Client(Methods):
             Defaults to True.
 
         fetch_stickers (``bool``, *optional*):
-            Pass True to automatically fetch names of sticker sets.
+            Pass True to automatically fetch names of sticker sets and optional
+            display stickers for gift service messages.
             Defaults to True.
 
         loop (:py:class:`asyncio.AbstractEventLoop`, *optional*):

@@ -88,12 +88,14 @@ class GiftedStars(Object):
         gifter: "raw.base.User" = None,
         receiver: "raw.base.User" = None,
     ) -> "GiftedStars":
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(),
-                hash=0
+        fetch_stickers = client.fetch_stickers
+        if fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetPremiumGifts(),
+                    hash=0
+                )
             )
-        )
 
         return GiftedStars(
             gifter=types.User._parse(client, gifter),
@@ -116,5 +118,5 @@ class GiftedStars(Object):
                         ) for doc in raw_stickers.documents
                     ]
                 )
-            )
+            ) if fetch_stickers else None
         )

@@ -100,14 +100,16 @@ class PremiumGiftCode(Object):
 
     @staticmethod
     async def _parse(client, giftcode: "raw.types.MessageActionGiftCode", users, chats):
+        fetch_stickers = client.fetch_stickers
         raw_peer_id = utils.get_raw_peer_id(giftcode.boost_peer)
 
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(),
-                hash=0
+        if fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetPremiumGifts(),
+                    hash=0
+                )
             )
-        )
 
         return PremiumGiftCode(
             creator=types.Chat._parse_chat(client, users.get(raw_peer_id) or chats.get(raw_peer_id)),
@@ -132,7 +134,7 @@ class PremiumGiftCode(Object):
                         ) for doc in raw_stickers.documents
                     ]
                 )
-            ),
+            ) if fetch_stickers else None,
             code=giftcode.slug
         )
 

@@ -99,12 +99,14 @@ class GiftedPremium(Object):
         receiver: "raw.base.User",
         users: Dict[int, "raw.base.User"]
     ) -> "GiftedPremium":
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(),
-                hash=0
+        fetch_stickers = client.fetch_stickers
+        if fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetPremiumGifts(),
+                    hash=0
+                )
             )
-        )
 
         caption, caption_entities = (utils.parse_text_with_entities(client, getattr(action, "message", None), users)).values()
 
@@ -129,7 +131,7 @@ class GiftedPremium(Object):
                         ) for doc in raw_stickers.documents
                     ]
                 )
-            ),
+            ) if fetch_stickers else None,
             caption=caption,
             caption_entities=caption_entities
         )

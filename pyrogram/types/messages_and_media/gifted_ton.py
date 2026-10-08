@@ -68,12 +68,14 @@ class GiftedTon(Object):
         gifter: "raw.base.User" = None,
         receiver: "raw.base.User" = None,
     ) -> "GiftedTon":
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetTonGifts(),
-                hash=0
+        fetch_stickers = client.fetch_stickers
+        if fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetTonGifts(),
+                    hash=0
+                )
             )
-        )
 
         return GiftedTon(
             gifter=types.User._parse(client, gifter),
@@ -92,5 +94,5 @@ class GiftedTon(Object):
                         ) for doc in raw_stickers.documents
                     ]
                 )
-            )
+            ) if fetch_stickers else None
         )
