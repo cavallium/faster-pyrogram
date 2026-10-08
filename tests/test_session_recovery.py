@@ -543,3 +543,34 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(0, session.transport_send_failures)
         self.assertTrue(session.is_started.is_set())
         self.assertEqual({}, session.results)
+
+    async def test_successful_ack_send_removes_only_its_snapshot_within_same_generation(self):
+        writer = self.writer()
+        session = self.session(self.connection(writer))
+        original = set(range(10))
+        session.pending_acks.update(original)
+        entered, release = asyncio.Event(), asyncio.Event()
+        sent = []
+        async def drain():
+            entered.set()
+            await release.wait()
+        def pack(message, *args):
+            self.assertIsInstance(message.body, raw.types.MsgsAck)
+            sent.append(set(message.body.msg_ids))
+            return b'data'
+        writer.drain.side_effect = drain
+        packet = Message(MsgContainer([]), 1, 0, 0)
+        with patch.object(sdk.mtproto, 'unpack', return_value=packet), \
+             patch.object(sdk.mtproto, 'pack', side_effect=pack):
+            task = asyncio.create_task(session.handle_packet(b'fixture', session.connection))
+            await asyncio.wait_for(entered.wait(), 1)
+            new_ids = {999, 1000}
+            session.pending_acks.update(new_ids)
+            release.set()
+            await task
+        self.assertEqual([original], sent)
+        self.assertEqual(new_ids, session.pending_acks)
+        writer.write.assert_called_once_with(b'data')
+        writer.drain.assert_awaited_once()
+        self.assertTrue(session.is_started.is_set())
+        self.assertEqual(0, session.transport_send_failures)

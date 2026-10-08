@@ -401,13 +401,14 @@ class Session:
         if len(self.pending_acks) >= self.ACKS_THRESHOLD:
             log.debug("Sending %s acks", len(self.pending_acks))
 
+            ack_ids = list(self.pending_acks)
             try:
-                await self.send(raw.types.MsgsAck(msg_ids=list(self.pending_acks)), False)
+                await self.send(raw.types.MsgsAck(msg_ids=ack_ids), False)
             except OSError:
                 pass
             else:
                 if connection is self.connection:
-                    self.pending_acks.clear()
+                    self.pending_acks.difference_update(ack_ids)
 
     async def ping_worker(self):
         log.info("PingTask started")
