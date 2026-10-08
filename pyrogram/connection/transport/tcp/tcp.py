@@ -188,7 +188,7 @@ class TCP:
         async with self.lock:
             if self.writer is None or self.writer.is_closing():
                 log.debug("Send called but writer is None or closing")
-                return None
+                raise OSError("TCP transport is not connected")
 
             if wait_for_marker:
                 log.debug("Waiting for marker event before sending")
