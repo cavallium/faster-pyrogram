@@ -255,6 +255,19 @@ Account
 
     {account}
 
+Wallet
+------
+
+.. autosummary::
+    :nosignatures:
+
+    {wallet}
+
+.. toctree::
+    :hidden:
+
+    {wallet}
+
 Advanced
 --------
 

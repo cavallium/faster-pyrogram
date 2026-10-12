@@ -700,6 +700,15 @@ def pyrogram_api():
             set_inactive_session_ttl
             get_global_privacy_settings
         """,
+        "wallet": """
+        Wallet
+            create_user_wallet
+            delete_ton_wallet
+            replace_ton_wallet
+            get_address_ton_wallet
+            get_user_ton_wallet_addresses
+            get_ton_wallet_ownership_proof_challenge
+        """,
     }
 
     root = PYROGRAM_API_DEST + "/methods"
@@ -779,6 +788,10 @@ def pyrogram_api():
             PrivacyRule
             StoriesStealthMode
             UserRating
+            UserTonWalletAddress
+            TonWalletOwnershipProof
+            TonWalletOwnershipProofChallenge
+            TonWalletState
             BotVerification
             BusinessBotRights
             ChatSettings

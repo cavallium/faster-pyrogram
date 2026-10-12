@@ -76,6 +76,10 @@ from .restriction import Restriction
 from .stories_stealth_mode import StoriesStealthMode
 from .user import User
 from .user_rating import UserRating
+from .user_ton_wallet_address import UserTonWalletAddress
+from .ton_wallet_ownership_proof import TonWalletOwnershipProof
+from .ton_wallet_ownership_proof_challenge import TonWalletOwnershipProofChallenge
+from .ton_wallet_state import TonWalletState
 from .username import Username
 from .verification_status import VerificationStatus
 from .video_chat_ended import VideoChatEnded
@@ -197,6 +201,10 @@ __all__ = [
     "StoriesStealthMode",
     "User",
     "UserRating",
+    "UserTonWalletAddress",
+    "TonWalletOwnershipProof",
+    "TonWalletOwnershipProofChallenge",
+    "TonWalletState",
     "Username",
     "VerificationStatus",
     "VideoChatEnded",
