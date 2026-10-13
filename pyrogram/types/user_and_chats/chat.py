@@ -859,11 +859,11 @@ class Chat(Object):
             is_business_bot=user.bot_business,
             verification_status=types.VerificationStatus._parse(user),
             username=user.username or (user.usernames[0].username if user.usernames else None),
-            usernames=types.List([types.Username._parse(r) for r in user.usernames]) or None,
+            usernames=types.List([types.Username._parse(r) for r in (user.usernames or [])]) or None,
             first_name=user.first_name,
             last_name=user.last_name,
             photo=types.ChatPhoto._parse(client, user.photo, peer_id, user.access_hash),
-            restrictions=types.List([types.Restriction._parse(r) for r in user.restriction_reason]) or None,
+            restrictions=types.List([types.Restriction._parse(r) for r in (user.restriction_reason or [])]) or None,
             dc_id=getattr(getattr(user, "photo", None), "dc_id", None),
             reply_color=types.ChatColor._parse(user.color),
             profile_color=types.ChatColor._parse_profile_color(user.profile_color),
@@ -916,8 +916,8 @@ class Chat(Object):
             return None
 
         peer_id = utils.get_channel_id(channel.id)
-        restriction_reason = getattr(channel, "restriction_reason", [])
-        usernames = getattr(channel, "usernames", [])
+        restriction_reason = getattr(channel, "restriction_reason", None) or []
+        usernames = getattr(channel, "usernames", None) or []
 
         if isinstance(channel, raw.types.ChannelForbidden):
             return Chat(

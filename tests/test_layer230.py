@@ -82,3 +82,16 @@ class Layer230Tests(unittest.IsolatedAsyncioTestCase):
         parsed = await types.Message._parse(client, message, {}, {42: round_trip(channel)}, replies=0)
         self.assertEqual(parsed.rich_message.blocks[0].text.text, "Body")
         self.assertEqual(parsed.chat.community, {"id": 123, "name": ""})
+
+    async def test_absent_optional_vectors_survive_parse(self):
+        client = Client("offline", api_id=1, api_hash="0" * 32, in_memory=True)
+        user = raw.types.User(id=123, first_name="Sparse", linked_community_id=456)
+        self.assertIsNone(user.usernames)
+        for value in (user, round_trip(user)):
+            self.assertIsNone(types.User._parse(client, value).usernames)
+            self.assertEqual(types.Chat._parse_user_chat(client, value).community, {"id": 456, "name": ""})
+        document = raw.types.Document(id=1, access_hash=2, file_reference=b"", date=1,
+            mime_type="application/octet-stream", size=1, dc_id=2, attributes=[])
+        self.assertIsNone(document.thumbs)
+        self.assertIsNone(types.Thumbnail._parse(client, document))
+        self.assertIsNone(types.Thumbnail._parse(client, round_trip(document)))
