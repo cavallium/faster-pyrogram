@@ -786,6 +786,7 @@ class Message(Object, Update):
         summary_language_code: Optional[str] = None,
         guest_bot_caller_user: Optional["types.User"] = None,
         guest_bot_caller_chat: Optional["types.Chat"] = None,
+        rich_message: Optional["raw.types.RichMessage"] = None,
         raw: Optional["raw.types.Message"] = None
     ):
         super().__init__(client)
@@ -952,6 +953,7 @@ class Message(Object, Update):
         self.summary_language_code = summary_language_code
         self.guest_bot_caller_user = guest_bot_caller_user
         self.guest_bot_caller_chat = guest_bot_caller_chat
+        self.rich_message = rich_message if rich_message is not None else getattr(raw, "rich_message", None)
         self.raw = raw
 
     @staticmethod
@@ -1765,6 +1767,9 @@ class Message(Object, Update):
             raw=message,
             client=client
         )
+
+        if parsed_message.rich_message is not None:
+            parsed_message._rich_message_users = users
 
         if (
             forward_header and

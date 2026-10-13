@@ -669,6 +669,7 @@ class Chat(Object):
         uses_unofficial_app: Optional[bool] = None,
         accepted_gift_types: Optional["types.AcceptedGiftTypes"] = None,
         note: Optional["types.FormattedText"] = None,
+        community: Optional[dict] = None,
         raw: Optional[Union["raw.types.UserFull", "raw.types.ChatFull", "raw.types.ChannelFull"]] = None
     ):
         super().__init__(client)
@@ -809,6 +810,10 @@ class Chat(Object):
         self.uses_unofficial_app = uses_unofficial_app
         self.accepted_gift_types = accepted_gift_types
         self.note = note
+        community_id = getattr(raw, "linked_community_id", None)
+        self.community = community if community is not None else (
+            {"id": community_id, "name": ""} if community_id is not None else None
+        )
         self.raw = raw
 
     # region Deprecated
