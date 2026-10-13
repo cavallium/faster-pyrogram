@@ -40,6 +40,9 @@ class JoinChat:
         Returns:
             :obj:`~pyrogram.types.Chat`: On success, a chat object is returned.
 
+        Raises:
+            ValueError: If Telegram requires WebView verification before joining.
+
         Example:
             .. code-block:: python
 
@@ -60,10 +63,6 @@ class JoinChat:
                     hash=match.group(1)
                 )
             )
-            if isinstance(chat.chats[0], raw.types.Chat):
-                return types.Chat._parse_chat_chat(self, chat.chats[0])
-            elif isinstance(chat.chats[0], raw.types.Channel):
-                return types.Chat._parse_channel_chat(self, chat.chats[0])
         else:
             chat = await self.invoke(
                 raw.functions.channels.JoinChannel(
@@ -71,4 +70,13 @@ class JoinChat:
                 )
             )
 
-            return types.Chat._parse_channel_chat(self, chat.chats[0])
+        if isinstance(chat, raw.types.messages.ChatInviteJoinResultWebView):
+            raise ValueError(
+                f"Joining this chat requires WebView verification "
+                f"(bot_id={chat.bot_id}, query_id={chat.query_id})"
+            )
+
+        chat = chat.updates.chats[0]
+        if isinstance(chat, raw.types.Chat):
+            return types.Chat._parse_chat_chat(self, chat)
+        return types.Chat._parse_channel_chat(self, chat)

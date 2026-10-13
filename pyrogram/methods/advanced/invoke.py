@@ -112,7 +112,8 @@ class Invoke:
             retry_delay=retry_delay
         )
 
-        await self.fetch_peers(getattr(r, "users", []))
-        await self.fetch_peers(getattr(r, "chats", []))
+        peers = r.updates if isinstance(r, raw.types.messages.ChatInviteJoinResultOk) else r
+        await self.fetch_peers(getattr(peers, "users", []))
+        await self.fetch_peers(getattr(peers, "chats", []))
 
         return r

@@ -22,6 +22,7 @@ from enum import Enum
 from json import dumps
 
 import pyrogram
+from pyrogram.raw.core import TLObject
 
 
 class Object:
@@ -46,6 +47,9 @@ class Object:
 
     @staticmethod
     def default(obj: "Object"):
+        if isinstance(obj, TLObject):
+            return TLObject.default(obj)
+
         if isinstance(obj, bytes):
             return repr(obj)
 

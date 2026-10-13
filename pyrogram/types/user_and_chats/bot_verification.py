@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from typing import List, Optional
 
 from pyrogram import raw, types
 from ..object import Object
@@ -32,8 +32,11 @@ class BotVerification(Object):
         custom_emoji_id (``str``):
             Custom emoji icon identifier.
 
-        description (``int``, *optional*):
+        description (``str``):
             Additional description about the verification.
+
+        description_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
+            Entities contained in the description.
     """
 
     def __init__(
@@ -41,11 +44,13 @@ class BotVerification(Object):
         *,
         bot: int,
         custom_emoji_id: str,
-        description: str
+        description: str,
+        description_entities: Optional[List["types.MessageEntity"]] = None
     ):
         self.bot = bot
         self.custom_emoji_id = custom_emoji_id
         self.description = description
+        self.description_entities = description_entities
 
     @staticmethod
     def _parse(
@@ -59,5 +64,11 @@ class BotVerification(Object):
         return BotVerification(
             bot=types.User._parse(client, users.get(verification.bot_id)),
             custom_emoji_id=str(verification.icon),
-            description=verification.description
+            description=verification.description.text,
+            description_entities=types.List(
+                entity for entity in (
+                    types.MessageEntity._parse(client, entity, users)
+                    for entity in verification.description.entities
+                ) if entity is not None
+            ) or None
         )
