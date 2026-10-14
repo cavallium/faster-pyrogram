@@ -80,6 +80,9 @@ class MessageEntityType(AutoName):
     CUSTOM_EMOJI = raw.types.MessageEntityCustomEmoji
     "Custom emoji"
 
+    TON_ADDRESS = raw.types.MessageEntityTonAddress
+    "TON blockchain address"
+
     DATE_TIME = raw.types.MessageEntityFormattedDate
     "Date time"
 

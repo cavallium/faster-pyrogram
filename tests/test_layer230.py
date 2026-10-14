@@ -14,6 +14,21 @@ def round_trip(value):
 
 
 class Layer230Tests(unittest.IsolatedAsyncioTestCase):
+    async def test_ton_address_entity_message_round_trip(self):
+        client = Client("offline", api_id=1, api_hash="0" * 32, in_memory=True,
+                        fetch_replies=False, fetch_topics=False, fetch_stories=False)
+        channel = raw.types.Channel(id=42, title="Fixture", date=1,
+            photo=raw.types.ChatPhotoEmpty(), megagroup=True)
+        message = round_trip(raw.types.Message(id=1, peer_id=raw.types.PeerChannel(channel_id=42),
+            date=1, message="🙂 TON", entities=[raw.types.MessageEntityTonAddress(offset=3, length=3)]))
+        parsed = await types.Message._parse(client, message, {}, {42: channel}, replies=0)
+        entity = parsed.entities[0]
+        self.assertEqual(entity.type, enums.MessageEntityType.TON_ADDRESS)
+        self.assertEqual((entity.offset, entity.length), (3, 3))
+        wire = round_trip(await entity.write())
+        self.assertIsInstance(wire, raw.types.MessageEntityTonAddress)
+        self.assertEqual((wire.offset, wire.length), (3, 3))
+
     async def test_inline_keyboard_types_round_trip(self):
         client = Client("offline", api_id=1, api_hash="0" * 32, in_memory=True)
         client.resolve_peer = AsyncMock(return_value=raw.types.InputUserSelf())
