@@ -54,8 +54,8 @@ class GiftedPremium(Object):
         day_count (``int``):
             Number of days the Telegram Premium subscription will be active.
 
-        sticker (:obj:`~pyrogram.types.Sticker`):
-            A sticker to be shown in the message.
+        sticker (:obj:`~pyrogram.types.Sticker`, *optional*):
+            A sticker to be shown in the message. Not fetched when fetch_stickers is False.
 
         caption (``str``, *optional*):
             Message added to the gifted Telegram Premium by the sender.

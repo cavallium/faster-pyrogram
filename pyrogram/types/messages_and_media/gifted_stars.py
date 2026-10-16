@@ -55,8 +55,8 @@ class GiftedStars(Object):
             Identifier of the transaction for Telegram Stars purchase.
             For receiver only.
 
-        sticker (:obj:`~pyrogram.types.Sticker`):
-            A sticker to be shown in the message.
+        sticker (:obj:`~pyrogram.types.Sticker`, *optional*):
+            A sticker to be shown in the message. Not fetched when fetch_stickers is False.
     """
 
     def __init__(
