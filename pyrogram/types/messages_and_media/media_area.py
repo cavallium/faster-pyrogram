@@ -19,7 +19,7 @@
 from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import enums, raw, types
+from pyrogram import enums, raw, types, utils
 from pyrogram.errors import ChannelInvalid, ChannelPrivate
 
 from ..object import Object
@@ -96,7 +96,10 @@ class MediaArea(Object):
             For weather type only.
 
         gift (:obj:`~pyrogram.types.Gift`, *optional*):
-            Information about this gift.
+            Information about this gift. Fetched only when ``fetch_stories`` is enabled.
+
+        gift_slug (``str``, *optional*):
+            Unique slug identifying the gift, available without fetching gift information.
     """
 
     def __init__(
@@ -123,6 +126,7 @@ class MediaArea(Object):
         temperature: float | None = None,
         color: int | None = None,
         gift: types.Gift | None = None,
+        gift_slug: str | None = None,
     ):
         super().__init__(client)
 
@@ -146,6 +150,7 @@ class MediaArea(Object):
         self.temperature = temperature
         self.color = color
         self.gift = gift
+        self.gift_slug = gift_slug
 
     @staticmethod
     async def _parse(
@@ -164,15 +169,19 @@ class MediaArea(Object):
         temperature = None
         color = None
         gift = None
+        gift_slug = None
 
         if isinstance(area, raw.types.MediaAreaChannelPost):
             sender_chat = await types.Chat._parse_channel_chat(client, chats.get(area.channel_id))
             message_id = area.msg_id
 
-            try:
-                message = await client.get_messages(chat_id=sender_chat.id, message_ids=message_id)
-            except (ChannelPrivate, ChannelInvalid):
-                pass
+            if client.fetch_replies:
+                try:
+                    message = await client.get_messages(
+                        chat_id=utils.get_channel_id(area.channel_id), message_ids=message_id
+                    )
+                except (ChannelPrivate, ChannelInvalid):
+                    pass
         elif isinstance(area, raw.types.MediaAreaGeoPoint):
             location = types.Location._parse(area.geo)
         elif isinstance(area, raw.types.MediaAreaSuggestedReaction):
@@ -188,7 +197,9 @@ class MediaArea(Object):
             temperature = area.temperature_c
             color = area.color
         elif isinstance(area, raw.types.MediaAreaStarGift):
-            gift = await client.get_upgraded_gift(area.slug)
+            gift_slug = area.slug
+            if client.fetch_stories:
+                gift = await client.get_upgraded_gift(area.slug)
 
         return MediaArea(
             x=area.coordinates.x,
@@ -211,6 +222,7 @@ class MediaArea(Object):
             temperature=temperature,
             color=color,
             gift=gift,
+            gift_slug=gift_slug,
             client=client,
         )
 

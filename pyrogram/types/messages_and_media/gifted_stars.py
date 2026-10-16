@@ -91,11 +91,19 @@ class GiftedStars(Object):
         gifter: raw.base.User | None = None,
         receiver: raw.base.User | None = None,
     ) -> GiftedStars:
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+        sticker = None
+
+        if client.fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+                )
             )
-        )
+            if raw_stickers.documents:
+                doc = random.choice(raw_stickers.documents)
+                sticker = await types.Sticker._parse(
+                    client, doc, {type(i): i for i in doc.attributes}
+                )
 
         return GiftedStars(
             gifter=await types.User._parse(client, gifter),
@@ -106,14 +114,5 @@ class GiftedStars(Object):
             cryptocurrency_amount=getattr(action, "crypto_amount", None),
             star_count=action.stars,
             transaction_id=getattr(action, "transaction_id", None),
-            sticker=random.choice(
-                types.List(
-                    [
-                        await types.Sticker._parse(
-                            client, doc, {type(i): i for i in doc.attributes}
-                        )
-                        for doc in raw_stickers.documents
-                    ]
-                )
-            ),
+            sticker=sticker,
         )

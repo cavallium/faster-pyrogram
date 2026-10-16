@@ -543,8 +543,8 @@ class TCP:
                     log.info("WEB proxy close exception: %s %s", type(e).__name__, e)
                 return
 
-            if self.writer is None or self.writer.is_closing():
-                log.debug("Close called but writer is already None or closing, skipping")
+            if self.writer is None:
+                log.debug("Close called but writer is already None, skipping")
                 return None
 
             try:
@@ -563,8 +563,7 @@ class TCP:
     async def send(self, data: bytes, wait_for_marker: bool = True) -> None:
         async with self.lock:
             if self._web_carrier is None and (self.writer is None or self.writer.is_closing()):
-                log.debug("Send called but writer is None or closing")
-                return None
+                raise OSError("TCP transport is not connected")
 
             if wait_for_marker:
                 log.debug("Waiting for marker event before sending")

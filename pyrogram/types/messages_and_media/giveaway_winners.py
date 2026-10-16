@@ -122,17 +122,18 @@ class GiveawayWinners(Object):
 
         giveaway_message = None
 
-        try:
-            giveaway_message = await client.get_messages(
-                chat_id=utils.get_channel_id(giveaway_media.channel_id),
-                message_ids=giveaway_media.launch_msg_id,
-                replies=0,
-            )
-        except (errors.ChannelPrivate, errors.ChannelInvalid, errors.MessageIdsEmpty):
-            pass
+        if client.fetch_replies:
+            try:
+                giveaway_message = await client.get_messages(
+                    chat_id=utils.get_channel_id(giveaway_media.channel_id),
+                    message_ids=giveaway_media.launch_msg_id,
+                    replies=0,
+                )
+            except (errors.ChannelPrivate, errors.ChannelInvalid, errors.MessageIdsEmpty):
+                pass
 
         return GiveawayWinners(
-            chat=await types.Chat._parse_channel_chat(client, chats[giveaway_media.channel_id]),
+            chat=await types.Chat._parse_channel_chat(client, chats.get(giveaway_media.channel_id)),
             giveaway_message_id=giveaway_media.launch_msg_id,
             giveaway_message=giveaway_message,
             winners_selection_date=utils.timestamp_to_datetime(giveaway_media.until_date),

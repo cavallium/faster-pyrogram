@@ -371,8 +371,12 @@ class Session:
         if not task.cancelled() and task.exception() is not None:
             log.error("Worker failed before the session stopped", exc_info=task.exception())
 
-    async def restart(self):
+    async def restart(self, expected_connection: Connection | None = None):
         async with self.restart_lock:
+            if expected_connection is not None and (
+                self.connection is not expected_connection or self.state is not SessionState.STARTED
+            ):
+                return
             if self.stored_msg_ids:
                 self.recent_msg_ids = self.stored_msg_ids[:30]
 
@@ -399,10 +403,14 @@ class Session:
             if self._must_stay_stopped:
                 await self._stop()
 
-    async def handle_packet(self, packet):
+    async def handle_packet(self, packet, connection: Connection | None = None):
+        connection = self.connection if connection is None else connection
+        if connection is not self.connection:
+            return
+
         try:
             data = await asyncio.get_running_loop().run_in_executor(
-                self.connection.protocol.crypto_executor,
+                connection.protocol.crypto_executor,
                 mtproto.unpack,
                 BytesIO(packet),
                 self.session_id,
@@ -410,9 +418,13 @@ class Session:
                 self.auth_key_id,
             )
         except ValueError as e:
-            log.debug(e)
-            log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
-            asyncio.create_task(self.restart())
+            if connection is self.connection:
+                log.debug(e)
+                log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
+                asyncio.create_task(self.restart(connection))
+            return
+
+        if connection is not self.connection:
             return
 
         messages = data.body.messages if isinstance(data.body, MsgContainer) else [data]
@@ -450,9 +462,10 @@ class Session:
                             "The msg_id is equal to any of the stored values"
                         )
 
-                    time_diff = (
-                        msg.msg_id - (await self.msg_factory.allocate_message_identity())
-                    ) / 2**32
+                    current_msg_id = await self.msg_factory.allocate_message_identity()
+                    if connection is not self.connection:
+                        return
+                    time_diff = (msg.msg_id - current_msg_id) / 2**32
 
                     if time_diff > 30:
                         raise SecurityCheckMismatch(
@@ -474,7 +487,7 @@ class Session:
 
                 if self.ignore_count >= self.MAX_CONSECUTIVE_IGNORED:
                     log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
-                    asyncio.create_task(self.restart())
+                    asyncio.create_task(self.restart(connection))
 
                 # A container mixes re-sent messages with new ones, so the rest of it,
                 #  the `Pong` that `start()` waits for included, is still handled.
@@ -517,12 +530,14 @@ class Session:
         if len(self.pending_acks) >= self.ACKS_THRESHOLD:
             log.debug("Sending %s acks", len(self.pending_acks))
 
+            ack_ids = list(self.pending_acks)
             try:
-                await self.send(raw.types.MsgsAck(msg_ids=list(self.pending_acks)), False)
+                await self.send(raw.types.MsgsAck(msg_ids=ack_ids), False)
             except OSError:
                 pass
             else:
-                self.pending_acks.clear()
+                if connection is self.connection:
+                    self.pending_acks.difference_update(ack_ids)
 
     def _current_salt(self, server_time: float) -> int:
         """Get the salt valid at `server_time`, dropping the ones it has passed"""
@@ -569,17 +584,19 @@ class Session:
             else:
                 break
 
+            ping_id = await self.msg_factory.allocate_message_identity()
+            connection = self.connection
             try:
                 await self.send(
                     raw.functions.PingDelayDisconnect(
-                        ping_id=await self.msg_factory.allocate_message_identity(),
+                        ping_id=ping_id,
                         disconnect_delay=self.WAIT_TIMEOUT + 10,
                     ),
                     wait_response=False,
                 )
             except OSError as e:
                 log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
-                asyncio.create_task(self.restart())
+                asyncio.create_task(self.restart(connection))
                 break
             except RPCError:
                 pass
@@ -599,7 +616,10 @@ class Session:
         log.info("NetworkTask started")
 
         while True:
-            packet = await self.connection.recv()
+            connection = self.connection
+            packet = await connection.recv()
+            if connection is not self.connection:
+                break
 
             if packet is None or len(packet) == 4:
                 if packet:
@@ -622,22 +642,23 @@ class Session:
 
                     log.warning("Server sent transport error: %s (%s)", error_code, error_msg)
 
-                if self.is_started.is_set():
+                if self.state is SessionState.STARTED:
                     if packet:
                         error = f"Server sent transport error - {error_code} - ({error_msg})."
                     else:
                         error = "Server sent a null packet."
 
                     log.info("Restarting session due to - %s", error)
-                    asyncio.create_task(self.restart())
+                    asyncio.create_task(self.restart(connection))
 
                 break
 
-            self._create_tracked_task(self.handle_packet(packet))
+            self._create_tracked_task(self.handle_packet(packet, connection))
 
         log.info("NetworkTask stopped")
 
     async def send(self, data: TLObject, wait_response: bool = True, timeout: float = WAIT_TIMEOUT):
+        connection = self.connection
         message = await self.msg_factory.create(data)
         msg_id = message.msg_id
 
@@ -649,32 +670,40 @@ class Session:
             pending_result = Result()
             self.results[msg_id] = pending_result
 
-        log.debug("Sent: %s", message)
-
-        payload = await asyncio.get_running_loop().run_in_executor(
-            self.connection.protocol.crypto_executor,
-            mtproto.pack,
-            message,
-            self._current_salt(self.client.server_time),
-            self.session_id,
-            self.auth_key,
-            self.auth_key_id,
-        )
-
         try:
-            await self.connection.send(payload)
-        except OSError as e:
-            self.results.pop(msg_id, None)
-            raise e
+            log.debug("Sent: %s", message)
+
+            payload = await asyncio.get_running_loop().run_in_executor(
+                connection.protocol.crypto_executor,
+                mtproto.pack,
+                message,
+                self._current_salt(self.client.server_time),
+                self.session_id,
+                self.auth_key,
+                self.auth_key_id,
+            )
+
+            try:
+                await connection.send(payload)
+            except OSError:
+                if connection is self.connection and self.state is SessionState.STARTED:
+                    self.is_started.clear()
+                try:
+                    await connection.close()
+                except Exception:
+                    pass
+                raise
+
+            if pending_result is not None:
+                try:
+                    await asyncio.wait_for(pending_result.event.wait(), timeout)
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            if pending_result is not None and self.results.get(msg_id) is pending_result:
+                self.results.pop(msg_id)
 
         if pending_result is not None:
-            try:
-                await asyncio.wait_for(pending_result.event.wait(), timeout)
-            except asyncio.TimeoutError:
-                pass
-
-            self.results.pop(msg_id, None)
-
             if pending_result.exception is not None:
                 raise pending_result.exception
 
@@ -717,19 +746,23 @@ class Session:
 
         query_name = ".".join(inner_query.QUALNAME.split(".")[1:])
 
-        try:
-            await asyncio.wait_for(self.is_started.wait(), self.WAIT_TIMEOUT)
-
-        # Carrying on instead reaches `send()`, which reads `self.connection.protocol` on a
-        #  session whose `connection` is still `None`: `AttributeError: 'NoneType' object has
-        #  no attribute 'protocol'`, naming neither the session nor the query.
-        except asyncio.TimeoutError as e:
-            raise TimeoutError(
-                f'Waited {self.WAIT_TIMEOUT}s to invoke "{query_name}", and {self} is not started'
-            ) from e
-
         attempt = 0
         while True:
+            try:
+                await asyncio.wait_for(self.is_started.wait(), self.WAIT_TIMEOUT)
+
+            # Carrying on instead reaches `send()`, which reads `self.connection.protocol` on a
+            #  session whose `connection` is still `None`: `AttributeError: 'NoneType' object has
+            #  no attribute 'protocol'`, naming neither the session nor the query.
+            except asyncio.TimeoutError as e:
+                raise TimeoutError(
+                    f'Waited {self.WAIT_TIMEOUT}s to invoke "{query_name}", and {self} is not started'
+                ) from e
+
+            if self._must_stay_stopped:
+                raise ConnectionError(f'Cannot invoke "{query_name}": {self} was stopped')
+
+            connection = self.connection
             try:
                 return await self.send(query, timeout=timeout)
             except (FloodWait, FloodPremiumWait) as e:
@@ -751,6 +784,13 @@ class Session:
                     isinstance(e, InternalServerError) and e.ID == "HISTORY_GET_FAILED"
                 ):
                     raise
+
+                if (
+                    isinstance(e, OSError)
+                    and self.state is SessionState.STARTED
+                    and not self.restart_lock.locked()
+                ):
+                    asyncio.create_task(self.restart(connection))
 
                 attempt += 1
 

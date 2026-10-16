@@ -25,3 +25,7 @@ faster-pyrogram is not polished or documented for anyone else's use. We don't ha
 ## Upstream
 
 Synchronized with [Kurigram](https://github.com/KurimuzonAkuma/pyrogram) main at `d4d069817a51bf8543b5083e525dd83acfca20da` (2026-10-14). Python 3.10 or newer is required.
+
+## Optional enrichment
+
+Set `fetch_replies=False`, `fetch_topics=False`, `fetch_stories=False`, and `fetch_stickers=False` to skip optional message-body, topic, story, and sticker enrichment. Parsing keeps reference identifiers and metadata from the response. Explicit API requests and required peer resolution still run.

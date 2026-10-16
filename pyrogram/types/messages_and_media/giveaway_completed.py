@@ -75,7 +75,7 @@ class GiveawayCompleted(Object):
 
         giveaway_message = None
 
-        if chat and message_id:
+        if client.fetch_replies and chat and message_id:
             try:
                 giveaway_message = await client.get_messages(
                     chat_id=chat.id, message_ids=message_id, replies=0

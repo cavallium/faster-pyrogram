@@ -273,7 +273,7 @@ async def test_stop_waits_for_the_packet_it_is_still_handling() -> None:
     release = asyncio.Event()
     handled: bool = False
 
-    async def handle_packet(packet: bytes) -> None:
+    async def handle_packet(packet: bytes, connection=None) -> None:
         nonlocal handled
 
         await release.wait()
@@ -305,7 +305,7 @@ async def test_stop_cancels_a_packet_that_will_not_finish(
 
     session = _started_session()
 
-    async def handle_packet(packet: bytes) -> None:
+    async def handle_packet(packet: bytes, connection=None) -> None:
         await asyncio.Event().wait()
 
     session.handle_packet = handle_packet

@@ -31,7 +31,7 @@ from pyrogram.errors import (
     InternalServerError,
     ServiceUnavailable,
 )
-from pyrogram.session.session import Session
+from pyrogram.session.session import Session, SessionState
 
 if TYPE_CHECKING:
     from pyrogram.raw.core import TLObject
@@ -48,6 +48,10 @@ class _Session(Session):
         self.is_started = asyncio.Event()
         self.is_started.set()
         self.client = FakeClient()
+        self.connection = None
+        self._state = SessionState.STARTED
+        self.restart_lock = asyncio.Lock()
+        self._must_stay_stopped = False
         self.seconds = seconds
         self.send_calls = 0
 
@@ -59,6 +63,10 @@ class _Session(Session):
     ) -> TLObject:
         self.send_calls += 1
         raise FloodWait(self.seconds)
+
+    async def restart(self, expected_connection=None):
+        # These tests isolate invoke retry accounting from transport recovery.
+        pass
 
 
 class _Query:

@@ -103,11 +103,19 @@ class PremiumGiftCode(Object):
     async def _parse(client, giftcode: raw.types.MessageActionGiftCode, users, chats):
         raw_peer_id = utils.get_raw_peer_id(giftcode.boost_peer)
 
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+        sticker = None
+
+        if client.fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+                )
             )
-        )
+            if raw_stickers.documents:
+                doc = random.choice(raw_stickers.documents)
+                sticker = await types.Sticker._parse(
+                    client, doc, {type(i): i for i in doc.attributes}
+                )
 
         return PremiumGiftCode(
             creator=await types.Chat._parse_chat(
@@ -122,16 +130,7 @@ class PremiumGiftCode(Object):
             cryptocurrency_amount=giftcode.crypto_amount,
             month_count=utils.get_premium_duration_month_count(giftcode.days),
             day_count=giftcode.days,
-            sticker=random.choice(
-                types.List(
-                    [
-                        await types.Sticker._parse(
-                            client, doc, {type(i): i for i in doc.attributes}
-                        )
-                        for doc in raw_stickers.documents
-                    ]
-                )
-            ),
+            sticker=sticker,
             code=giftcode.slug,
         )
 

@@ -810,7 +810,7 @@ class User(Object, Update):
         # parsed_user.bot_info = user.bot_info
         # parsed_user.bot_forum_view
 
-        if user.pinned_msg_id:
+        if client.fetch_replies and user.pinned_msg_id:
             parsed_user.pinned_message = await client.get_messages(
                 chat_id=parsed_user.id, pinned=True
             )
@@ -855,9 +855,11 @@ class User(Object, Update):
             parsed_user.personal_channel = await types.Chat._parse_channel_chat(
                 client, chats[user.personal_channel_id]
             )
-            parsed_user.personal_channel_message = await client.get_messages(
-                chat_id=parsed_user.personal_channel.id, message_ids=user.personal_channel_message
-            )
+            if client.fetch_replies and user.personal_channel_message:
+                parsed_user.personal_channel_message = await client.get_messages(
+                    chat_id=parsed_user.personal_channel.id,
+                    message_ids=user.personal_channel_message,
+                )
 
         parsed_user.gift_count = user.stargifts_count
         # parsed_user.starref_program = user.starref_program

@@ -1161,7 +1161,7 @@ class Chat(Object):
         )
         # parsed_chat.bot_info = user.bot_info
 
-        if user.pinned_msg_id:
+        if client.fetch_replies and user.pinned_msg_id:
             parsed_chat.pinned_message = await client.get_messages(
                 chat_id=parsed_chat.id, pinned=True
             )
@@ -1206,9 +1206,11 @@ class Chat(Object):
             parsed_chat.personal_channel = await Chat._parse_channel_chat(
                 client, chats[user.personal_channel_id]
             )
-            parsed_chat.personal_channel_message = await client.get_messages(
-                chat_id=parsed_chat.personal_channel.id, message_ids=user.personal_channel_message
-            )
+            if client.fetch_replies and user.personal_channel_message:
+                parsed_chat.personal_channel_message = await client.get_messages(
+                    chat_id=parsed_chat.personal_channel.id,
+                    message_ids=user.personal_channel_message,
+                )
 
         parsed_chat.gift_count = user.stargifts_count
         # parsed_chat.starref_program
@@ -1277,7 +1279,7 @@ class Chat(Object):
 
         # parsed_chat.bot_info
 
-        if chat.pinned_msg_id:
+        if client.fetch_replies and chat.pinned_msg_id:
             parsed_chat.pinned_message = await client.get_messages(
                 chat_id=parsed_chat.id, pinned=True
             )
@@ -1349,7 +1351,7 @@ class Chat(Object):
         parsed_chat.migrated_from_chat_id = channel.migrated_from_chat_id
         parsed_chat.migrated_from_max_id = channel.migrated_from_max_id
 
-        if channel.pinned_msg_id:
+        if client.fetch_replies and channel.pinned_msg_id:
             parsed_chat.pinned_message = await client.get_messages(
                 chat_id=parsed_chat.id, pinned=True
             )

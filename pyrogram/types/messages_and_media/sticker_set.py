@@ -135,15 +135,15 @@ class StickerSet(Object):
         thumb = documents.get(_set.thumb_document_id)
 
         if thumb is None:
-            if _set.thumb_document_id:
+            if _set.thumb_document_id and client.fetch_stickers:
                 r = await client.invoke(
                     raw.functions.messages.GetCustomEmojiDocuments(
                         document_id=[_set.thumb_document_id]
                     )
                 )
 
-                thumb = r[0]
-            else:
+                thumb = r[0] if r else None
+            elif not _set.thumb_document_id and sticker_set.documents:
                 thumb = sticker_set.documents[0]
 
         await client.sticker_set_name_cache.set((_set.id, _set.access_hash), _set.short_name)

@@ -57,7 +57,7 @@ from pyrogram.handlers.handler import Handler
 from pyrogram.methods import Methods
 from pyrogram.qrlogin import QRLogin
 from pyrogram.session import Auth, Session
-from pyrogram.storage import SQLiteStorage, Storage, UpdateState
+from pyrogram.storage import MemoryStorage, SQLiteStorage, Storage, UpdateState
 from pyrogram.types import LinkPreviewOptions, TermsOfService, User
 from pyrogram.utils import ainput
 
@@ -258,7 +258,8 @@ class Client(Methods):
             Global link preview options for the client.
 
         fetch_replies (``bool``, *optional*):
-            Pass True to automatically fetch replies for messages.
+            Pass True to automatically fetch reply and reference message bodies,
+            including pinned messages and personal-channel posts.
             Defaults to True.
 
         fetch_topics (``bool``, *optional*):
@@ -266,11 +267,12 @@ class Client(Methods):
             Defaults to True.
 
         fetch_stories (``bool``, *optional*):
-            Pass True to automatically fetch stories if they are missing.
+            Pass True to automatically fetch missing stories and story-area gift details.
             Defaults to True.
 
         fetch_stickers (``bool``, *optional*):
-            Pass True to automatically fetch names of sticker sets.
+            Pass True to automatically fetch sticker-set names, gift display stickers,
+            and missing sticker-set thumbnails.
             Defaults to False.
 
         init_connection_params (``dict`` | :obj:`~pyrogram.raw.base.JSONValue`, *optional*):
@@ -409,11 +411,9 @@ class Client(Methods):
         self.storage: Storage
 
         if self.session_string:
-            self.storage = SQLiteStorage(
-                self.name, workdir=self.workdir, session_string=self.session_string, in_memory=True
-            )
+            self.storage = MemoryStorage(self.name, session_string=self.session_string)
         elif self.in_memory:
-            self.storage = SQLiteStorage(self.name, workdir=self.workdir, in_memory=True)
+            self.storage = MemoryStorage(self.name)
         elif isinstance(storage_engine, Storage):
             self.storage = storage_engine
         else:

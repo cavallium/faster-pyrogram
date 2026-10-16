@@ -101,11 +101,19 @@ class GiftedPremium(Object):
         receiver: raw.base.User,
         users: dict[int, raw.base.User],
     ) -> GiftedPremium:
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+        sticker = None
+
+        if client.fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+                )
             )
-        )
+            if raw_stickers.documents:
+                doc = random.choice(raw_stickers.documents)
+                sticker = await types.Sticker._parse(
+                    client, doc, {type(i): i for i in doc.attributes}
+                )
 
         caption, caption_entities = (
             await utils.parse_text_with_entities(client, getattr(action, "message", None), users)
@@ -120,16 +128,7 @@ class GiftedPremium(Object):
             cryptocurrency_amount=getattr(action, "crypto_amount", None),
             day_count=action.days,
             month_count=utils.get_premium_duration_month_count(action.days),
-            sticker=random.choice(
-                types.List(
-                    [
-                        await types.Sticker._parse(
-                            client, doc, {type(i): i for i in doc.attributes}
-                        )
-                        for doc in raw_stickers.documents
-                    ]
-                )
-            ),
+            sticker=sticker,
             caption=caption,
             caption_entities=caption_entities,
         )

@@ -50,7 +50,7 @@ class GiveawayPrizeStars(Object):
         is_unclaimed (``bool``, *optional*):
             True, if the corresponding winner wasn't chosen and the Telegram Stars were received by the owner of the boosted chat.
 
-        sticker (:obj:`~pyrogram.types.Sticker`):
+        sticker (:obj:`~pyrogram.types.Sticker`, *optional*):
             A sticker to be shown in the message.
     """
 
@@ -81,39 +81,40 @@ class GiveawayPrizeStars(Object):
         action: raw.types.MessageActionPrizeStars,
         chats: dict[int, raw.base.Chat],
     ) -> GiveawayPrizeStars:
-        raw_stickers = await client.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+        sticker = None
+
+        if client.fetch_stickers:
+            raw_stickers = await client.invoke(
+                raw.functions.messages.GetStickerSet(
+                    stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
+                )
             )
-        )
+            if raw_stickers.documents:
+                doc = random.choice(raw_stickers.documents)
+                sticker = await types.Sticker._parse(
+                    client, doc, {type(i): i for i in doc.attributes}
+                )
 
         parsed_message = None
 
-        try:
-            parsed_message = await client.get_messages(
-                chat_id=utils.get_peer_id(action.boost_peer),
-                message_ids=action.giveaway_msg_id,
-                replies=0,
-            )
-        except (MessageIdsEmpty, ChannelPrivate):
-            pass
+        if client.fetch_replies:
+            try:
+                parsed_message = await client.get_messages(
+                    chat_id=utils.get_peer_id(action.boost_peer),
+                    message_ids=action.giveaway_msg_id,
+                    replies=0,
+                )
+            except (MessageIdsEmpty, ChannelPrivate):
+                pass
 
         return GiveawayPrizeStars(
             star_count=action.stars,
+            is_unclaimed=action.unclaimed,
             transaction_id=action.transaction_id,
             boosted_chat=await types.Chat._parse_chat(
                 client, chats.get(utils.get_raw_peer_id(action.boost_peer))
             ),
             giveaway_message_id=action.giveaway_msg_id,
             giveaway_message=parsed_message,
-            sticker=random.choice(
-                types.List(
-                    [
-                        await types.Sticker._parse(
-                            client, doc, {type(i): i for i in doc.attributes}
-                        )
-                        for doc in raw_stickers.documents
-                    ]
-                )
-            ),
+            sticker=sticker,
         )
