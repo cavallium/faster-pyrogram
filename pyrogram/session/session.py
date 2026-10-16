@@ -639,6 +639,8 @@ class Session:
         self, data: TLObject, wait_response: bool = True, timeout: float = WAIT_TIMEOUT
     ):
         connection = self.connection
+        if connection is None or connection.protocol is None:
+            raise OSError("Session transport is not connected")
         message = await self.msg_factory.create(data)
         msg_id = message.msg_id
 
@@ -756,7 +758,7 @@ class Session:
                     query_name, str(e) or repr(e)
                 )
 
-                if self.state == SessionState.STARTED and not self.restart_lock.locked():
+                if connection is not None and self.state == SessionState.STARTED and not self.restart_lock.locked():
                     self.client.loop.create_task(self.restart(connection))
 
                 await asyncio.sleep(retry_delay)

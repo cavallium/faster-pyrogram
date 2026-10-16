@@ -1135,6 +1135,102 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
                                 await Client.get_session(client, dc_id=2, is_media=True, temporary=temporary)
                         self.assertEqual({2: replacement} if replace else {}, client.media_sessions)
 
+    async def test_missing_connection_or_protocol_is_retryable_before_factory_and_results(self):
+        for state in (sdk.SessionState.STOPPED, sdk.SessionState.STARTING, sdk.SessionState.STARTED):
+            for missing in ('connection', 'protocol'):
+                for wait_response in (False, True):
+                    with self.subTest(state=state, missing=missing, wait_response=wait_response):
+                        session = self.session()
+                        session._state = state
+                        if state != sdk.SessionState.STARTED:
+                            session.is_started.clear()
+                        session.connection = None if missing == 'connection' else Connection(2, '127.0.0.1', 1, True)
+                        session.msg_factory.create = AsyncMock()
+                        unrelated = session.results[123] = sdk.Result()
+                        with patch.object(sdk.mtproto, 'pack') as pack:
+                            with self.assertRaisesRegex(OSError, 'Session transport is not connected'):
+                                await session.send(raw.functions.Ping(ping_id=1), wait_response=wait_response)
+                        session.msg_factory.create.assert_not_awaited()
+                        pack.assert_not_called()
+                        self.assertEqual({123: unrelated}, session.results)
+                        self.assertEqual(0, session.transport_send_failures)
+                        self.assertEqual(state == sdk.SessionState.STARTED, session.is_started.is_set())
+
+    async def test_actual_invoke_missing_transport_after_readiness_timeout_recovers_on_retry(self):
+        for missing in ('connection', 'protocol'):
+            with self.subTest(missing=missing):
+                session = self.session()
+                session.connection = None if missing == 'connection' else Connection(2, '127.0.0.1', 1, True)
+                session._state = sdk.SessionState.STOPPED
+                session.is_started.clear()
+                session.restart = AsyncMock()
+                writer = self.writer()
+                replacement = self.connection(writer)
+                async def drain():
+                    result = session.results[session.msg_factory._last_msg_id]
+                    result.value = 'success'
+                    result.event.set()
+                writer.drain.side_effect = drain
+                original_wait_for = asyncio.wait_for
+                waits, retries = [], []
+                async def wait_for(operation, timeout):
+                    waits.append(timeout)
+                    return await original_wait_for(operation, timeout if session.is_started.is_set() else 0)
+                async def sleep(delay):
+                    retries.append(delay)
+                    self.assertEqual({}, session.results)
+                    self.assertEqual(0, session.transport_send_failures)
+                    session.connection = replacement
+                    session._state = sdk.SessionState.STARTED
+                    session.is_started.set()
+                with patch.object(sdk.asyncio, 'wait_for', side_effect=wait_for), patch.object(sdk.asyncio, 'sleep', side_effect=sleep):
+                    self.assertEqual('success', await session.invoke(raw.functions.Ping(ping_id=1), retries=2, retry_delay=0))
+                self.assertEqual(session.WAIT_TIMEOUT, waits[0])
+                self.assertEqual([0], retries)
+                session.restart.assert_not_awaited()
+                writer.close.assert_not_called()
+                self.assertEqual({}, session.results)
+                self.assertEqual(0, session.transport_send_failures)
+                self.assertTrue(session.is_started.is_set())
+                self.assertEqual(1, writer.write.call_count)
+
+    async def test_missing_capture_invoke_failure_cannot_schedule_manual_restart_of_replacement(self):
+        session = self.session()
+        session.connection = None
+        writer = self.writer()
+        replacement = self.connection(writer)
+        session.restart = AsyncMock()
+        entered, release = asyncio.Event(), asyncio.Event()
+        original_send = session.send
+        async def send(*args, **kwargs):
+            try:
+                return await original_send(*args, **kwargs)
+            except OSError:
+                entered.set()
+                await release.wait()  # Restore a healthy connection before invoke handles this failure.
+                raise
+        async def drain():
+            result = session.results[session.msg_factory._last_msg_id]
+            result.value = 'success'
+            result.event.set()
+        writer.drain.side_effect = drain
+        session.send = send
+        caller = asyncio.create_task(session.invoke(raw.functions.Ping(ping_id=1), retries=2, retry_delay=0))
+        await asyncio.wait_for(entered.wait(), 1)
+        session.connection = replacement
+        session._state = sdk.SessionState.STARTED
+        session.is_started.set()
+        release.set()
+        self.assertEqual('success', await asyncio.wait_for(caller, 1))
+        await self.settle_tasks()
+        session.restart.assert_not_awaited()
+        self.assertTrue(session.is_started.is_set())
+        self.assertIs(replacement, session.connection)
+        self.assertEqual({}, session.results)
+        self.assertEqual(0, session.transport_send_failures)
+        writer.close.assert_not_called()
+        writer.transport.abort.assert_not_called()
+
     async def test_pack_oserror_is_not_counted_as_transport_send_failure(self):
         writer = self.writer()
         session = self.session(self.connection(writer))
