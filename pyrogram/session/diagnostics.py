@@ -22,12 +22,15 @@ class ConnectionDiagnostics:
     not wire rate or completed writes. Bootstrap is InitConnection shape or a Ping
     from the owned startup task; only the separate phase counters establish STARTING
     and not-ready state. InitConnection shape alone does not establish caller ownership.
+    Pending additions count insertions into the current set, not globally unique IDs;
+    ACK snapshot lengths count attempted local sends, not accepted acknowledgments.
     """
 
     __slots__ = ('ordinal', 'generation', 'dc_id', 'started', 'interval', 'opened',
-                 'reported', 'counts', 'bucket', 'bucket_counts', 'bucket_total_peak')
+                 'reported', 'counts', 'bucket', 'bucket_counts', 'bucket_total_peak',
+                 'inbound_eligible', 'pending_additions', 'ack_attempt_ids', 'ack_attempt_max', 'pending_at_open')
 
-    def __init__(self, generation, dc_id, previous_start):
+    def __init__(self, generation, dc_id, previous_start, pending_count=0):
         self.ordinal = next(_ordinals)
         self.generation = generation
         self.dc_id = dc_id
@@ -39,12 +42,17 @@ class ConnectionDiagnostics:
         self.bucket = 0
         self.bucket_counts = [0] * len(_CATEGORIES)
         self.bucket_total_peak = 0
+        self.inbound_eligible = 0
+        self.pending_additions = 0
+        self.ack_attempt_ids = 0
+        self.ack_attempt_max = 0
+        self.pending_at_open = pending_count
 
     def connected(self):
         self.opened = time.monotonic()
 
     @staticmethod
-    def category(query, bootstrap=False):
+    def unwrapped(query):
         # Bounded unwrapping: malformed/cyclic wrappers become the fixed other bucket.
         for _ in range(4):
             if isinstance(query, (raw.functions.InvokeWithLayer, raw.functions.InvokeWithoutUpdates,
@@ -52,6 +60,11 @@ class ConnectionDiagnostics:
                 query = query.query
             else:
                 break
+        return query
+
+    @staticmethod
+    def category(query, bootstrap=False):
+        query = ConnectionDiagnostics.unwrapped(query)
         if isinstance(query, raw.functions.InitConnection) or (
             isinstance(query, raw.functions.Ping) and bootstrap
         ):
@@ -84,8 +97,17 @@ class ConnectionDiagnostics:
         row[6] += not ready
         row[7] += not current
         row[8] = max(row[8], self.bucket_counts[category])
+        if category == 3:
+            entries = len(self.unwrapped(query).msg_ids)
+            self.ack_attempt_ids += entries
+            self.ack_attempt_max = max(self.ack_attempt_max, entries)
         self.bucket_total_peak = max(self.bucket_total_peak, sum(self.bucket_counts))
         return category
+
+    def inbound(self, eligible, additions):
+        if not self.reported:
+            self.inbound_eligible += eligible
+            self.pending_additions += additions
 
     def complete(self, category, error=None):
         if self.reported or category is None:
@@ -94,7 +116,7 @@ class ConnectionDiagnostics:
             3 if isinstance(error, asyncio.CancelledError) else 4))
         self.counts[category][outcome] += 1
 
-    def emit(self, reason, state, ready, primary, current, close_succeeded=None):
+    def emit(self, reason, state, ready, primary, current, close_succeeded=None, pending_count=None):
         if self.reported:
             return
         self.reported = True  # Freeze AS OF first 429/close, including explicitly unfinished sends.
@@ -113,6 +135,12 @@ class ConnectionDiagnostics:
             send_semantics='local_connection_send_not_server_acceptance',
             actual_connection_send_attempts=attempts, actual_connection_send_completions=completions,
             inflight_at_cutoff=attempts - completions, attempt_bucket_1s_total_peak=self.bucket_total_peak,
+            inbound_ack_eligible_messages=self.inbound_eligible,
+            new_pending_ack_id_additions=self.pending_additions,
+            ack_snapshot_id_entries_attempted_total=self.ack_attempt_ids,
+            ack_snapshot_id_entries_attempted_max=self.ack_attempt_max,
+            pending_ack_ids_at_open=self.pending_at_open,
+            pending_ack_ids_at_cutoff=pending_count if current else None,
             categories=counts)
         log.info('Session diagnostics: %s', json.dumps(summary, separators=(',', ':'), sort_keys=True))
 

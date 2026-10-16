@@ -47,6 +47,8 @@ class TCPSendTests(unittest.IsolatedAsyncioTestCase):
         session.auth_key = b'0' * 256
         session.auth_key_id = 9
         session.pending_acks = set()
+        session._ack_task = None
+        session._run_generation = 0
         session.connection = Connection(2, '127.0.0.1', 1, True, loop=session.client.loop)
         session.connection.protocol = transport
         return session
@@ -111,10 +113,12 @@ class TCPSendTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(session_module.mtproto, 'unpack', return_value=packet), \
              patch.object(session_module.mtproto, 'pack', return_value=b'data') as pack:
             await session.handle_packet(b'fixture')
+            await session._ack_task
             self.assertEqual(ack_ids, session.pending_acks)
             self.assertEqual({}, session.results)
             writer = transport.writer = self.writer()
             await session.handle_packet(b'fixture')
+            await session._ack_task
         self.assertEqual(set(), session.pending_acks)
         self.assertEqual({}, session.results)
         self.assertEqual(2, pack.call_count)

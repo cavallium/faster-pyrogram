@@ -23,6 +23,7 @@ import os
 from enum import Enum, auto
 from hashlib import sha1
 from io import BytesIO
+from itertools import islice
 from typing import Any, Dict, List, Optional, Set
 
 import pyrogram
@@ -87,6 +88,7 @@ class Session:
     SLEEP_THRESHOLD = 10
     MAX_RETRIES = 10
     ACKS_THRESHOLD = 10
+    ACKS_MAX_IDS = 8192  # https://core.telegram.org/mtproto/service_messages_about_messages
     PING_INTERVAL = 5
     RETRY_DELAY = 1
     STORED_MSG_IDS_MAX_SIZE = 1000 * 2
@@ -128,6 +130,7 @@ class Session:
         self.ignore_count = 0
 
         self.pending_acks: Set[int] = set()
+        self._ack_task: Optional[asyncio.Task] = None
 
         self.results: Dict[int, Result] = {}
 
@@ -260,7 +263,8 @@ class Session:
                         diagnostics = None
                         if _SESSION_DIAGNOSTICS:
                             try:
-                                diagnostics = ConnectionDiagnostics(generation, self.dc_id, self._diagnostic_last_open)
+                                diagnostics = ConnectionDiagnostics(generation, self.dc_id, self._diagnostic_last_open,
+                                    len(self.pending_acks))
                                 connection._session_diagnostics = diagnostics
                                 self._diagnostic_last_open = diagnostics.started
                             except Exception:
@@ -380,7 +384,8 @@ class Session:
         self.ignore_count = 0
         self.stored_msg_ids.clear()
         self.ping_task_event.set()
-        tasks = [task for task in (self.ping_task, self.recv_task)
+        ack_task = self._ack_task
+        tasks = [task for task in (self.ping_task, self.recv_task, ack_task)
                  if task is not None and task is not asyncio.current_task()]
         connection = self.connection
 
@@ -393,6 +398,9 @@ class Session:
                     task.cancel()
             closed = False
             try:
+                # Join the ACK owner before close needs the same transport send lock.
+                if ack_task is not None and ack_task is not asyncio.current_task() and ack_task in tasks:
+                    await asyncio.gather(ack_task, return_exceptions=True)
                 if connection is not None:
                     await connection.close()
                 closed = True
@@ -400,11 +408,14 @@ class Session:
                 if diagnostics is not None:
                     try:
                         diagnostics.emit('close', self.state.name, self.is_started.is_set(),
-                            getattr(self.client, 'session', None) is self, self.connection is connection, closed)
+                            getattr(self.client, 'session', None) is self, self.connection is connection, closed,
+                            len(self.pending_acks) if self.connection is connection else None)
                     except Exception:
                         pass
                 outcomes = await asyncio.gather(*tasks, return_exceptions=True)
                 self.ping_task = self.recv_task = None
+                if self._ack_task is ack_task:
+                    self._ack_task = None
                 if self.connection is connection:
                     self.connection = None
                 self.ping_task_event.clear()
@@ -477,6 +488,7 @@ class Session:
         if connection is not self.connection:
             return
 
+        diagnostics = record_for(connection) if _SESSION_DIAGNOSTICS else None
         messages = (
             data.body.messages
             if isinstance(data.body, MsgContainer)
@@ -490,7 +502,13 @@ class Session:
                 self.client._set_server_time(msg.msg_id)
 
             if msg.seq_no % 2 != 0:
-                if msg.msg_id in self.pending_acks:
+                already_pending = msg.msg_id in self.pending_acks
+                if diagnostics is not None:
+                    try:
+                        diagnostics.inbound(True, not already_pending)
+                    except Exception:
+                        pass
+                if already_pending:
                     continue
                 else:
                     self.pending_acks.add(msg.msg_id)
@@ -548,6 +566,11 @@ class Session:
                 bisect.insort(self.stored_msg_ids, msg.msg_id)
 
             if isinstance(msg.body, (raw.types.MsgDetailedInfo, raw.types.MsgNewDetailedInfo)):
+                if diagnostics is not None:
+                    try:
+                        diagnostics.inbound(False, msg.body.answer_msg_id not in self.pending_acks)
+                    except Exception:
+                        pass
                 self.pending_acks.add(msg.body.answer_msg_id)
                 continue
 
@@ -570,17 +593,30 @@ class Session:
                 self.results[msg_id].value = getattr(msg.body, "result", msg.body)
                 self.results[msg_id].event.set()
 
-        if len(self.pending_acks) >= self.ACKS_THRESHOLD:
-            log.debug("Sending %s acks", len(self.pending_acks))
+        if (len(self.pending_acks) >= self.ACKS_THRESHOLD
+                and connection is self.connection
+                and self.state in (SessionState.STARTING, SessionState.STARTED)
+                and (self._ack_task is None or self._ack_task.done())):
+            self._ack_task = self.client.loop.create_task(self._flush_acks(connection, self._run_generation))
 
-            ack_ids = list(self.pending_acks)
-            try:
-                await self.send(raw.types.MsgsAck(msg_ids=ack_ids), False)
-            except OSError:
-                pass
-            else:
-                if connection is self.connection:
-                    self.pending_acks.difference_update(ack_ids)
+    async def _flush_acks(self, connection, generation):
+        owner = asyncio.current_task()
+        try:
+            while (self._ack_task is owner and self._owns_start(generation, connection)
+                    and self.state in (SessionState.STARTING, SessionState.STARTED) and self.pending_acks):
+                ack_ids = list(islice(self.pending_acks, self.ACKS_MAX_IDS))
+                log.debug("Sending %s acks", len(ack_ids))
+                try:
+                    await self.send(raw.types.MsgsAck(msg_ids=ack_ids), False)
+                except OSError:
+                    return  # Keep the snapshot for the next eligible incoming packet.
+                if (self._ack_task is not owner or not self._owns_start(generation, connection)
+                        or self.state not in (SessionState.STARTING, SessionState.STARTED)):
+                    return
+                self.pending_acks.difference_update(ack_ids)
+        finally:
+            if self._ack_task is owner:
+                self._ack_task = None
 
     async def ping_worker(self):
         log.info("PingTask started")
@@ -639,7 +675,8 @@ class Session:
                                 if diagnostics is not None:
                                     try:
                                         diagnostics.emit('transport_429', self.state.name, self.is_started.is_set(),
-                                            getattr(self.client, 'session', None) is self, self.connection is connection)
+                                            getattr(self.client, 'session', None) is self, self.connection is connection,
+                                            pending_count=len(self.pending_acks) if self.connection is connection else None)
                                     except Exception:
                                         pass
                             raise TransportFlood(
@@ -734,7 +771,8 @@ class Session:
                     if diagnostics is not None:
                         try:
                             diagnostics.emit('send_oserror_close', self.state.name, self.is_started.is_set(),
-                                getattr(self.client, 'session', None) is self, self.connection is connection, closed)
+                                getattr(self.client, 'session', None) is self, self.connection is connection, closed,
+                                len(self.pending_acks) if self.connection is connection else None)
                         except Exception:
                             pass
                 raise

@@ -1,5 +1,8 @@
 import asyncio
 import json
+import os
+from hashlib import sha256
+from io import BytesIO
 import threading
 import unittest
 from types import SimpleNamespace
@@ -10,7 +13,7 @@ from pyrogram.connection import Connection
 from pyrogram.connection.transport.tcp.tcp import TCP
 from pyrogram.connection.transport.tcp.tcp_abridged import TCPAbridged
 from pyrogram.errors import InternalServerError, HistoryGetFailed
-from pyrogram.raw.core import Message, MsgContainer
+from pyrogram.raw.core import Message, MsgContainer, Long
 from pyrogram.session import session as sdk
 from pyrogram.session import diagnostics as diagnostic
 
@@ -361,10 +364,12 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(sdk.mtproto, 'unpack', return_value=Message(MsgContainer([]), 1, 0, 0)):
             task = asyncio.create_task(session.handle_packet(b'fixture', old))
             await asyncio.wait_for(entered.wait(), 1)
+            owner = session._ack_task
             session.connection = self.connection()
             session.pending_acks = {999}
             release.set()
             await task
+            await owner
         self.assertEqual({999}, session.pending_acks)
 
     async def test_packet_failures_and_ping_capture_restart_generation(self):
@@ -1249,13 +1254,16 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_diagnostic_disabled_never_reads_clock_or_logs_or_attaches_record(self):
         with patch.object(sdk, '_SESSION_DIAGNOSTICS', False), patch.object(diagnostic, 'time') as clock, \
-                patch.object(diagnostic.log, 'info') as log:
+                patch.object(diagnostic.log, 'info') as log, \
+                patch.object(diagnostic.ConnectionDiagnostics, 'inbound', side_effect=AssertionError('disabled inbound')) as inbound:
             clock.monotonic.side_effect = AssertionError('diagnostic clock on disabled path')
             session, connection = self.diagnostic_bootstrap()
             with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
                 await session.start()
                 await session.send(raw.functions.Ping(ping_id=5), wait_response=False)
+                await session.handle_packet(self.ack_envelope(session, 0, 1))
                 await session.stop()
+            inbound.assert_not_called()
             self.assertFalse(hasattr(connection, '_session_diagnostics'))
             clock.monotonic.assert_not_called()
             log.assert_not_called()
@@ -1571,16 +1579,329 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(session.is_started.is_set())
         self.assertEqual({}, session.results)
 
+    def ack_envelope(self, session, first=0, count=0, body=None, seq_no=1):
+        base = int(session.client.server_time * 2 ** 32)
+        messages = []
+        for index in range(first, first + count):
+            message_body = body if body is not None else raw.types.RpcResult(req_msg_id=0,
+                result=raw.types.messages.Messages(messages=[], topics=[], chats=[], users=[]))
+            messages.append(Message(message_body, base + 4 * index + 1, seq_no, len(message_body)))
+        body = MsgContainer(messages)
+        message = Message(body, base + 4 * (100000 + first) + 1, 0, len(body))
+        data = Long(session.salt) + session.session_id + message.write()
+        data += os.urandom(-(len(data) + 12) % 16 + 12)
+        key = sha256(session.auth_key[96:128] + data).digest()[8:24]
+        aes_key, iv = sdk.mtproto.kdf(session.auth_key, key, False)
+        return session.auth_key_id + key + sdk.mtproto.aes.ige256_encrypt(data, aes_key, iv)
+
+    def ack_writes(self, session, writer):
+        snapshots = []
+        def write(payload):
+            key = payload[8:24]
+            aes_key, iv = sdk.mtproto.kdf(session.auth_key, key, True)
+            data = sdk.mtproto.aes.ige256_decrypt(payload[24:], aes_key, iv)
+            message = Message.read(BytesIO(data[16:]))
+            self.assertIsInstance(message.body, raw.types.MsgsAck)
+            snapshots.append(set(message.body.msg_ids))
+        writer.write.side_effect = write
+        return snapshots
+
+    async def test_ack_diagnostic_counts_current_set_additions_carryover_and_attempted_ids(self):
+        with patch.object(sdk, '_SESSION_DIAGNOSTICS', True), patch.object(diagnostic.log, 'info') as log:
+            session, connection = self.diagnostic_bootstrap()
+            carryover = {987654321987, 987654321991, 987654321995}
+            session.pending_acks.update(carryover)
+            await session.start()
+            record = connection._session_diagnostics
+            self.assertEqual(3, record.pending_at_open)
+            await session.handle_packet(self.ack_envelope(session, 0, 1))
+            await session.handle_packet(self.ack_envelope(session, 0, 1))  # Pending retransmission, not a new addition.
+            answer = int(session.client.server_time * 2 ** 32) + 999
+            detail = raw.types.MsgDetailedInfo(msg_id=123, answer_msg_id=answer, bytes=5, status=0)
+            await session.handle_packet(self.ack_envelope(session, 2, 1, detail, 0))
+            repeat = raw.types.MsgNewDetailedInfo(answer_msg_id=answer, bytes=5, status=0)
+            await session.handle_packet(self.ack_envelope(session, 3, 1, repeat, 0))
+            self.assertEqual(5, len(session.pending_acks))
+            self.assertEqual(2, record.inbound_eligible)
+            self.assertEqual(2, record.pending_additions)
+            await session.handle_packet(self.ack_envelope(session, 4, 5))
+            await session._ack_task
+            self.assertEqual(set(), session.pending_acks)
+            await session.stop()
+            summary = json.loads(log.call_args.args[1])
+            self.assertEqual(7, summary['inbound_ack_eligible_messages'])
+            self.assertEqual(7, summary['new_pending_ack_id_additions'])
+            self.assertEqual(10, summary['ack_snapshot_id_entries_attempted_total'])
+            self.assertEqual(10, summary['ack_snapshot_id_entries_attempted_max'])
+            self.assertEqual(3, summary['pending_ack_ids_at_open'])
+            self.assertEqual(0, summary['pending_ack_ids_at_cutoff'])
+            self.assertNotIn('987654321987', log.call_args.args[1])
+            log.assert_called_once()
+
+    def test_ack_diagnostic_frozen_snapshot_does_not_expose_replacement_pending_count(self):
+        with patch.object(diagnostic.log, 'info') as log:
+            record = diagnostic.ConnectionDiagnostics(1, 4, None, pending_count=2)
+            record.inbound(True, 1)
+            category = record.attempt(raw.types.MsgsAck(msg_ids=[987654321987]), 'STARTED', True, True)
+            record.complete(category, OSError('uncertain send'))
+            record.emit('close', 'STARTED', True, False, False, True, pending_count=999)
+            record.inbound(True, 1)
+            record.attempt(raw.types.MsgsAck(msg_ids=[123, 456]), 'STARTED', True, False)
+            summary = json.loads(log.call_args.args[1])
+            self.assertEqual(1, summary['inbound_ack_eligible_messages'])
+            self.assertEqual(1, summary['new_pending_ack_id_additions'])
+            self.assertEqual(1, summary['ack_snapshot_id_entries_attempted_total'])
+            self.assertEqual(1, summary['ack_snapshot_id_entries_attempted_max'])
+            self.assertEqual(2, summary['pending_ack_ids_at_open'])
+            self.assertIsNone(summary['pending_ack_ids_at_cutoff'])
+            self.assertEqual(1, record.inbound_eligible)
+            self.assertEqual(1, record.ack_attempt_ids)
+            self.assertNotIn('987654321987', log.call_args.args[1])
+
+    async def test_ack_real_crypto_tcp_burst_has_one_owner_and_no_duplicate_id_copies(self):
+        writer = self.writer()
+        session = self.session(self.connection(writer))
+        snapshots = self.ack_writes(session, writer)
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def drain():
+            entered.set()
+            await release.wait()
+        writer.drain.side_effect = drain
+        await session.handle_packet(self.ack_envelope(session, 0, 10))
+        await asyncio.wait_for(entered.wait(), 1)
+        owner = session._ack_task
+        for packet in range(1, 8):
+            await session.handle_packet(self.ack_envelope(session, packet * 10, 10))
+            self.assertIs(owner, session._ack_task)
+        self.assertEqual(1, len(self.loop.tasks))
+        self.assertEqual(80, len(session.pending_acks))
+        release.set()
+        await owner
+        base = int(session.client.server_time * 2 ** 32)
+        expected = {base + 4 * index + 1 for index in range(80)}
+        self.assertEqual([10, 70], [len(ids) for ids in snapshots])
+        self.assertEqual(expected, set().union(*snapshots))
+        self.assertEqual(80, sum(map(len, snapshots)))
+        self.assertEqual(set(), session.pending_acks)
+        self.assertEqual(2, writer.write.call_count)
+        self.assertIsNone(session._ack_task)
+
+    async def test_ack_threshold_idle_and_starting_bootstrap_eligibility(self):
+        writer = self.writer()
+        session = self.session(self.connection(writer))
+        session._state = sdk.SessionState.STARTING
+        session.is_started.clear()
+        snapshots = self.ack_writes(session, writer)
+        await session.handle_packet(self.ack_envelope(session, 0, 9))
+        self.assertEqual(9, len(session.pending_acks))
+        self.assertIsNone(session._ack_task)
+        writer.write.assert_not_called()
+        await session.handle_packet(self.ack_envelope(session, 9, 1))
+        await session._ack_task
+        self.assertEqual([10], list(map(len, snapshots)))
+        self.assertEqual(set(), session.pending_acks)
+        self.assertFalse(session.is_started.is_set())
+
+    async def test_ack_chunks_respect_8192_protocol_bound_and_preserve_union(self):
+        for count in (8191, 8192, 8193, 16385):
+            with self.subTest(count=count):
+                writer = self.writer()
+                session = self.session(self.connection(writer))
+                expected = set(range(count))
+                session.pending_acks.update(expected)
+                snapshots = self.ack_writes(session, writer)
+                await session.handle_packet(self.ack_envelope(session))
+                await session._ack_task
+                self.assertTrue(all(0 < len(ids) <= 8192 for ids in snapshots))
+                self.assertEqual((count + 8191) // 8192, len(snapshots))
+                self.assertEqual(count, sum(map(len, snapshots)))
+                self.assertEqual(expected, set().union(*snapshots))
+                self.assertEqual(set(), session.pending_acks)
+
+    async def test_ack_failed_before_or_after_write_retains_ids_until_normal_incoming_retry(self):
+        for after_write in (False, True):
+            with self.subTest(after_write=after_write):
+                writer = self.writer(closing=not after_write)
+                session = self.session(self.connection(writer))
+                expected = set(range(10))
+                session.pending_acks.update(expected)
+                first = self.ack_writes(session, writer)
+                if after_write:
+                    writer.drain.side_effect = OSError('failed drain')
+                await session.handle_packet(self.ack_envelope(session))
+                await session._ack_task
+                self.assertEqual(expected, session.pending_acks)
+                self.assertIsNone(session._ack_task)
+                self.assertEqual(int(after_write), len(first))
+                self.assertEqual(1, session.transport_send_failures)
+                # A failure does not create a self-retry loop or another snapshot.
+                await asyncio.sleep(0)
+                self.assertIsNone(session._ack_task)
+                healthy = self.writer()
+                session.connection = self.connection(healthy)
+                session._run_generation += 1
+                session.is_started.set()
+                retried = self.ack_writes(session, healthy)
+                await session.handle_packet(self.ack_envelope(session))
+                await session._ack_task
+                self.assertEqual([expected], retried)
+                self.assertEqual(set(), session.pending_acks)
+
+    async def test_ack_owner_cancellation_retains_unsent_ids_and_next_packet_retries(self):
+        writer = self.writer()
+        session = self.session(self.connection(writer))
+        expected = set(range(10))
+        session.pending_acks.update(expected)
+        snapshots = self.ack_writes(session, writer)
+        entered = asyncio.Event()
+        async def drain():
+            entered.set()
+            await asyncio.Future()
+        writer.drain.side_effect = drain
+        await session.handle_packet(self.ack_envelope(session))
+        await asyncio.wait_for(entered.wait(), 1)
+        owner = session._ack_task
+        owner.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await owner
+        self.assertEqual(expected, session.pending_acks)
+        self.assertIsNone(session._ack_task)
+        self.assertFalse(session.connection.protocol.lock.locked())
+        writer.drain.side_effect = None
+        await session.handle_packet(self.ack_envelope(session))
+        await session._ack_task
+        self.assertEqual([expected, expected], snapshots)  # First write had no confirmed drain.
+        self.assertEqual(set(), session.pending_acks)
+
+    async def test_ack_stop_joins_owned_drain_before_connection_close(self):
+        writer = self.writer()
+        connection = self.connection(writer)
+        session = self.session(connection)
+        expected = set(range(10))
+        session.pending_acks.update(expected)
+        entered = asyncio.Event()
+        async def drain():
+            entered.set()
+            await asyncio.Future()
+        writer.drain.side_effect = drain
+        await session.handle_packet(self.ack_envelope(session))
+        await asyncio.wait_for(entered.wait(), 1)
+        owner = session._ack_task
+        original_close = connection.close
+        async def close():
+            self.assertTrue(owner.done())
+            self.assertFalse(connection.protocol.lock.locked())
+            await original_close()
+        connection.close = close
+        await asyncio.wait_for(session.stop(), 1)
+        self.assertTrue(owner.cancelled())
+        self.assertEqual(expected, session.pending_acks)
+        self.assertIsNone(session._ack_task)
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        self.assertIsNone(session.connection)
+
+    async def test_ack_qualified_restart_retains_cancelled_ids_and_new_packet_drains_them(self):
+        session, old = self.diagnostic_bootstrap()
+        with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+            await session.start()
+        session.pending_acks.update(range(10))
+        entered = asyncio.Event()
+        async def drain():
+            entered.set()
+            await asyncio.Future()
+        old.protocol.writer.drain.side_effect = drain
+        await session.handle_packet(self.ack_envelope(session))
+        await asyncio.wait_for(entered.wait(), 1)
+        owner = session._ack_task
+        healthy = self.writer()
+        replacement = self.connection(healthy)
+        replacement.connect = AsyncMock()
+        async def response():
+            for result in session.results.values():
+                result.value = 'success'
+                result.event.set()
+        healthy.drain.side_effect = response
+        session.client.connection_factory.return_value = replacement
+        with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+            await asyncio.wait_for(session.restart(old), 1)
+        self.assertTrue(owner.cancelled())
+        self.assertTrue(session.is_started.is_set())
+        self.assertEqual(set(range(10)), session.pending_acks)
+        snapshots = self.ack_writes(session, healthy)
+        await session.handle_packet(self.ack_envelope(session))
+        await session._ack_task
+        self.assertEqual([set(range(10))], snapshots)
+        self.assertEqual(set(), session.pending_acks)
+        await session.stop()
+
+    async def test_ack_stale_success_cannot_remove_pending_ids_or_clear_new_owner(self):
+        for replace_connection in (False, True):
+            with self.subTest(replace_connection=replace_connection):
+                writer = self.writer()
+                session = self.session(self.connection(writer))
+                session.pending_acks.update(range(10))
+                entered, release = asyncio.Event(), asyncio.Event()
+                async def drain():
+                    entered.set()
+                    await release.wait()
+                writer.drain.side_effect = drain
+                await session.handle_packet(self.ack_envelope(session))
+                await asyncio.wait_for(entered.wait(), 1)
+                old_owner = session._ack_task
+                if replace_connection:
+                    session.connection = self.connection(self.writer())
+                session._run_generation += 1
+                session.pending_acks = {999}
+                new_owner = asyncio.create_task(asyncio.Event().wait())
+                session._ack_task = new_owner
+                release.set()
+                await old_owner
+                self.assertEqual({999}, session.pending_acks)
+                self.assertIs(new_owner, session._ack_task)
+                await session.stop()
+                self.assertTrue(new_owner.cancelled())
+                self.assertIsNone(session._ack_task)
+
+    async def test_ack_owner_does_not_track_or_cancel_packet_application_caller(self):
+        writer = self.writer()
+        session = self.session(self.connection(writer))
+        session.pending_acks.update(range(10))
+        entered, release, caller_returned = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        async def drain():
+            entered.set()
+            await release.wait()
+        writer.drain.side_effect = drain
+        async def application():
+            await session.handle_packet(self.ack_envelope(session))
+            caller_returned.set()
+            await asyncio.Future()
+        caller = asyncio.create_task(application())
+        await asyncio.wait_for(entered.wait(), 1)
+        await asyncio.wait_for(caller_returned.wait(), 1)
+        owner = session._ack_task
+        self.assertIsNot(caller, owner)
+        caller.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await caller
+        self.assertFalse(owner.done())
+        release.set()
+        await owner
+        self.assertEqual(set(), session.pending_acks)
+
     async def test_successful_ack_send_removes_only_its_snapshot_within_same_generation(self):
         writer = self.writer()
         session = self.session(self.connection(writer))
         original = set(range(10))
         session.pending_acks.update(original)
-        entered, release = asyncio.Event(), asyncio.Event()
+        entered, release, tail_entered, tail_release = (asyncio.Event() for _ in range(4))
         sent = []
         async def drain():
-            entered.set()
-            await release.wait()
+            if len(sent) == 1:
+                entered.set()
+                await release.wait()
+            else:
+                tail_entered.set()
+                await tail_release.wait()
         def pack(message, *args):
             self.assertIsInstance(message.body, raw.types.MsgsAck)
             sent.append(set(message.body.msg_ids))
@@ -1589,15 +1910,19 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         packet = Message(MsgContainer([]), 1, 0, 0)
         with patch.object(sdk.mtproto, 'unpack', return_value=packet), \
              patch.object(sdk.mtproto, 'pack', side_effect=pack):
-            task = asyncio.create_task(session.handle_packet(b'fixture', session.connection))
+            await session.handle_packet(b'fixture', session.connection)
             await asyncio.wait_for(entered.wait(), 1)
+            owner = session._ack_task
             new_ids = {999, 1000}
             session.pending_acks.update(new_ids)
             release.set()
-            await task
-        self.assertEqual([original], sent)
-        self.assertEqual(new_ids, session.pending_acks)
-        writer.write.assert_called_once_with(b'data')
-        writer.drain.assert_awaited_once()
+            await asyncio.wait_for(tail_entered.wait(), 1)
+            self.assertEqual(new_ids, session.pending_acks)  # Only the first successful snapshot was removed.
+            tail_release.set()
+            await owner
+        self.assertEqual([original, new_ids], sent)
+        self.assertEqual(set(), session.pending_acks)
+        self.assertEqual(2, writer.write.call_count)
+        self.assertEqual(2, writer.drain.await_count)
         self.assertTrue(session.is_started.is_set())
         self.assertEqual(0, session.transport_send_failures)
