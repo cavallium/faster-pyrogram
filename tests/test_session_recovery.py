@@ -278,7 +278,7 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         session = self.session()
         old = session.connection
         session.connection = self.connection()
-        session.stop, session.start = AsyncMock(), AsyncMock()
+        session.stop, session.start = AsyncMock(wraps=session.stop), AsyncMock()
         self.assertEqual((0, 0), (session.transport_send_failures, session.restart_requests_ignored))
         await session.restart(old)
         session._state = sdk.SessionState.STARTING
@@ -426,28 +426,714 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(session.is_started.is_set())
         self.assertEqual(0, session.transport_send_failures)
 
-    async def test_starting_send_failure_uses_existing_unqualified_start_recovery(self):
-        connection = self.connection()
-        session = self.session(connection)
+    def bootstrap_session(self):
+        session = self.session()
         session._state = sdk.SessionState.STOPPED
         session.is_started.clear()
-        connection.connect = AsyncMock()
-        connection.recv = AsyncMock(side_effect=lambda: asyncio.Future())
-        async def recv():
-            await asyncio.Future()
-        connection.recv.side_effect = recv
+        connection = SimpleNamespace(connect=AsyncMock(), close=AsyncMock())
         session.client.connection_factory = Mock(return_value=connection)
-        session.restart = AsyncMock()
-        with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+        session.client.init_connection_params = None
+        session.client.storage = SimpleNamespace(api_id=AsyncMock(return_value=123))
+        for key in ('app_version', 'device_model', 'system_version', 'system_lang_code', 'lang_pack', 'lang_code'):
+            setattr(session.client, key, 'fixture')
+        async def worker():
+            await asyncio.Future()
+        session.recv_worker = worker
+        session.ping_worker = worker
+        session.send = AsyncMock(return_value='success')
+        return session, connection
+
+    async def test_actual_bootstrap429_keeps_deadline_and_adds_owned_backoff(self):
+        session, _ = self.bootstrap_session()
+        del session.send
+        del session.recv_worker
+        virtual = 0
+        connects, delays, connections = [], [], []
+        original_wait_for, original_sleep = asyncio.wait_for, asyncio.sleep
+        received = asyncio.Event()
+        def factory(**kwargs):
+            queue = asyncio.Queue()
+            transport = self.connection().protocol
+            async def connect():
+                connects.append(virtual)
+                if len(connects) == 4:
+                    raise ValueError('end controlled attempts')
+            async def send(payload):
+                self.assertIsInstance(payload, bytes)  # Actual mtproto.pack and executor.
+                queue.put_nowait((-429).to_bytes(4, 'little', signed=True))
+            async def recv():
+                value = await queue.get()
+                received.set()
+                return value
+            async def close():
+                queue.put_nowait(None)
+            connection = SimpleNamespace(connect=connect, send=send, recv=recv,
+                close=AsyncMock(side_effect=close), protocol=transport)
+            connections.append(connection)
+            return connection
+        session.client.connection_factory = factory
+        async def wait_for(operation, timeout):
+            nonlocal virtual
+            self.assertEqual(2, timeout)
+            waiter = asyncio.create_task(operation)
+            try:
+                await original_wait_for(received.wait(), 1)
+                received.clear()
+                self.assertTrue(session.recv_task.done())
+                self.assertEqual(1, len(session.results))
+                self.assertFalse(next(iter(session.results.values())).event.is_set())
+                virtual += timeout
+                raise asyncio.TimeoutError
+            finally:
+                waiter.cancel()
+                await asyncio.gather(waiter, return_exceptions=True)
+        async def sleep(delay):
+            nonlocal virtual
+            self.assertIsNone(session.recv_task)
+            self.assertEqual({}, session.results)
+            connections[-1].close.assert_awaited_once()
+            delays.append(delay)
+            virtual += delay
+            await original_sleep(0)
+        with patch.object(sdk.asyncio, 'wait_for', side_effect=wait_for), patch.object(sdk.asyncio, 'sleep', side_effect=sleep):
+            with self.assertRaisesRegex(ValueError, 'end controlled attempts'):
+                await session.start()
+        self.assertEqual([0, 3, 7, 13], connects)
+        self.assertEqual([1, 2, 4], delays)
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        self.assertEqual(3, len(self.loop.tasks))  # Receive owners only; no queued restart.
+        self.assertEqual({}, session.results)
+
+    async def test_bootstrap_owned_backoff_recovers_and_resets(self):
+        session, connection = self.bootstrap_session()
+        delays = []
+        async def sleep(delay):
+            self.assertEqual(sdk.SessionState.STOPPED, session.state)
+            self.assertTrue(session.recv_task is None)
+            self.assertGreater(connection.close.await_count, 0)
+            delays.append(delay)
+        session.send.side_effect = [OSError('failed')] * 6 + ['ping', 'init']
+        with patch.object(sdk.asyncio, 'sleep', side_effect=sleep):
             await session.start()
-        await self.wait_until(lambda: session.restart.await_count == 1)
-        session.restart.assert_awaited_once_with()
-        self.assertEqual(sdk.SessionState.STARTING, session.state)
+        self.assertEqual([1, 2, 4, 8, 15, 15], delays)
+        self.assertEqual(7, connection.connect.await_count)
+        self.assertTrue(session.is_started.is_set())
+        self.assertEqual(sdk.SessionState.STARTED, session.state)
+        self.assertTrue(all(call.kwargs['timeout'] == 2 for call in session.send.await_args_list))
+        await session.stop()
+        delays.clear()
+        session.send.side_effect = [OSError('again'), 'ping', 'init']
+        with patch.object(sdk.asyncio, 'sleep', side_effect=sleep):
+            await session.start()
+        self.assertEqual([1], delays)
+        await session.stop()
+
+    async def test_bootstrap_flood_wait_is_minimum(self):
+        for error in (sdk.FloodWait(12), sdk.FloodPremiumWait(20)):
+            session, connection = self.bootstrap_session()
+            session.send.side_effect = [error, 'ping', 'init']
+            with patch.object(sdk.asyncio, 'sleep', new_callable=AsyncMock) as sleep:
+                await session.start()
+            sleep.assert_awaited_once_with(error.value)
+            await session.stop()
+
+    async def test_cancel_connect_ping_init_and_backoff_cleans_and_can_restart(self):
+        for phase in ('connect', 'ping', 'init', 'backoff'):
+            with self.subTest(phase=phase):
+                session, connection = self.bootstrap_session()
+                entered = asyncio.Event()
+                async def block(*args, **kwargs):
+                    entered.set()
+                    await asyncio.Future()
+                if phase == 'connect':
+                    connection.connect.side_effect = block
+                elif phase in ('ping', 'init'):
+                    async def send(query, **kwargs):
+                        if phase == 'ping' or isinstance(query, raw.functions.InvokeWithLayer):
+                            await block()
+                    session.send.side_effect = send
+                else:
+                    session.send.side_effect = OSError('failed')
+                with patch.object(sdk.asyncio, 'sleep', side_effect=block) if phase == 'backoff' else patch.object(session, 'RETRY_DELAY', 1):
+                    task = asyncio.create_task(session.start())
+                    await asyncio.wait_for(entered.wait(), 1)
+                    task.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await task
+                self.assertEqual(sdk.SessionState.STOPPED, session.state)
+                self.assertFalse(session.is_started.is_set())
+                self.assertIsNone(session.recv_task)
+                self.assertIsNone(session.ping_task)
+                connection.close.assert_awaited()
+                connection.connect.side_effect = None
+                session.send.side_effect = None
+                await session.start()
+                self.assertTrue(session.is_started.is_set())
+                await session.stop()
+
+    async def test_stop_during_backoff_does_not_resurrect(self):
+        session, connection = self.bootstrap_session()
+        entered = asyncio.Event()
+        async def sleep(delay):
+            entered.set()
+            await asyncio.Future()
+        session.send.side_effect = OSError('failed')
+        with patch.object(sdk.asyncio, 'sleep', side_effect=sleep):
+            task = asyncio.create_task(session.start())
+            await asyncio.wait_for(entered.wait(), 1)
+            await session.stop()
+        self.assertTrue(task.cancelled())
+        self.assertEqual(1, connection.connect.await_count)
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        session.send.side_effect = None
+        await session.restart()  # A new explicit intent may reconnect after stop.
+        self.assertTrue(session.is_started.is_set())
+        await session.stop()
+
+    async def test_stop_invalidates_qualified_restart_while_close_blocked(self):
+        session, connection = self.bootstrap_session()
+        await session.start()
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def close():
+            entered.set()
+            await release.wait()
+        connection.close.side_effect = close
+        task = asyncio.create_task(session.restart(connection))
+        await asyncio.wait_for(entered.wait(), 1)
+        stop = asyncio.create_task(session.stop())
+        await self.wait_until(lambda: session._run_generation == 2)
+        release.set()
+        await asyncio.gather(task, stop)
+        self.assertEqual(1, connection.connect.await_count)
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
         self.assertFalse(session.is_started.is_set())
-        self.assertEqual(1, session.transport_send_failures)
-        self.assertEqual(0, session.restart_requests_ignored)
-        session.recv_task.cancel()
-        await asyncio.gather(session.recv_task, return_exceptions=True)
+
+    async def test_fatal_bootstrap_auth_and_transport404_cleanup(self):
+        for error in (sdk.AuthKeyDuplicated('fixture'), sdk.Unauthorized('fixture')):
+            session, connection = self.bootstrap_session()
+            session.send.side_effect = error
+            with self.assertRaises(type(error)):
+                await session.start()
+            self.assertEqual(sdk.SessionState.STOPPED, session.state)
+            connection.close.assert_awaited_once()
+        session, connection = self.bootstrap_session()
+        async def recv():
+            raise sdk.AuthKeyNotFound('404')
+        session.recv_worker = recv
+        async def send(*args, **kwargs):
+            await asyncio.sleep(0)
+            raise TimeoutError('bootstrap')
+        session.send.side_effect = send
+        with self.assertRaises(sdk.AuthKeyNotFound):
+            await session.start()
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+
+    async def test_concurrent_start_during_backoff_does_not_take_ownership(self):
+        session, connection = self.bootstrap_session()
+        entered = asyncio.Event()
+        async def sleep(delay):
+            entered.set()
+            await asyncio.Future()
+        session.send.side_effect = OSError('failed')
+        with patch.object(sdk.asyncio, 'sleep', side_effect=sleep):
+            task = asyncio.create_task(session.start())
+            await asyncio.wait_for(entered.wait(), 1)
+            generation = session._run_generation
+            await session.start()
+            self.assertEqual(generation, session._run_generation)
+            self.assertIsNot(task, session._start_task)
+            self.assertFalse(session._start_task.done())
+            await asyncio.gather(session.stop(), session.stop())
+        self.assertTrue(task.cancelled())
+        self.assertEqual(1, connection.connect.await_count)
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+
+    async def test_manual_restart_cannot_override_stop_during_close(self):
+        session, connection = self.bootstrap_session()
+        await session.start()
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def close():
+            entered.set()
+            await release.wait()
+        connection.close.side_effect = close
+        restart = asyncio.create_task(session.restart())
+        await asyncio.wait_for(entered.wait(), 1)
+        stop = asyncio.create_task(session.stop())
+        await self.wait_until(lambda: session._run_generation == 3)
+        release.set()
+        await asyncio.gather(restart, stop)
+        self.assertEqual(1, connection.connect.await_count)
+        self.assertFalse(session.is_started.is_set())
+
+    async def test_stop_during_failed_attempt_close_joins_before_return(self):
+        session, connection = self.bootstrap_session()
+        session.send.side_effect = OSError('failed')
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def close():
+            entered.set()
+            await release.wait()
+        connection.close.side_effect = close
+        start = asyncio.create_task(session.start())
+        await asyncio.wait_for(entered.wait(), 1)
+        stop = asyncio.create_task(session.stop())
+        await self.wait_until(session._start_task.cancelling)
+        self.assertFalse(stop.done())
+        release.set()
+        await stop
+        self.assertTrue(start.cancelled())
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        self.assertEqual(1, connection.connect.await_count)
+        self.assertIsNone(session.recv_task)
+
+    async def test_stop_cancels_ping_before_waiting_for_transport_close_lock(self):
+        connection = self.connection(self.writer())
+        session = self.session(connection)
+        entered = asyncio.Event()
+        async def ping():
+            async with connection.protocol.lock:
+                entered.set()
+                await asyncio.Future()
+        session.ping_task = asyncio.create_task(ping())
+        await asyncio.wait_for(entered.wait(), 1)
+        ping_task = session.ping_task
+        await asyncio.wait_for(session.stop(), 1)
+        self.assertTrue(ping_task.cancelled())
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+
+    async def test_factory_failure_is_owned_and_retries_without_stale_connection(self):
+        session, connection = self.bootstrap_session()
+        session.client.connection_factory.side_effect = [OSError('factory failed'), connection]
+        with patch.object(sdk.asyncio, 'sleep', new_callable=AsyncMock) as sleep:
+            await session.start()
+        sleep.assert_awaited_once_with(1)
+        self.assertTrue(session.is_started.is_set())
+        self.assertEqual(1, connection.connect.await_count)
+        await session.stop()
+
+    async def test_disconnect_callback_can_stop_retry_and_qualified_restart(self):
+        for bootstrap in (False, True):
+            session, connection = self.bootstrap_session()
+            async def disconnected(client, current):
+                self.assertFalse(current._lifecycle_lock.locked())
+                self.assertEqual(sdk.SessionState.STOPPED, current.state)
+                await current.stop()
+            session.client.disconnect_handler = AsyncMock(side_effect=disconnected)
+            if bootstrap:
+                session.send.side_effect = OSError('failed')
+                await asyncio.wait_for(session.start(), 1)
+            else:
+                await session.start()
+                await asyncio.wait_for(session.restart(connection), 1)
+            session.client.disconnect_handler.assert_awaited_once_with(session.client, session)
+            self.assertEqual(1, connection.connect.await_count)
+            self.assertFalse(session.is_started.is_set())
+
+    async def test_fatal_receive_remains_visible_to_stop_and_qualified_restart(self):
+        for restart in (False, True):
+            session, connection = self.bootstrap_session()
+            await session.start()
+            session.recv_task.cancel()
+            await asyncio.gather(session.recv_task, return_exceptions=True)
+            async def fatal():
+                raise sdk.AuthKeyNotFound('404')
+            session.recv_task = asyncio.create_task(fatal())
+            await asyncio.sleep(0)
+            with self.assertRaises(sdk.AuthKeyNotFound):
+                if restart:
+                    await session.restart(connection)
+                else:
+                    await session.stop()
+            self.assertEqual(1, connection.connect.await_count)
+            self.assertEqual(sdk.SessionState.STOPPED, session.state)
+            self.assertIsNone(session.connection)
+
+    async def test_delayed_unpack_cannot_mutate_stopped_session_without_replacement(self):
+        old = self.connection()
+        session = self.session(old)
+        response = session.results[123] = sdk.Result()
+        packet = Message(raw.types.Pong(msg_id=123, ping_id=1), 10, 1, 0)
+        unpack, entered, release = self.blocked_crypto(packet)
+        with patch.object(sdk.mtproto, 'unpack', side_effect=unpack):
+            task = asyncio.create_task(session.handle_packet(b'fixture', old))
+            await asyncio.wait_for(entered.wait(), 1)
+            await session.stop()
+            self.assertIsNone(session.connection)
+            release.set()
+            await task
+        self.assertEqual([], session.stored_msg_ids)
+        self.assertIsNone(response.value)
+        self.assertFalse(response.event.is_set())
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+
+    async def test_failed_close_is_terminal_and_preserves_bootstrap_cause(self):
+        session, connection = self.bootstrap_session()
+        bootstrap_error = OSError('bootstrap failed')
+        cleanup_error = OSError('close failed')
+        session.send.side_effect = bootstrap_error
+        connection.close.side_effect = cleanup_error
+        session.client.disconnect_handler = AsyncMock()
+        with patch.object(sdk.asyncio, 'sleep', new_callable=AsyncMock) as sleep:
+            with self.assertRaisesRegex(OSError, 'close failed') as raised:
+                await session.start()
+        self.assertIs(bootstrap_error, raised.exception.__cause__)
+        sleep.assert_not_awaited()
+        session.client.connection_factory.assert_called_once()
+        connection.connect.assert_awaited_once()
+        connection.close.assert_awaited_once()
+        session.client.disconnect_handler.assert_awaited_once()
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        self.assertIsNone(session._start_task)
+        self.assertIsNone(session.connection)
+
+    async def test_stop_joins_sdk_operation_not_application_caller_lifetime(self):
+        session, connection = self.bootstrap_session()
+        entered, continued, unrelated_release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        async def connect():
+            entered.set()
+            await asyncio.Future()
+        connection.connect.side_effect = connect
+        async def application():
+            try:
+                await session.start()
+            except asyncio.CancelledError:
+                pass
+            continued.set()
+            await unrelated_release.wait()
+        caller = asyncio.create_task(application())
+        try:
+            await asyncio.wait_for(entered.wait(), 1)
+            self.assertIsNot(caller, session._start_task)
+            await asyncio.wait_for(session.stop(), 1)
+            await asyncio.wait_for(continued.wait(), 1)
+            self.assertFalse(caller.done())
+            self.assertEqual(sdk.SessionState.STOPPED, session.state)
+            self.assertIsNone(session._start_task)
+            connection.close.assert_awaited_once()
+        finally:
+            unrelated_release.set()
+            await caller
+
+    async def test_cancel_get_session_in_connect_callback_cleans_before_cache_eviction(self):
+        from pyrogram.client import Client
+        from pyrogram import client as client_module
+        for replace in (False, True):
+            with self.subTest(replace=replace):
+                session, connection = self.bootstrap_session()
+                client = session.client
+                client.storage.dc_id = AsyncMock(return_value=2)
+                client.storage.test_mode = AsyncMock(return_value=False)
+                client.sessions, client.media_sessions, client.ipv6 = {}, {}, False
+                client.get_session = AsyncMock(return_value=SimpleNamespace(auth_key=b'key'))
+                client.get_dc_option = AsyncMock(return_value=SimpleNamespace(ip_address='127.0.0.1', port=443))
+                entered = asyncio.Event()
+                replacement = object()
+                async def callback(*args):
+                    self.assertFalse(session._lifecycle_lock.locked())
+                    if replace:
+                        client.media_sessions[2] = replacement
+                    entered.set()
+                    await asyncio.Future()
+                client.connect_handler = callback
+                with patch.object(client_module, 'Session', return_value=session):
+                    caller = asyncio.create_task(Client.get_session(client, dc_id=2, is_media=True))
+                    await asyncio.wait_for(entered.wait(), 1)
+                    self.assertTrue(session.is_started.is_set())
+                    caller.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await caller
+                self.assertEqual({2: replacement} if replace else {}, client.media_sessions)
+                self.assertEqual(sdk.SessionState.STOPPED, session.state)
+                self.assertFalse(session.is_started.is_set())
+                self.assertIsNone(session.connection)
+                self.assertIsNone(session._start_task)
+                self.assertIsNone(session.recv_task)
+                self.assertIsNone(session.ping_task)
+                connection.close.assert_awaited_once()
+
+    async def test_old_connect_callback_cancellation_preserves_reentrant_new_intent(self):
+        for restart in (False, True):
+            with self.subTest(restart=restart):
+                session, old = self.bootstrap_session()
+                replacement = SimpleNamespace(connect=AsyncMock(), close=AsyncMock())
+                entered = asyncio.Event()
+                calls = 0
+                async def callback(*args):
+                    nonlocal calls
+                    calls += 1
+                    if calls > 1:
+                        return
+                    await session.stop()
+                    if restart:
+                        session.client.connection_factory.return_value = replacement
+                        await session.restart()
+                    entered.set()
+                    await asyncio.Future()
+                session.client.connect_handler = callback
+                caller = asyncio.create_task(session.start())
+                await asyncio.wait_for(entered.wait(), 1)
+                caller.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await caller
+                old.close.assert_awaited_once()
+                replacement.close.assert_not_awaited()
+                if restart:
+                    self.assertIs(replacement, session.connection)
+                    self.assertTrue(session.is_started.is_set())
+                    self.assertEqual(sdk.SessionState.STARTED, session.state)
+                else:
+                    self.assertIsNone(session.connection)
+                    self.assertEqual(sdk.SessionState.STOPPED, session.state)
+                await session.stop()
+
+    async def test_repeated_start_and_competing_stop_cancellation_cannot_interrupt_cleanup(self):
+        session, connection = self.bootstrap_session()
+        connect_entered, close_entered, close_release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        async def connect():
+            connect_entered.set()
+            await asyncio.Future()
+        async def close():
+            close_entered.set()
+            await close_release.wait()
+        connection.connect.side_effect = connect
+        connection.close.side_effect = close
+        caller = asyncio.create_task(session.start())
+        await asyncio.wait_for(connect_entered.wait(), 1)
+        owner = session._start_task
+        caller.cancel()
+        await asyncio.wait_for(close_entered.wait(), 1)
+        first_stop = asyncio.create_task(session.stop())
+        second_stop = asyncio.create_task(session.stop())
+        await self.wait_until(lambda: session._run_generation == 3)
+        for _ in range(3):
+            caller.cancel()
+            first_stop.cancel()
+            await asyncio.sleep(0)
+        self.assertFalse(owner.done())
+        self.assertFalse(second_stop.done())
+        self.assertEqual(1, owner.cancelling())
+        close_release.set()
+        for task in (caller, first_stop):
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+        await asyncio.wait_for(second_stop, 1)
+        connection.close.assert_awaited_once()
+        self.assertTrue(owner.cancelled())
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        self.assertFalse(session.is_started.is_set())
+        self.assertIsNone(session.connection)
+        self.assertIsNone(session._start_task)
+
+    async def test_competing_stop_waiters_cannot_cancel_established_close(self):
+        session, connection = self.bootstrap_session()
+        await session.start()
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def close():
+            entered.set()
+            await release.wait()
+        connection.close.side_effect = close
+        first = asyncio.create_task(session.stop())
+        await asyncio.wait_for(entered.wait(), 1)
+        second = asyncio.create_task(session.stop())
+        await self.wait_until(lambda: session._run_generation == 3)
+        for _ in range(3):
+            first.cancel()
+            await asyncio.sleep(0)
+        self.assertFalse(second.done())
+        release.set()
+        with self.assertRaises(asyncio.CancelledError):
+            await first
+        await asyncio.wait_for(second, 1)
+        connection.close.assert_awaited_once()
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        self.assertIsNone(session.connection)
+
+    async def test_get_session_callback_swallowing_cancellation_still_cleans_current_run(self):
+        from pyrogram.client import Client
+        from pyrogram import client as client_module
+        for uncancel in (False, True):
+            with self.subTest(uncancel=uncancel):
+                session, connection = self.bootstrap_session()
+                client = session.client
+                client.storage.dc_id = AsyncMock(return_value=2)
+                client.storage.test_mode = AsyncMock(return_value=False)
+                client.sessions, client.media_sessions, client.ipv6 = {}, {}, False
+                client.get_session = AsyncMock(return_value=SimpleNamespace(auth_key=b'key'))
+                client.get_dc_option = AsyncMock(return_value=SimpleNamespace(ip_address='127.0.0.1', port=443))
+                entered = asyncio.Event()
+                async def callback(*args):
+                    entered.set()
+                    try:
+                        await asyncio.Future()
+                    except asyncio.CancelledError:
+                        if uncancel:
+                            asyncio.current_task().uncancel()
+                client.connect_handler = callback
+                with patch.object(client_module, 'Session', return_value=session):
+                    caller = asyncio.create_task(Client.get_session(client, dc_id=2, is_media=True))
+                    await asyncio.wait_for(entered.wait(), 1)
+                    caller.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await caller
+                self.assertEqual({}, client.media_sessions)
+                self.assertEqual(sdk.SessionState.STOPPED, session.state)
+                self.assertFalse(session.is_started.is_set())
+                self.assertIsNone(session.connection)
+                self.assertIsNone(session._start_task)
+                self.assertIsNone(session.recv_task)
+                self.assertIsNone(session.ping_task)
+                connection.close.assert_awaited_once()
+
+    async def test_cancel_old_get_session_preserves_same_object_new_ready_starting_or_backoff_run(self):
+        from pyrogram.client import Client
+        from pyrogram import client as client_module
+        for phase in ('starting', 'backoff', 'ready'):
+            ready = phase == 'ready'
+            with self.subTest(phase=phase):
+                session, old = self.bootstrap_session()
+                client = session.client
+                client.storage.dc_id = AsyncMock(return_value=2)
+                client.storage.test_mode = AsyncMock(return_value=False)
+                client.sessions, client.media_sessions, client.ipv6 = {}, {}, False
+                client.get_session = AsyncMock(return_value=SimpleNamespace(auth_key=b'key'))
+                client.get_dc_option = AsyncMock(return_value=SimpleNamespace(ip_address='127.0.0.1', port=443))
+                entered, connecting = asyncio.Event(), asyncio.Event()
+                replacement = SimpleNamespace(connect=AsyncMock(), close=AsyncMock())
+                async def connect():
+                    connecting.set()
+                    if phase == 'starting':
+                        await asyncio.Future()
+                replacement.connect.side_effect = connect
+                new_caller = None
+                calls = 0
+                async def callback(*args):
+                    nonlocal calls, new_caller
+                    calls += 1
+                    if calls > 1:
+                        return
+                    await session.stop()
+                    client.connection_factory.return_value = replacement
+                    if phase == 'backoff':
+                        session.send.side_effect = OSError('new run retry')
+                    new_caller = asyncio.create_task(session.start())
+                    await connecting.wait()
+                    if ready:
+                        await new_caller
+                    elif phase == 'backoff':
+                        await self.wait_until(lambda: session.state == sdk.SessionState.STOPPED
+                            and session.connection is None and session._has_live_intent())
+                    entered.set()
+                    try:
+                        await asyncio.Future()
+                    except asyncio.CancelledError:
+                        asyncio.current_task().uncancel()
+                client.connect_handler = callback
+                with patch.object(client_module, 'Session', return_value=session):
+                    old_caller = asyncio.create_task(Client.get_session(client, dc_id=2, is_media=True))
+                    await asyncio.wait_for(entered.wait(), 1)
+                    old_caller.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await old_caller
+                self.assertIs(session, client.media_sessions[2])
+                self.assertIs(None if phase == 'backoff' else replacement, session.connection)
+                expected_state = {'ready': sdk.SessionState.STARTED, 'starting': sdk.SessionState.STARTING,
+                    'backoff': sdk.SessionState.STOPPED}[phase]
+                self.assertEqual(expected_state, session.state)
+                self.assertTrue(session._has_live_intent())
+                self.assertEqual(ready, session.is_started.is_set())
+                old.close.assert_awaited_once()
+                self.assertEqual(1 if phase == 'backoff' else 0, replacement.close.await_count)
+                await session.stop()
+                await asyncio.gather(new_caller, return_exceptions=True)
+
+    async def test_old_get_session_does_not_retain_invalidated_same_object_stopping_run(self):
+        from pyrogram.client import Client
+        from pyrogram import client as client_module
+        session, old = self.bootstrap_session()
+        client = session.client
+        client.storage.dc_id = AsyncMock(return_value=2)
+        client.storage.test_mode = AsyncMock(return_value=False)
+        client.sessions, client.media_sessions, client.ipv6 = {}, {}, False
+        client.get_session = AsyncMock(return_value=SimpleNamespace(auth_key=b'key'))
+        client.get_dc_option = AsyncMock(return_value=SimpleNamespace(ip_address='127.0.0.1', port=443))
+        connecting, closing, release, entered = (asyncio.Event() for _ in range(4))
+        async def connect():
+            connecting.set()
+            await asyncio.Future()
+        async def close():
+            closing.set()
+            await release.wait()
+        replacement = SimpleNamespace(connect=connect, close=AsyncMock(side_effect=close))
+        new_caller = stopping = None
+        async def callback(*args):
+            nonlocal new_caller, stopping
+            await session.stop()
+            client.connection_factory.return_value = replacement
+            new_caller = asyncio.create_task(session.start())
+            await connecting.wait()
+            stopping = asyncio.create_task(session.stop())
+            await closing.wait()
+            entered.set()
+            try:
+                await asyncio.Future()
+            except asyncio.CancelledError:
+                asyncio.current_task().uncancel()
+        client.connect_handler = callback
+        with patch.object(client_module, 'Session', return_value=session):
+            old_caller = asyncio.create_task(Client.get_session(client, dc_id=2, is_media=True))
+            await asyncio.wait_for(entered.wait(), 1)
+            self.assertEqual(sdk.SessionState.STOPPING, session.state)
+            self.assertFalse(session._has_live_intent())
+            old_caller.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await old_caller
+        self.assertEqual({}, client.media_sessions)
+        self.assertFalse(stopping.done())
+        release.set()
+        await asyncio.wait_for(stopping, 1)
+        await asyncio.gather(new_caller, return_exceptions=True)
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        self.assertIsNone(session._start_task)
+        replacement.close.assert_awaited_once()
+
+    async def test_start_operation_cancelled_before_first_step_releases_owner(self):
+        session, connection = self.bootstrap_session()
+        original = asyncio.create_task
+        def cancel_operation(coroutine):
+            task = original(coroutine)
+            if coroutine.cr_code.co_name == '_start':
+                task.cancel()
+            return task
+        with patch.object(sdk.asyncio, 'create_task', side_effect=cancel_operation):
+            with self.assertRaises(asyncio.CancelledError):
+                await session.start()
+        self.assertIsNone(session._start_task)
+        self.assertEqual(sdk.SessionState.STOPPED, session.state)
+        session.client.connection_factory.assert_not_called()
+
+    async def test_get_session_evicts_only_its_failed_cached_start(self):
+        from pyrogram.client import Client
+        from pyrogram import client as client_module
+        for cancel in (False, True):
+            for replace in (False, True):
+                for temporary in (False, True):
+                    with self.subTest(cancel=cancel, replace=replace, temporary=temporary):
+                        replacement = object()
+                        client = SimpleNamespace(storage=SimpleNamespace(dc_id=AsyncMock(return_value=2),
+                            test_mode=AsyncMock(return_value=False), auth_key=AsyncMock(return_value=b'key')),
+                            sessions={}, media_sessions={}, ipv6=False,
+                            get_dc_option=AsyncMock(return_value=SimpleNamespace(ip_address='127.0.0.1', port=443)))
+                        session = SimpleNamespace(_has_live_intent=lambda: False)
+                        error = asyncio.CancelledError() if cancel else RuntimeError('startup')
+                        async def start():
+                            if replace:
+                                client.media_sessions[2] = replacement
+                            raise error
+                        session.start = start
+                        client.get_session = AsyncMock(return_value=SimpleNamespace(auth_key=b'key'))
+                        with patch.object(client_module, 'Session', return_value=session):
+                            with self.assertRaises(type(error)):
+                                await Client.get_session(client, dc_id=2, is_media=True, temporary=temporary)
+                        self.assertEqual({2: replacement} if replace else {}, client.media_sessions)
 
     async def test_pack_oserror_is_not_counted_as_transport_send_failure(self):
         writer = self.writer()

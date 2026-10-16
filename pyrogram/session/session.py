@@ -139,6 +139,10 @@ class Session:
 
         self.is_started = asyncio.Event()
         self.restart_lock = asyncio.Lock()
+        self._lifecycle_lock = asyncio.Lock()
+        self._run_generation = 0
+        self._start_task: Optional[asyncio.Task] = None
+        self._start_generation = None
         self.transport_send_failures = 0
         self.restart_requests_ignored = 0
 
@@ -155,120 +159,250 @@ class Session:
 
             log.debug("Session state changed: %s -> %s", old_state.name, new_state.name)
 
+    def _owns_start(self, generation, connection):
+        return self._run_generation == generation and self.connection is connection
+
+    def _has_live_intent(self):
+        task = self._start_task
+        return (self.state == SessionState.STARTED and self.is_started.is_set()) or (
+            task is not None and self._start_generation == self._run_generation
+            and not task.done() and not task.cancelling()
+        )
+
+    @staticmethod
+    async def _await_task(task, *, cancel_on_cancel=False, ignore_cancelled=False):
+        """Join SDK work without forwarding repeated waiter cancellation into cleanup."""
+        cancelled = None
+        waiter = asyncio.current_task()
+        cancellation_count = waiter.cancelling()
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError as e:
+                if not task.cancelled() or waiter.cancelling() > cancellation_count:
+                    cancelled = e
+                if task.cancelled():
+                    break
+                if cancel_on_cancel and not task.cancelling():
+                    task.cancel()
+            except Exception:
+                break
+        if cancelled is not None:
+            failure = None if task.cancelled() else task.exception()
+            raise cancelled from failure
+        if ignore_cancelled and task.cancelled():
+            return
+        return task.result()
+
     async def start(self):
-        if self._state in (SessionState.STARTED, SessionState.STARTING):
+        current = asyncio.current_task()
+        if self._state in (SessionState.STARTED, SessionState.STARTING) or (
+            self._start_task is not None and self._start_generation == self._run_generation
+            and self._start_task is not current and not self._start_task.done()
+        ):
             log.debug("Session already started")
             return
 
-        await self._set_state(SessionState.STARTING)
-
-        self.connection = self.client.connection_factory(
-            dc_id=self.dc_id,
-            server_address=self.server_address,
-            port=self.port,
-            test_mode=self.test_mode,
-            proxy=self.client.proxy,
-            media=self.is_media,
-            protocol_factory=self.client.protocol_factory,
-            crypto_executor_workers=self.CRYPTO_EXECUTOR_WORKERS,
-            loop=self.client.loop
-        )
-
+        self._run_generation += 1
+        generation = self._run_generation
+        operation = asyncio.create_task(self._start(generation))
+        self._start_task = operation
+        self._start_generation = generation
         try:
-            await self.connection.connect()
+            return await self._await_task(operation, cancel_on_cancel=True)
+        except asyncio.CancelledError as cancelled:
+            # A callback may swallow the operation's cancellation, even uncancel it.
+            # The public caller still owns cancellation of this particular run.
+            async def stop_current():
+                if self._run_generation == generation:
+                    await self.stop()
+            if self._run_generation == generation:
+                try:
+                    await self._await_task(asyncio.create_task(stop_current()))
+                except Exception as cleanup_error:
+                    raise cancelled from cleanup_error
+            raise
+        finally:
+            if self._start_task is operation and operation.done():
+                self._start_task = None
+                self._start_generation = None
 
-            self.recv_task = self.client.loop.create_task(self.recv_worker())
-
-            await self.send(raw.functions.Ping(ping_id=0), timeout=self.START_TIMEOUT)
-
-            init_connection_params = self.client.init_connection_params
-
-            if isinstance(init_connection_params, dict):
-                init_connection_params = utils.obj_to_jsonvalue(init_connection_params)
-
-            if not self.is_cdn:
-                await self.send(
-                    raw.functions.InvokeWithLayer(
-                        layer=layer,
-                        query=raw.functions.InitConnection(
-                            api_id=await self.client.storage.api_id(),
-                            app_version=self.client.app_version,
-                            device_model=self.client.device_model,
-                            system_version=self.client.system_version,
-                            system_lang_code=self.client.system_lang_code,
-                            lang_pack=self.client.lang_pack,
-                            lang_code=self.client.lang_code,
-                            query=raw.functions.help.GetConfig(),
-                            params=init_connection_params,
+    async def _start(self, generation):
+        owner = asyncio.current_task()
+        connection = None
+        delay = self.RETRY_DELAY
+        try:
+            while self._run_generation == generation:
+                error = None
+                cleanup_failed = False
+                async with self._lifecycle_lock:
+                    if self._run_generation != generation:
+                        return
+                    await self._set_state(SessionState.STARTING)
+                    connection = self.connection = None
+                    try:
+                        connection = self.connection = self.client.connection_factory(
+                            dc_id=self.dc_id,
+                            server_address=self.server_address,
+                            port=self.port,
+                            test_mode=self.test_mode,
+                            proxy=self.client.proxy,
+                            media=self.is_media,
+                            protocol_factory=self.client.protocol_factory,
+                            crypto_executor_workers=self.CRYPTO_EXECUTOR_WORKERS,
+                            loop=self.client.loop
                         )
-                    ),
-                    timeout=self.START_TIMEOUT
-                )
 
-            self.ping_task = self.client.loop.create_task(self.ping_worker())
+                        await connection.connect()
 
-            log.info(
-                "Session initialized: Pyrogram v%s (Layer %s)", pyrogram.__version__, layer
-            )
-            log.info("Device: %s - %s", self.client.device_model, self.client.app_version)
-            log.info("System: %s (%s)", self.client.system_version, self.client.lang_code)
-        except (AuthKeyDuplicated, Unauthorized) as e:
-            await self.stop()
-            raise e
-        except (OSError, RPCError) as e:
-            log.info("Restarting session due to - %s - %s", e.__class__.__name__, e)
-            self.client.loop.create_task(self.restart())
-            return
-        except Exception as e:
-            await self.stop()
-            raise e
+                        if not self._owns_start(generation, connection):
+                            raise asyncio.CancelledError
+                        self.recv_task = self.client.loop.create_task(self.recv_worker())
 
-        await self._set_state(SessionState.STARTED)
-        self.is_started.set()
+                        await self.send(raw.functions.Ping(ping_id=0), timeout=self.START_TIMEOUT)
 
-        log.info("Session started")
+                        if not self._owns_start(generation, connection):
+                            raise asyncio.CancelledError
+                        init_connection_params = self.client.init_connection_params
 
-        if callable(self.client.connect_handler):
-            try:
-                await self.client.connect_handler(self.client, self)
-            except Exception as e:
-                log.exception(e)
+                        if isinstance(init_connection_params, dict):
+                            init_connection_params = utils.obj_to_jsonvalue(init_connection_params)
 
-    async def stop(self):
-        if self._state in (SessionState.STOPPED, SessionState.STOPPING):
-            log.debug("Session already stopped")
-            return
+                        if not self.is_cdn:
+                            api_id = await self.client.storage.api_id()
+                            if not self._owns_start(generation, connection):
+                                raise asyncio.CancelledError
+                            await self.send(
+                                raw.functions.InvokeWithLayer(
+                                    layer=layer,
+                                    query=raw.functions.InitConnection(
+                                        api_id=api_id,
+                                        app_version=self.client.app_version,
+                                        device_model=self.client.device_model,
+                                        system_version=self.client.system_version,
+                                        system_lang_code=self.client.system_lang_code,
+                                        lang_pack=self.client.lang_pack,
+                                        lang_code=self.client.lang_code,
+                                        query=raw.functions.help.GetConfig(),
+                                        params=init_connection_params,
+                                    )
+                                ),
+                                timeout=self.START_TIMEOUT
+                            )
 
-        await self._set_state(SessionState.STOPPING)
+                        if not self._owns_start(generation, connection):
+                            raise asyncio.CancelledError
+                        self.ping_task = self.client.loop.create_task(self.ping_worker())
 
-        self.ignore_count = 0
+                        log.info(
+                            "Session initialized: Pyrogram v%s (Layer %s)", pyrogram.__version__, layer
+                        )
+                        log.info("Device: %s - %s", self.client.device_model, self.client.app_version)
+                        log.info("System: %s (%s)", self.client.system_version, self.client.lang_code)
+                        await self._set_state(SessionState.STARTED)
+                        if not self._owns_start(generation, connection):
+                            raise asyncio.CancelledError
+                        self.is_started.set()
+                        log.info("Session started")
+                    except BaseException as e:
+                        error = e
+                        try:
+                            failure = await self._teardown()
+                            if failure is not None and not isinstance(error, asyncio.CancelledError):
+                                error = failure
+                        except asyncio.CancelledError as cleanup_cancelled:
+                            error = cleanup_cancelled
+                        except Exception as cleanup_error:
+                            cleanup_error.__cause__ = error
+                            error = cleanup_error
+                            cleanup_failed = True
 
-        self.is_started.clear()
+                if error is None:
+                    break
+                await self._notify_stopped()
+                if cleanup_failed or isinstance(error, (AuthKeyDuplicated, Unauthorized)) or not isinstance(error, (OSError, RPCError)):
+                    raise error
+                if self._run_generation != generation:
+                    return
+                wait = max(delay, error.value if isinstance(error, (FloodWait, FloodPremiumWait)) else 0)
+                log.info("Session bootstrap retry in %s s: dc_id=%s primary=%s (%s)",
+                         wait, self.dc_id, getattr(self.client, "session", None) is self,
+                         error.__class__.__name__)
+                await asyncio.sleep(wait)
+                delay = min(delay * 2, self.WAIT_TIMEOUT)
+            if self._run_generation == generation and self.is_started.is_set() and callable(self.client.connect_handler):
+                try:
+                    await self.client.connect_handler(self.client, self)
+                except Exception as e:
+                    log.exception(e)
+        except BaseException:
+            # The connect callback is part of startup too. Never tear down a newer intent.
+            if self.state != SessionState.STOPPED and self._owns_start(generation, connection):
+                async with self._lifecycle_lock:
+                    if self._owns_start(generation, connection):
+                        await self._teardown()
+                await self._notify_stopped()
+            raise
+        finally:
+            if self._start_task is owner:
+                self._start_task = None
+                self._start_generation = None
 
-        self.stored_msg_ids.clear()
-
-        self.ping_task_event.set()
-
-        if self.ping_task is not None:
-            await self.ping_task
-
-        self.ping_task_event.clear()
-
-        await self.connection.close()
-
-        if self.recv_task:
-            await self.recv_task
-            self.recv_task = None
-
-        await self._set_state(SessionState.STOPPED)
-
+    async def _notify_stopped(self):
         log.info("Session stopped")
-
         if callable(self.client.disconnect_handler):
             try:
                 await self.client.disconnect_handler(self.client, self)
             except Exception as e:
                 log.exception(e)
+
+    async def _teardown(self):
+        """Close the attempt while its caller owns the lifecycle lock."""
+        await self._set_state(SessionState.STOPPING)
+        self.is_started.clear()
+        self.ignore_count = 0
+        self.stored_msg_ids.clear()
+        self.ping_task_event.set()
+        tasks = [task for task in (self.ping_task, self.recv_task)
+                 if task is not None and task is not asyncio.current_task()]
+        connection = self.connection
+
+        async def close_attempt():
+            # A ping may own the transport send lock that close also needs.
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            try:
+                if connection is not None:
+                    await connection.close()
+            finally:
+                outcomes = await asyncio.gather(*tasks, return_exceptions=True)
+                self.ping_task = self.recv_task = None
+                if self.connection is connection:
+                    self.connection = None
+                self.ping_task_event.clear()
+                await self._set_state(SessionState.STOPPED)
+            return next((value for value in outcomes if isinstance(value, AuthKeyNotFound)), None)
+
+        cleanup = asyncio.create_task(close_attempt())
+        return await self._await_task(cleanup)
+
+    async def stop(self):
+        self._run_generation += 1
+        generation = self._run_generation
+        self.is_started.clear()
+        owner = self._start_task
+        if owner is not None and owner is not asyncio.current_task() and not owner.done():
+            if not owner.cancelling():
+                owner.cancel()
+            await self._await_task(owner, ignore_cancelled=True)
+        async with self._lifecycle_lock:
+            if self._run_generation != generation or self._state == SessionState.STOPPED:
+                return
+            failure = await self._teardown()
+        await self._notify_stopped()
+        if failure is not None:
+            raise failure
 
     async def restart(self, expected_connection: Optional[Connection] = None):
         async with self.restart_lock:
@@ -277,11 +411,22 @@ class Session:
             ):
                 self.restart_requests_ignored += 1
                 return
+            generation = self._run_generation
             if self.stored_msg_ids:
-               self.recent_msg_ids = self.stored_msg_ids[:30]
-
-            await self.stop()
-            await self.start()
+                self.recent_msg_ids = self.stored_msg_ids[:30]
+            if expected_connection is None:
+                generation += 1  # The increment performed by our own stop, not a later external stop.
+                await self.stop()
+            else:
+                async with self._lifecycle_lock:
+                    if self._run_generation != generation:
+                        return
+                    failure = await self._teardown()
+                await self._notify_stopped()
+                if failure is not None:
+                    raise failure
+            if self._run_generation == generation:
+                await self.start()
 
     async def handle_packet(self, packet, connection: Optional[Connection] = None):
         connection = self.connection if connection is None else connection

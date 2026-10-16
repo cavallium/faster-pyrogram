@@ -1397,7 +1397,12 @@ class Client(Methods):
         if not temporary:
             sessions[dc_id] = session
 
-        await session.start()
+        try:
+            await session.start()
+        except BaseException:
+            if not temporary and sessions.get(dc_id) is session and not session._has_live_intent():
+                del sessions[dc_id]
+            raise
 
         if not is_current_dc and export_authorization:
             for _ in range(3):
