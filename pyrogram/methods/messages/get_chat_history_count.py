@@ -16,8 +16,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from typing import Union
 
 import pyrogram
 from pyrogram import raw
@@ -26,16 +27,13 @@ log = logging.getLogger(__name__)
 
 
 class GetChatHistoryCount:
-    async def get_chat_history_count(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str]
-    ) -> int:
+    async def get_chat_history_count(self: pyrogram.Client, chat_id: int | str) -> int:
         """Get the total count of messages in a chat.
 
         .. note::
 
             Due to Telegram latest internal changes, the server can't reliably find anymore the total count of messages
-            a **private** or a **basic group** chat has with a single method call. To overcome this limitation, Pyrogram
+            a **private** or a **basic group** chat has with a single method call. To overcome this limitation, Kurigram
             has to iterate over all the messages. Channels and supergroups are not affected by this limitation.
 
         .. include:: /_includes/usable-by/users.rst
@@ -53,20 +51,31 @@ class GetChatHistoryCount:
                 await app.get_chat_history_count(chat_id)
         """
 
-        r = await self.invoke(
-            raw.functions.messages.GetHistory(
-                peer=await self.resolve_peer(chat_id),
-                offset_id=0,
-                offset_date=0,
-                add_offset=0,
-                limit=1,
-                max_id=0,
-                min_id=0,
-                hash=0
-            )
-        )
+        peer = await self.resolve_peer(chat_id)
 
-        if isinstance(r, raw.types.messages.Messages):
-            return len(r.messages)
-        else:
-            return r.count
+        # https://t.me/tdlibchat/189410
+        ranges = await self.get_message_split_ranges()
+        total = 0
+
+        for split_range in ranges:
+            r = await self.invoke(
+                raw.functions.InvokeWithMessagesRange(
+                    range=split_range,
+                    query=raw.functions.messages.GetHistory(
+                        peer=peer,
+                        offset_id=0,
+                        offset_date=0,
+                        add_offset=0,
+                        limit=1,
+                        max_id=0,
+                        min_id=0,
+                        hash=0,
+                    ),
+                )
+            )
+            if isinstance(r, raw.types.messages.Messages):
+                total += len(r.messages)
+            else:
+                total += r.count
+
+        return total

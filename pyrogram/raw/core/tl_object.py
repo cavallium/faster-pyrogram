@@ -16,38 +16,54 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from io import BytesIO
+from __future__ import annotations as _annotations
+
 from json import dumps
-from typing import cast, List, Any, Union, Dict
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from ..all import objects
 
+if TYPE_CHECKING:
+    from io import BytesIO
 
-class TLObject:
-    __slots__: List[str] = []
+ReturnType = TypeVar("ReturnType")
+
+
+class TLObject(Generic[ReturnType]):
+    __slots__: list[str] = []
 
     QUALNAME = "Base"
 
+    # `b` is positional-only so subclasses may keep their own parameter names;
+    #  no call site passes it by keyword.
     @classmethod
-    def read(cls, b: BytesIO, *args: Any) -> Any:
-        return cast(TLObject, objects[int.from_bytes(b.read(4), "little")]).read(b, *args)
+    def read(cls, b: BytesIO, /, *args: Any) -> Any:
+        return cast("TLObject", objects[int.from_bytes(b.read(4), "little")]).read(b, *args)
 
     def write(self, *args: Any) -> bytes:
-        pass
+        raise NotImplementedError
 
     @staticmethod
-    def default(obj: "TLObject") -> Union[str, Dict[str, str]]:
+    def default(obj: TLObject) -> str | dict[str, str]:
         if isinstance(obj, bytes):
             return repr(obj)
 
-        return {
-            "_": obj.QUALNAME,
-            **{
-                attr: getattr(obj, attr)
-                for attr in obj.__slots__
-                if getattr(obj, attr) is not None
-            }
-        }
+        attributes_to_mask = {"code", "phone", "token", "autologin_token", "logout_tokens"}
+
+        filtered_attributes = {}
+
+        for attr in obj.__slots__:
+            value = getattr(obj, attr)
+
+            if value is None:
+                continue
+
+            if attr in attributes_to_mask:
+                filtered_attributes[attr] = "*" * 9
+            else:
+                filtered_attributes[attr] = value
+
+        return {"_": obj.QUALNAME, **filtered_attributes}
 
     def __str__(self) -> str:
         return dumps(self, indent=4, default=TLObject.default, ensure_ascii=False)
@@ -62,10 +78,12 @@ class TLObject:
                 f"{attr}={repr(getattr(self, attr))}"
                 for attr in self.__slots__
                 if getattr(self, attr) is not None
-            )
+            ),
         )
 
-    def __eq__(self, other: Any) -> bool:
+    # `other` is positional-only to match `bytes.__eq__`/`list.__eq__`, which the
+    #  primitives multiply inherit alongside this class.
+    def __eq__(self, other: object, /) -> bool:
         for attr in self.__slots__:
             try:
                 if getattr(self, attr) != getattr(other, attr):
@@ -75,8 +93,13 @@ class TLObject:
 
         return True
 
+    # Equality is by mutable attribute value (see `__eq__` above), so a stable hash across
+    #  the object's lifetime cannot be guaranteed. Declared explicitly rather than relying on
+    #  the implicit `__hash__ = None` Python already applies when `__eq__` is defined alone.
+    __hash__ = None
+
     def __len__(self) -> int:
         return len(self.write())
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        pass
+    def __call__(self, *args: Any, **kwargs: Any) -> ReturnType:
+        raise NotImplementedError

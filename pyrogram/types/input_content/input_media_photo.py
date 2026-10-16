@@ -16,11 +16,27 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, List, Union, BinaryIO
+from __future__ import annotations as _annotations
+
+import io
+import os
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
+
+import pyrogram
+from pyrogram import raw, utils
+from pyrogram.file_id import FileType
 
 from .input_media import InputMedia
-from ..messages_and_media import MessageEntity
-from ... import enums
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pyrogram._typing import PathType
+
+    from ... import enums
+    from ..messages_and_media import MessageEntity
 
 
 class InputMediaPhoto(InputMedia):
@@ -28,7 +44,7 @@ class InputMediaPhoto(InputMedia):
     It is intended to be used with :obj:`~pyrogram.Client.send_media_group`.
 
     Parameters:
-        media (``str`` | ``BinaryIO``):
+        media (``str`` | ``os.PathLike`` | ``BinaryIO``):
             Photo to send.
             Pass a file_id as string to send a photo that exists on the Telegram servers or
             pass a file path as string to upload a new photo that exists on your local machine or
@@ -48,16 +64,80 @@ class InputMediaPhoto(InputMedia):
 
         has_spoiler (``bool``, *optional*):
             Pass True if the photo needs to be covered with a spoiler animation.
+
+    Raises:
+        FileNotFoundError: In case a local ``os.PathLike`` doesn't point to an existing file.
     """
 
     def __init__(
         self,
-        media: Union[str, BinaryIO],
+        media: PathType | BinaryIO,
         caption: str = "",
-        parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: List[MessageEntity] = None,
-        has_spoiler: bool = None
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[MessageEntity] | None = None,
+        has_spoiler: bool | None = None,
     ):
         super().__init__(media, caption, parse_mode, caption_entities)
 
         self.has_spoiler = has_spoiler
+
+    async def write(
+        self,
+        *,
+        client: pyrogram.Client,
+        chat_id: int | str | None = None,
+        progress: Callable | None = None,
+        progress_args: tuple = (),
+        ttl_seconds: int | None = None,
+        **kwargs,
+    ) -> raw.base.InputMedia:
+        if chat_id is None:
+            peer = raw.types.InputPeerSelf()
+        else:
+            peer = await client.resolve_peer(chat_id)
+
+        if isinstance(self.media, io.BytesIO) or Path(self.media).is_file():
+            uploaded_media = await client.invoke(
+                raw.functions.messages.UploadMedia(
+                    peer=peer,
+                    media=raw.types.InputMediaUploadedPhoto(
+                        file=await client.save_file(
+                            self.media, progress=progress, progress_args=progress_args
+                        ),
+                        spoiler=self.has_spoiler,
+                        ttl_seconds=ttl_seconds,
+                    ),
+                )
+            )
+
+            return raw.types.InputMediaPhoto(
+                id=raw.types.InputPhoto(
+                    id=uploaded_media.photo.id,
+                    access_hash=uploaded_media.photo.access_hash,
+                    file_reference=uploaded_media.photo.file_reference,
+                ),
+                spoiler=self.has_spoiler,
+                ttl_seconds=ttl_seconds,
+            )
+
+        if isinstance(self.media, os.PathLike):
+            raise FileNotFoundError(f"No such file or directory: {self.media}")
+
+        # Only a `str` can name a URL or a file id; anything else was consumed or
+        #  rejected above.
+        if not isinstance(self.media, str):
+            raise TypeError(f"media must be a path, URL, or file id, got: {self.media!r}")
+
+        if re.match("^https?://", self.media):
+            return raw.types.InputMediaPhotoExternal(
+                url=self.media,
+                spoiler=self.has_spoiler,
+                ttl_seconds=ttl_seconds,
+            )
+
+        return utils.get_input_media_from_file_id(
+            self.media,
+            FileType.PHOTO,
+            has_spoiler=self.has_spoiler,
+            ttl_seconds=ttl_seconds,
+        )

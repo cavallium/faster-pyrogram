@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, List
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -25,12 +25,12 @@ from pyrogram import types
 
 class AnswerShippingQuery:
     async def answer_shipping_query(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         shipping_query_id: str,
         ok: bool,
-        shipping_options: Optional[List["types.ShippingOption"]] = None,
-        error_message: Optional[str] = None
-    ):
+        shipping_options: list[types.ShippingOption] | None = None,
+        error_message: str | None = None,
+    ) -> bool:
         """If you sent an invoice requesting a shipping address and the parameter ``is_flexible`` was specified, the API sends the confirmation in the form of an :obj:`~pyrogram.handlers.ShippingQueryHandler`.
 
         Use this method to reply to shipping queries.
@@ -44,7 +44,7 @@ class AnswerShippingQuery:
             ok (``bool``):
                 Specify True if everything is alright (goods are available, etc.) and the bot is ready to proceed with the order. Use False if there are any problems.
 
-            shipping_options (List of :obj:`~pyrogram.types.ShippingOptions`, *optional*):
+            shipping_options (List of :obj:`~pyrogram.types.ShippingOption`, *optional*):
                 Required if ok is True. A array of available shipping options.
 
             error_message (``str``, *optional*):
@@ -70,11 +70,10 @@ class AnswerShippingQuery:
         r = await self.invoke(
             raw.functions.messages.SetBotShippingResults(
                 query_id=int(shipping_query_id),
-                shipping_options=[
-                    so.write()
-                    for so in shipping_options
-                ] if shipping_options else None,
-                error=error_message
+                shipping_options=[so.write() for so in shipping_options]
+                if shipping_options
+                else None,
+                error=error_message,
             )
         )
 

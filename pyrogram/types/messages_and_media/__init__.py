@@ -1,42 +1,57 @@
-#  Pyrogram - Telegram MTProto API Client Library for Python
+#  Kurigram - Telegram MTProto API Client Library for Python
+#
 #  Copyright (C) 2017-present Dan <https://github.com/delivrance>
+#  Copyright (C) 2024-present KurimuzonAkuma <https://github.com/KurimuzonAkuma>
 #
-#  This file is part of Pyrogram.
+#  This file is part of Kurigram.
 #
-#  Pyrogram is free software: you can redistribute it and/or modify
+#  Kurigram is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Lesser General Public License as published
 #  by the Free Software Foundation, either version 3 of the License, or
 #  (at your option) any later version.
 #
-#  Pyrogram is distributed in the hope that it will be useful,
+#  Kurigram is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #  GNU Lesser General Public License for more details.
 #
 #  You should have received a copy of the GNU Lesser General Public License
-#  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+#  along with Kurigram. If not, see <https://www.gnu.org/licenses/>.
 
 from .animation import Animation
+from .auction_bid import AuctionBid
+from .auction_round import AuctionRound
+from .auction_state import AuctionState, AuctionStateActive, AuctionStateFinished
 from .audio import Audio
 from .available_effect import AvailableEffect
 from .boosts_status import BoostsStatus
 from .business_message import BusinessMessage
 from .chat_background import ChatBackground
 from .chat_boost import ChatBoost
+from .chat_has_protected_content_disable_requested import ChatHasProtectedContentDisableRequested
+from .chat_has_protected_content_toggled import ChatHasProtectedContentToggled
+from .chat_owner_changed import ChatOwnerChanged
+from .chat_owner_left import ChatOwnerLeft
 from .chat_theme import ChatTheme
 from .checked_gift_code import CheckedGiftCode
+from .checklist import Checklist
 from .checklist_task import ChecklistTask
 from .checklist_tasks_added import ChecklistTasksAdded
 from .checklist_tasks_done import ChecklistTasksDone
-from .checklist import Checklist
-from .contact_registered import ContactRegistered
+from .community_chat_added import CommunityChatAdded
+from .community_chat_joined import CommunityChatJoined
+from .community_chat_removed import CommunityChatRemoved
 from .contact import Contact
+from .contact_registered import ContactRegistered
+from .craft_gift_result import CraftGiftResult, CraftGiftResultFail, CraftGiftResultSuccess
 from .dice import Dice
 from .direct_message_price_changed import DirectMessagePriceChanged
-from .direct_topic import DirectMessagesTopic
+from .direct_messages_topic import DirectMessagesTopic
 from .document import Document
+from .ephemeral_message_parameters import EphemeralMessageParameters
 from .external_reply_info import ExternalReplyInfo
 from .fact_check import FactCheck
+from .file import File
 from .formatted_text import FormattedText
 from .forum_topic import ForumTopic
 from .forum_topic_closed import ForumTopicClosed
@@ -46,20 +61,35 @@ from .forum_topic_reopened import ForumTopicReopened
 from .game import Game
 from .general_forum_topic_hidden import GeneralForumTopicHidden
 from .general_forum_topic_unhidden import GeneralForumTopicUnhidden
-from .gift_code import GiftCode
+from .gift import Gift
+from .gift_attribute import GiftAttribute
+from .gift_auction import GiftAuction
+from .gift_auction_state import GiftAuctionState
+from .gift_collection import GiftCollection
+from .gift_purchase_limit import GiftPurchaseLimit
+from .gift_resale_parameters import GiftResaleParameters
+from .gift_resale_price import GiftResalePrice, GiftResalePriceStar, GiftResalePriceTon
 from .gift_upgrade_preview import GiftUpgradePreview
-from .invoice import Invoice
-from .link_preview_options import LinkPreviewOptions
+from .gift_upgrade_price import GiftUpgradePrice
+from .gift_upgrade_variants import GiftUpgradeVariants
+from .gifted_grams import GiftedGrams
+from .gifted_premium import GiftedPremium
+from .gifted_stars import GiftedStars
 from .giveaway import Giveaway
-from .input_checklist_task import InputChecklistTask
 from .giveaway_completed import GiveawayCompleted
 from .giveaway_created import GiveawayCreated
 from .giveaway_prize_stars import GiveawayPrizeStars
 from .giveaway_winners import GiveawayWinners
+from .input_checklist_task import InputChecklistTask
+from .invoice import Invoice
+from .link_preview_options import LinkPreviewOptions
+from .live_photo import LivePhoto
 from .location import Location
+from .managed_bot_created import ManagedBotCreated
 from .mask_position import MaskPosition
 from .media_area import MediaArea
 from .message import Message
+from .message_content import MessageContent
 from .message_entity import MessageEntity
 from .message_origin import MessageOrigin
 from .message_origin_channel import MessageOriginChannel
@@ -79,29 +109,116 @@ from .payment_option import PaymentOption
 from .payment_result import PaymentResult
 from .photo import Photo
 from .poll import Poll
-from .proximity_alert_triggered import ProximityAlertTriggered
 from .poll_option import PollOption
+from .poll_option_added import PollOptionAdded
+from .poll_option_deleted import PollOptionDeleted
+from .premium_gift_code import PremiumGiftCode
+from .proximity_alert_triggered import ProximityAlertTriggered
 from .reaction import Reaction
 from .refunded_payment import RefundedPayment
 from .reply_parameters import ReplyParameters
 from .restriction_reason import RestrictionReason
+from .rich_block import (
+    RichBlock,
+    RichBlockAnchor,
+    RichBlockAnimation,
+    RichBlockAudio,
+    RichBlockBlockQuotation,
+    RichBlockButtons,
+    RichBlockCaption,
+    RichBlockCollage,
+    RichBlockDetails,
+    RichBlockDivider,
+    RichBlockDocument,
+    RichBlockExpandableBlockQuotation,
+    RichBlockFooter,
+    RichBlockList,
+    RichBlockListItem,
+    RichBlockMap,
+    RichBlockMathematicalExpression,
+    RichBlockParagraph,
+    RichBlockPhoto,
+    RichBlockPreformatted,
+    RichBlockPullQuotation,
+    RichBlockSectionHeading,
+    RichBlockSlideshow,
+    RichBlockTable,
+    RichBlockTableCell,
+    RichBlockThinking,
+    RichBlockUnsupported,
+    RichBlockVideo,
+    RichBlockVoiceNote,
+)
+from .rich_message import RichMessage
+from .rich_text import (
+    RichText,
+    RichTextAnchor,
+    RichTextAnchorLink,
+    RichTextBankCardNumber,
+    RichTextBold,
+    RichTextTonAddress,
+    RichTextBotCommand,
+    RichTextButton,
+    RichTextCashtag,
+    RichTextCode,
+    RichTextCustomEmoji,
+    RichTextDateTime,
+    RichTextEmailAddress,
+    RichTextHashtag,
+    RichTextItalic,
+    RichTextMarked,
+    RichTextMathematicalExpression,
+    RichTextMention,
+    RichTextPhoneNumber,
+    RichTextReference,
+    RichTextReferenceLink,
+    RichTextSpoiler,
+    RichTextStrikethrough,
+    RichTextSubscript,
+    RichTextSuperscript,
+    RichTextTextMention,
+    RichTextUnderline,
+    RichTextUrl,
+)
+from .ton_wallet_transfer import TonWalletTransfer
+from .ton_connect_request import TonConnectRequest
 from .saved_credentials import SavedCredentials
 from .screenshot_taken import ScreenshotTaken
-from .gift_attribute import GiftAttribute
-from .gift import Gift
-from .gifted_premium import GiftedPremium
-from .gifted_stars import GiftedStars
+from .star_amount import StarAmount
 from .sticker import Sticker
-from .story_view import StoryView
+from .sticker_set import StickerSet
 from .story import Story
+from .story_view import StoryView
 from .stripped_thumbnail import StrippedThumbnail
 from .successful_payment import SuccessfulPayment
+from .suggested_post_approval_failed import SuggestedPostApprovalFailed
+from .suggested_post_approved import SuggestedPostApproved
+from .suggested_post_declined import SuggestedPostDeclined
+from .suggested_post_info import SuggestedPostInfo
+from .suggested_post_paid import SuggestedPostPaid
+from .suggested_post_parameters import SuggestedPostParameters
+from .suggested_post_price import SuggestedPostPrice, SuggestedPostPriceStar, SuggestedPostPriceTon
+from .suggested_post_refunded import SuggestedPostRefunded
 from .text_quote import TextQuote
 from .thumbnail import Thumbnail
+from .upgraded_gift_attribute_id import UpgradedGiftAttributeId
 from .upgraded_gift_attribute_id_backdrop import UpgradedGiftAttributeIdBackdrop
 from .upgraded_gift_attribute_id_model import UpgradedGiftAttributeIdModel
 from .upgraded_gift_attribute_id_symbol import UpgradedGiftAttributeIdSymbol
-from .upgraded_gift_attribute_id import UpgradedGiftAttributeId
+from .upgraded_gift_attribute_rarity import (
+    UpgradedGiftAttributeRarity,
+    UpgradedGiftAttributeRarityEpic,
+    UpgradedGiftAttributeRarityLegendary,
+    UpgradedGiftAttributeRarityPerMille,
+    UpgradedGiftAttributeRarityRare,
+    UpgradedGiftAttributeRarityUncommon,
+)
+from .upgraded_gift_original_details import UpgradedGiftOriginalDetails
+from .upgraded_gift_purchase_offer import (
+    UpgradedGiftPurchaseOffer,
+    UpgradedGiftPurchaseOfferRejected,
+)
+from .upgraded_gift_value_info import UpgradedGiftValueInfo
 from .venue import Venue
 from .video import Video
 from .video_note import VideoNote
@@ -109,29 +226,59 @@ from .voice import Voice
 from .web_app_data import WebAppData
 from .web_page import WebPage
 from .write_access_allowed import WriteAccessAllowed
+from .ton_connect_request_state import (
+    TonConnectRequestState,
+    TonConnectRequestStatePending,
+    TonConnectRequestStateAccepted,
+    TonConnectRequestStateRejected,
+)
 
 __all__ = [
+    "TonConnectRequestState",
+    "TonConnectRequestStatePending",
+    "TonConnectRequestStateAccepted",
+    "TonConnectRequestStateRejected",
     "Animation",
+    "AuctionBid",
+    "AuctionRound",
+    "AuctionState",
+    "AuctionStateActive",
+    "AuctionStateFinished",
     "Audio",
     "AvailableEffect",
     "BoostsStatus",
     "BusinessMessage",
     "ChatBackground",
     "ChatBoost",
+    "ChatHasProtectedContentDisableRequested",
+    "ChatHasProtectedContentToggled",
+    "ChatOwnerChanged",
+    "ChatOwnerLeft",
     "ChatTheme",
     "CheckedGiftCode",
+    "Checklist",
     "ChecklistTask",
     "ChecklistTasksAdded",
     "ChecklistTasksDone",
-    "Checklist",
-    "ContactRegistered",
+    "CommunityChatAdded",
+    "CommunityChatJoined",
+    "CommunityChatRemoved",
+    "TonWalletTransfer",
+    "TonConnectRequest",
     "Contact",
+    "StickerSet",
+    "ContactRegistered",
+    "CraftGiftResult",
+    "CraftGiftResultFail",
+    "CraftGiftResultSuccess",
     "Dice",
     "DirectMessagePriceChanged",
     "DirectMessagesTopic",
     "Document",
+    "EphemeralMessageParameters",
     "ExternalReplyInfo",
     "FactCheck",
+    "File",
     "FormattedText",
     "ForumTopic",
     "ForumTopicClosed",
@@ -141,20 +288,37 @@ __all__ = [
     "Game",
     "GeneralForumTopicHidden",
     "GeneralForumTopicUnhidden",
-    "GiftCode",
+    "Gift",
+    "GiftAttribute",
+    "GiftAuction",
+    "GiftAuctionState",
+    "GiftCollection",
+    "GiftPurchaseLimit",
+    "GiftResaleParameters",
+    "GiftResalePrice",
+    "GiftResalePriceStar",
+    "GiftResalePriceTon",
     "GiftUpgradePreview",
+    "GiftUpgradePrice",
+    "GiftUpgradeVariants",
+    "GiftedGrams",
+    "GiftedPremium",
+    "GiftedStars",
     "Giveaway",
-    "InputChecklistTask",
-    "Invoice",
-    "LinkPreviewOptions",
     "GiveawayCompleted",
     "GiveawayCreated",
     "GiveawayPrizeStars",
     "GiveawayWinners",
+    "InputChecklistTask",
+    "Invoice",
+    "LinkPreviewOptions",
+    "LivePhoto",
     "Location",
+    "ManagedBotCreated",
     "MaskPosition",
     "MediaArea",
     "Message",
+    "MessageContent",
     "MessageEntity",
     "MessageOrigin",
     "MessageOriginChannel",
@@ -174,29 +338,107 @@ __all__ = [
     "PaymentResult",
     "Photo",
     "Poll",
-    "ProximityAlertTriggered",
     "PollOption",
+    "PollOptionAdded",
+    "PollOptionDeleted",
+    "PremiumGiftCode",
+    "ProximityAlertTriggered",
     "Reaction",
     "RefundedPayment",
     "ReplyParameters",
     "RestrictionReason",
+    "RichBlock",
+    "RichBlockAnchor",
+    "RichBlockAnimation",
+    "RichBlockAudio",
+    "RichBlockBlockQuotation",
+    "RichBlockButtons",
+    "RichBlockCaption",
+    "RichBlockCollage",
+    "RichBlockDetails",
+    "RichBlockDivider",
+    "RichBlockDocument",
+    "RichBlockExpandableBlockQuotation",
+    "RichBlockFooter",
+    "RichBlockList",
+    "RichBlockListItem",
+    "RichBlockMap",
+    "RichBlockMathematicalExpression",
+    "RichBlockParagraph",
+    "RichBlockPhoto",
+    "RichBlockPreformatted",
+    "RichBlockPullQuotation",
+    "RichBlockSectionHeading",
+    "RichBlockSlideshow",
+    "RichBlockTable",
+    "RichBlockTableCell",
+    "RichBlockThinking",
+    "RichBlockUnsupported",
+    "RichBlockVideo",
+    "RichBlockVoiceNote",
+    "RichMessage",
+    "RichText",
+    "RichTextAnchor",
+    "RichTextAnchorLink",
+    "RichTextBankCardNumber",
+    "RichTextBold",
+    "RichTextTonAddress",
+    "RichTextBotCommand",
+    "RichTextButton",
+    "RichTextCashtag",
+    "RichTextCode",
+    "RichTextCustomEmoji",
+    "RichTextDateTime",
+    "RichTextEmailAddress",
+    "RichTextHashtag",
+    "RichTextItalic",
+    "RichTextMarked",
+    "RichTextMathematicalExpression",
+    "RichTextMention",
+    "RichTextPhoneNumber",
+    "RichTextReference",
+    "RichTextReferenceLink",
+    "RichTextSpoiler",
+    "RichTextStrikethrough",
+    "RichTextSubscript",
+    "RichTextSuperscript",
+    "RichTextTextMention",
+    "RichTextUnderline",
+    "RichTextUrl",
     "SavedCredentials",
     "ScreenshotTaken",
-    "GiftAttribute",
-    "Gift",
-    "GiftedPremium",
-    "GiftedStars",
+    "StarAmount",
     "Sticker",
-    "StoryView",
     "Story",
+    "StoryView",
     "StrippedThumbnail",
     "SuccessfulPayment",
+    "SuggestedPostApprovalFailed",
+    "SuggestedPostApproved",
+    "SuggestedPostDeclined",
+    "SuggestedPostInfo",
+    "SuggestedPostPaid",
+    "SuggestedPostParameters",
+    "SuggestedPostPrice",
+    "SuggestedPostPriceStar",
+    "SuggestedPostPriceTon",
+    "SuggestedPostRefunded",
     "TextQuote",
     "Thumbnail",
+    "UpgradedGiftAttributeId",
     "UpgradedGiftAttributeIdBackdrop",
     "UpgradedGiftAttributeIdModel",
     "UpgradedGiftAttributeIdSymbol",
-    "UpgradedGiftAttributeId",
+    "UpgradedGiftAttributeRarity",
+    "UpgradedGiftAttributeRarityEpic",
+    "UpgradedGiftAttributeRarityLegendary",
+    "UpgradedGiftAttributeRarityPerMille",
+    "UpgradedGiftAttributeRarityRare",
+    "UpgradedGiftAttributeRarityUncommon",
+    "UpgradedGiftOriginalDetails",
+    "UpgradedGiftPurchaseOffer",
+    "UpgradedGiftPurchaseOfferRejected",
+    "UpgradedGiftValueInfo",
     "Venue",
     "Video",
     "VideoNote",

@@ -16,19 +16,24 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncGenerator, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import types, raw, utils
+from pyrogram import raw, types, utils
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class GetDialogs:
     async def get_dialogs(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         limit: int = 0,
-        exclude_pinned: Optional[bool] = None,
-        from_archive: Optional[bool] = None
-    ) -> AsyncGenerator["types.Dialog", None]:
+        exclude_pinned: bool | None = None,
+        from_archive: bool | None = None,
+    ) -> AsyncGenerator[types.Dialog, None]:
         """Get a user's dialogs sequentially.
 
         .. include:: /_includes/usable-by/users.rst
@@ -66,6 +71,8 @@ class GetDialogs:
         offset_id = 0
         offset_peer = raw.types.InputPeerEmpty()
 
+        seen_dialogs_ids = set()
+
         while True:
             r = await self.invoke(
                 raw.functions.messages.GetDialogs(
@@ -75,9 +82,9 @@ class GetDialogs:
                     limit=limit,
                     hash=0,
                     exclude_pinned=exclude_pinned,
-                    folder_id=None if from_archive is None else 1 if from_archive else 0
+                    folder_id=None if from_archive is None else 1 if from_archive else 0,
                 ),
-                sleep_threshold=60
+                sleep_threshold=60,
             )
 
             users = {i.id: i for i in r.users}
@@ -89,9 +96,9 @@ class GetDialogs:
                 if isinstance(message, raw.types.MessageEmpty):
                     continue
 
-                chat_id = utils.get_peer_id(message.peer_id)
-
-                messages[chat_id] = await types.Message._parse(self, message, users, chats)
+                messages[utils.get_peer_id(message.peer_id)] = await types.Message._parse(
+                    self, message, users, chats
+                )
 
             dialogs = []
 
@@ -99,16 +106,31 @@ class GetDialogs:
                 if not isinstance(dialog, raw.types.Dialog):
                     continue
 
-                dialogs.append(types.Dialog._parse(self, dialog, messages, users, chats))
+                peer_id = utils.get_raw_peer_id(dialog.peer)
+
+                if peer_id in seen_dialogs_ids:
+                    continue
+
+                if isinstance(
+                    users.get(peer_id) or chats.get(peer_id),
+                    (raw.types.UserEmpty, raw.types.ChatEmpty),
+                ):
+                    continue
+
+                seen_dialogs_ids.add(peer_id)
+
+                dialogs.append(await types.Dialog._parse(self, dialog, messages, users, chats))
 
             if not dialogs:
                 return
 
-            last = dialogs[-1]
+            last_message = next(
+                filter(None, (messages.get(d.chat.id) for d in reversed(dialogs))), None
+            )
 
-            offset_id = last.top_message.id
-            offset_date = utils.datetime_to_timestamp(last.top_message.date)
-            offset_peer = await self.resolve_peer(last.chat.id)
+            offset_id = last_message.id if last_message else 0
+            offset_date = utils.datetime_to_timestamp(last_message.date) if last_message else 0
+            offset_peer = await self.resolve_peer(dialogs[-1].chat.id)
 
             for dialog in dialogs:
                 yield dialog

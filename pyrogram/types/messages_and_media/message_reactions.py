@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict, List, Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types
@@ -38,7 +38,7 @@ class MessageReactions(Object):
             Information about top users that added the paid reaction.
 
         can_get_added_reactions (``bool``, *optional*):
-            True, if the list of added reactions is available using :meth:`~pyrogram.Client.get_message_added_reactions`.
+            True, if the list of added reactions is available.
     """
 
     # TODO: Add get_message_added_reactions method
@@ -46,11 +46,11 @@ class MessageReactions(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
-        reactions: Optional[List["types.Reaction"]] = None,
-        are_tags: Optional[bool] = None,
-        paid_reactors: Optional[List["types.PaidReactor"]] = None,
-        can_get_added_reactions: Optional[bool] = None,
+        client: pyrogram.Client | None = None,
+        reactions: list[types.Reaction],
+        are_tags: bool | None = None,
+        paid_reactors: list[types.PaidReactor] | None = None,
+        can_get_added_reactions: bool | None = None,
     ):
         super().__init__(client)
 
@@ -60,12 +60,12 @@ class MessageReactions(Object):
         self.can_get_added_reactions = can_get_added_reactions
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        message_reactions: Optional["raw.base.MessageReactions"],
-        users: Dict[int, "types.User"],
-        chats: Dict[int, "types.Chat"],
-    ) -> Optional["MessageReactions"]:
+    async def _parse(
+        client: pyrogram.Client,
+        message_reactions: raw.base.MessageReactions | None,
+        users: dict[int, types.User],
+        chats: dict[int, types.Chat],
+    ) -> MessageReactions | None:
         if not message_reactions:
             return None
 
@@ -80,7 +80,7 @@ class MessageReactions(Object):
             are_tags=message_reactions.reactions_as_tags,
             paid_reactors=types.List(
                 [
-                    types.PaidReactor._parse(client, paid_reactor, users, chats)
+                    await types.PaidReactor._parse(client, paid_reactor, users, chats)
                     for paid_reactor in message_reactions.top_reactors
                 ]
             )

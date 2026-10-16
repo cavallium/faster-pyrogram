@@ -16,18 +16,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union, AsyncGenerator
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import types, raw, utils
+from pyrogram import raw, types, utils
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class GetForumTopics:
     async def get_forum_topics(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        limit: int = 0
-    ) -> AsyncGenerator["types.ForumTopic", None]:
+        self: pyrogram.Client, chat_id: int | str, limit: int = 0
+    ) -> AsyncGenerator[types.ForumTopic, None]:
         """Get one or more topic from a chat.
 
         .. include:: /_includes/usable-by/users.rst
@@ -60,12 +63,12 @@ class GetForumTopics:
 
         while True:
             r = await self.invoke(
-                raw.functions.channels.GetForumTopics(
-                    channel=await self.resolve_peer(chat_id),
+                raw.functions.messages.GetForumTopics(
+                    peer=await self.resolve_peer(chat_id),
                     offset_date=offset_date,
                     offset_id=offset_id,
                     offset_topic=offset_topic,
-                    limit=limit
+                    limit=limit,
                 )
             )
 
@@ -83,7 +86,8 @@ class GetForumTopics:
             topics = []
 
             for topic in r.topics:
-                topics.append(types.ForumTopic._parse(self, topic, messages, users, chats))
+                parsed_topic = await types.ForumTopic._parse(self, topic, messages, users, chats)
+                topics.append(utils.require_parsed(parsed_topic))
 
             if not topics:
                 return

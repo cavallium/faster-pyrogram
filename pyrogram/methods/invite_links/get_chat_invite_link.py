@@ -16,19 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
 
 
 class GetChatInviteLink:
     async def get_chat_invite_link(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         invite_link: str,
-    ) -> "types.ChatInviteLink":
+    ) -> types.ChatInviteLink | None:
         """Get detailed information about a chat invite link.
 
         .. include:: /_includes/usable-by/users.rst
@@ -38,19 +37,20 @@ class GetChatInviteLink:
                 Unique identifier for the target chat or username of the target channel/supergroup
                 (in the format @username).
 
-            invite_link (str):
+            invite_link (``str``):
                 The invite link.
 
         Returns:
-            :obj:`~pyrogram.types.ChatInviteLink`: On success, the invite link is returned.
+            :obj:`~pyrogram.types.ChatInviteLink` | ``None``: On success, the invite link is returned,
+            otherwise, in case the chat only accepts join requests through its public link, None is
+            returned.
         """
         r = await self.invoke(
             raw.functions.messages.GetExportedChatInvite(
-                peer=await self.resolve_peer(chat_id),
-                link=invite_link
+                peer=await self.resolve_peer(chat_id), link=invite_link
             )
         )
 
         users = {i.id: i for i in r.users}
 
-        return types.ChatInviteLink._parse(self, r.invite, users)
+        return await types.ChatInviteLink._parse(self, r.invite, users)

@@ -16,19 +16,24 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import inspect
-from typing import List
+from __future__ import annotations as _annotations
 
-import pyrogram
+from typing import TYPE_CHECKING
+
 from pyrogram.methods.utilities.idle import idle
+from pyrogram.utils import loops
+
+if TYPE_CHECKING:
+    import pyrogram
 
 
 class Run:
     def run(
-        self: "pyrogram.Client", *,
+        self: pyrogram.Client,
+        *,
         use_qr: bool = False,
-        except_ids: List[int] = [],
-    ):
+        except_ids: list[int] | None = None,
+    ) -> None:
         """Start the client, idle the main script and finally stop the client.
 
         When calling this method without any argument it acts as a convenience method that calls
@@ -48,6 +53,7 @@ class Run:
 
         Raises:
             ConnectionError: In case you try to run an already started client.
+            ImportError: In case ``use_qr`` is True and the ``qrcode`` extra is not installed.
 
         Example:
             .. code-block:: python
@@ -58,13 +64,13 @@ class Run:
                 ...  # Set handlers up
                 app.run()
         """
-        run = self.loop.run_until_complete
 
-        if inspect.iscoroutinefunction(self.start):
-            run(self.start(use_qr=use_qr, except_ids=except_ids))
-            run(idle())
-            run(self.stop())
-        else:
-            self.start(use_qr=use_qr, except_ids=except_ids)
-            run(idle())
-            self.stop()
+        async def start_idle_and_stop() -> None:
+            await self.start(
+                use_qr=use_qr,
+                except_ids=except_ids,
+            )
+            await idle()
+            await self.stop()
+
+        loops.run(start_idle_and_stop())

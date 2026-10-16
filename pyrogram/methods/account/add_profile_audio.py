@@ -1,0 +1,197 @@
+#  Pyrogram - Telegram MTProto API Client Library for Python
+#  Copyright (C) 2017-present Dan <https://github.com/delivrance>
+#
+#  This file is part of Pyrogram.
+#
+#  Pyrogram is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Lesser General Public License as published
+#  by the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  Pyrogram is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Lesser General Public License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import annotations as _annotations
+
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
+
+import pyrogram
+from pyrogram import StopTransmission, raw, utils
+from pyrogram.errors import FilePartMissing
+from pyrogram.file_id import FileType
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pyrogram._typing import PathType
+
+
+class AddProfileAudio:
+    async def add_profile_audio(
+        self: pyrogram.Client,
+        audio: PathType | BinaryIO,
+        duration: int = 0,
+        performer: str | None = None,
+        title: str | None = None,
+        thumb: PathType | BinaryIO | None = None,
+        file_name: str | None = None,
+        progress: Callable | None = None,
+        progress_args: tuple = (),
+    ) -> bool | None:
+        """Adds an audio file to the beginning of the profile audio files of the current user.
+
+        .. include:: /_includes/usable-by/users.rst
+
+        Parameters:
+            audio (``str`` | ``os.PathLike`` | ``BinaryIO``):
+                Audio file to add.
+                Pass a file_id as string to add an audio file that exists on the Telegram servers,
+                pass a file path as string to upload a new audio file that exists on your local machine, or
+                pass a binary file-like object with its attribute ".name" set for in-memory uploads.
+
+            duration (``int``, *optional*):
+                Duration of the audio in seconds.
+
+            performer (``str``, *optional*):
+                Performer.
+
+            title (``str``, *optional*):
+                Track name.
+
+            thumb (``str`` | ``os.PathLike`` | ``BinaryIO``, *optional*):
+                Thumbnail of the music file album cover.
+                The thumbnail should be in JPEG format and less than 200 KB in size.
+                A thumbnail's width and height should not exceed 320 pixels.
+                Thumbnails can't be reused and can be only uploaded as a new file.
+
+            file_name (``str``, *optional*):
+                File name of the audio sent.
+                Defaults to file's path basename.
+
+            progress (``Callable``, *optional*):
+                Pass a callback function to view the file transmission progress.
+                The function must take *(current, total)* as positional arguments and will be called back each
+                time a new file chunk has been successfully transmitted.
+
+            progress_args (``tuple``, *optional*):
+                Extra custom arguments for the progress callback function.
+                You can pass anything you need to be available in the progress callback scope; for example, a Message
+                object or a Client instance in order to edit the message with the updated progress status.
+
+        Returns:
+            ``bool`` | ``None``: On success, True is returned, otherwise, in
+            case the upload is deliberately stopped with :meth:`~pyrogram.Client.stop_transmission`, None is returned.
+
+        Raises:
+            FileNotFoundError: In case a local ``os.PathLike`` doesn't point to an existing file.
+
+        Example:
+            .. code-block:: python
+
+                # Add audio file by uploading from file
+                await app.add_profile_audio("audio.mp3")
+
+                # Set audio metadata
+                await app.add_profile_audio(
+                    "audio.mp3",
+                    title="Title", performer="Performer", duration=234)
+
+                # Keep track of the progress while uploading
+                async def progress(current, total):
+                    print(f"{current * 100 / total:.1f}%")
+
+                await app.add_profile_audio("audio.mp3", progress=progress)
+        """
+        file = None
+
+        try:
+            if isinstance(audio, (str, os.PathLike)):
+                if os.path.isfile(audio):
+                    mime_type = self.guess_mime_type(audio) or "audio/mpeg"
+                    if mime_type == "audio/ogg":
+                        mime_type = "audio/opus"
+                    thumb = await self.save_file(thumb)
+                    file = await self.save_file(
+                        audio, progress=progress, progress_args=progress_args
+                    )
+
+                    uploaded_media = await self.invoke(
+                        raw.functions.messages.UploadMedia(
+                            peer=raw.types.InputPeerSelf(),
+                            media=raw.types.InputMediaUploadedDocument(
+                                mime_type=mime_type,
+                                file=file,
+                                thumb=thumb,
+                                attributes=[
+                                    raw.types.DocumentAttributeAudio(
+                                        duration=duration, performer=performer, title=title
+                                    ),
+                                    raw.types.DocumentAttributeFilename(
+                                        file_name=file_name or Path(audio).name
+                                    ),
+                                ],
+                            ),
+                        )
+                    )
+
+                    media = raw.types.InputDocument(
+                        id=uploaded_media.document.id,
+                        access_hash=uploaded_media.document.access_hash,
+                        file_reference=uploaded_media.document.file_reference,
+                    )
+                elif isinstance(audio, str):
+                    media = (utils.get_input_media_from_file_id(audio, FileType.AUDIO)).id
+                else:
+                    raise FileNotFoundError(f"No such file or directory: {audio}")
+            else:
+                mime_type = self.guess_mime_type(file_name or audio.name) or "audio/mpeg"
+                if mime_type == "audio/ogg":
+                    mime_type = "audio/opus"
+                thumb = await self.save_file(thumb)
+                file = await self.save_file(audio, progress=progress, progress_args=progress_args)
+
+                uploaded_media = await self.invoke(
+                    raw.functions.messages.UploadMedia(
+                        peer=raw.types.InputPeerSelf(),
+                        media=raw.types.InputMediaUploadedDocument(
+                            mime_type=mime_type,
+                            file=file,
+                            thumb=thumb,
+                            attributes=[
+                                raw.types.DocumentAttributeAudio(
+                                    duration=duration, performer=performer, title=title
+                                ),
+                                raw.types.DocumentAttributeFilename(
+                                    file_name=file_name or audio.name
+                                ),
+                            ],
+                        ),
+                    )
+                )
+
+                media = raw.types.InputDocument(
+                    id=uploaded_media.document.id,
+                    access_hash=uploaded_media.document.access_hash,
+                    file_reference=uploaded_media.document.file_reference,
+                )
+
+            while True:
+                try:
+                    r = await self.invoke(raw.functions.account.SaveMusic(id=media))
+                except FilePartMissing as e:
+                    # The error names the missing part; without it there is nothing to resave.
+                    if e.file_part is None:
+                        raise
+
+                    await self.save_file(audio, file_id=file.id, file_part=e.file_part)
+                else:
+                    return r
+        except StopTransmission:
+            return None

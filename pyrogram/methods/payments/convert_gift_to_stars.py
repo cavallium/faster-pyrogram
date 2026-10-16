@@ -16,17 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import re
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
+from pyrogram import raw, utils
 
 
 class ConvertGiftToStars:
     async def convert_gift_to_stars(
-        self: "pyrogram.Client",
-        owned_gift_id: str,
-        business_connection_id: str = None
+        self: pyrogram.Client, owned_gift_id: str, business_connection_id: str | None = None
     ) -> bool:
         """Convert a given regular gift to Telegram Stars.
 
@@ -53,31 +51,11 @@ class ConvertGiftToStars:
                 # Convert gift
                 await app.convert_gift_to_stars(message_id=123)
         """
-        if not isinstance(owned_gift_id, str):
-            raise ValueError(f"owned_gift_id has to be str, but {type(owned_gift_id)} was provided")
-    
-        saved_gift_match = re.match(r"^(-\d+)_(\d+)$", owned_gift_id)
-        slug_match = self.UPGRADED_GIFT_RE.match(owned_gift_id)
-
-        if saved_gift_match:
-            stargift = raw.types.InputSavedStarGiftChat(
-                peer=await self.resolve_peer(saved_gift_match.group(1)),
-                saved_id=int(saved_gift_match.group(2))
-            )
-        elif slug_match:
-            stargift = raw.types.InputSavedStarGiftSlug(
-                slug=slug_match.group(1)
-            )
-        else:
-            stargift = raw.types.InputSavedStarGiftUser(
-                msg_id=int(owned_gift_id)
-            )
-
         r = await self.invoke(
             raw.functions.payments.ConvertStarGift(
-                stargift=stargift
+                stargift=await utils.get_input_stargift(self, owned_gift_id)
             ),
-            business_connection_id=business_connection_id
+            business_connection_id=business_connection_id,
         )
 
         return r

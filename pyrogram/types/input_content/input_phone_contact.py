@@ -16,14 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 from pyrogram import raw
 from pyrogram.session.internals import MsgId
+
 from ..object import Object
 
 
 class InputPhoneContact(Object):
     """A Phone Contact to be added in your Telegram address book.
-    It is intended to be used with :meth:`~pyrogram.Client.add_contacts()`
+    It is intended to be used with :meth:`~pyrogram.Client.import_contacts()`
 
     Parameters:
         phone (``str``):
@@ -39,13 +42,10 @@ class InputPhoneContact(Object):
     def __init__(self, phone: str, first_name: str, last_name: str = ""):
         super().__init__(None)
 
-    def __new__(cls,
-                phone: str,
-                first_name: str,
-                last_name: str = ""):
+    def __new__(cls, phone: str, first_name: str, last_name: str = ""):
         return raw.types.InputPhoneContact(
             client_id=MsgId(),
             phone="+" + phone.strip("+"),
             first_name=first_name,
-            last_name=last_name
+            last_name=last_name,
         )

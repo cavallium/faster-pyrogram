@@ -16,9 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import pyrogram
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
+
 from ..object import Object
+
+if TYPE_CHECKING:
+    import pyrogram
+    from pyrogram import raw
 
 
 class Contact(Object):
@@ -44,12 +50,12 @@ class Contact(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         phone_number: str,
         first_name: str,
-        last_name: str = None,
-        user_id: int = None,
-        vcard: str = None
+        last_name: str | None = None,
+        user_id: int | None = None,
+        vcard: str | None = None,
     ):
         super().__init__(client)
 
@@ -60,12 +66,12 @@ class Contact(Object):
         self.vcard = vcard
 
     @staticmethod
-    def _parse(client: "pyrogram.Client", contact: "raw.types.MessageMediaContact") -> "Contact":
+    def _parse(client: pyrogram.Client, contact: raw.types.MessageMediaContact) -> Contact:
         return Contact(
             phone_number=contact.phone_number,
             first_name=contact.first_name,
             last_name=contact.last_name or None,
             vcard=contact.vcard or None,
             user_id=contact.user_id or None,
-            client=client
+            client=client,
         )

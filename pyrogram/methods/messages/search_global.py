@@ -16,24 +16,29 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncGenerator, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, enums
 from pyrogram import types
 from pyrogram import utils
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
 
 class SearchGlobal:
     async def search_global(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         query: str = "",
-        filter: "enums.MessagesFilter" = enums.MessagesFilter.EMPTY,
-        channels_only: Optional[bool] = None,
-        groups_only: Optional[bool] = None,
-        users_only: Optional[bool] = None,
+        filter: enums.MessagesFilter = enums.MessagesFilter.EMPTY,
+        channels_only: bool | None = None,
+        groups_only: bool | None = None,
+        users_only: bool | None = None,
         limit: int = 0,
-    ) -> AsyncGenerator["types.Message", None]:
+    ) -> AsyncGenerator[types.Message, None]:
         """Search messages globally from all of your chats.
 
         If you want to get the messages count only, see :meth:`~pyrogram.Client.search_global_count`.
@@ -107,11 +112,11 @@ class SearchGlobal:
                         broadcasts_only=channels_only,
                         groups_only=groups_only,
                         users_only=users_only,
-                        limit=limit
+                        limit=limit,
                     ),
-                    sleep_threshold=60
+                    sleep_threshold=60,
                 ),
-                replies=0
+                replies=0,
             )
 
             if not messages:

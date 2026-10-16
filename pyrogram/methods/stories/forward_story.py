@@ -16,34 +16,40 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Optional, Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, types, utils
 
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
 
 class ForwardStory:
     async def forward_story(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        from_chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
+        from_chat_id: int | str,
         story_id: int,
-        disable_notification: bool = None,
-        message_thread_id: int = None,
-        schedule_date: datetime = None,
-        paid_message_star_count: int = None,
-        protect_content: bool = None,
-        allow_paid_broadcast: bool = None,
-        reply_parameters: "types.ReplyParameters" = None,
-        reply_markup: Union[
-            "types.InlineKeyboardMarkup",
-            "types.ReplyKeyboardMarkup",
-            "types.ReplyKeyboardRemove",
-            "types.ForceReply"
-        ] = None,
-        message_effect_id: int = None
-    ) -> Optional["types.Message"]:
+        disable_notification: bool | None = None,
+        message_thread_id: int | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        repeat_period: int | None = None,
+        paid_message_star_count: int | None = None,
+        protect_content: bool | None = None,
+        allow_paid_broadcast: bool | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        reply_markup: (
+            types.InlineKeyboardMarkup
+            | types.ReplyKeyboardMarkup
+            | types.ReplyKeyboardRemove
+            | types.ForceReply
+            | None
+        ) = None,
+        message_effect_id: int | None = None,
+    ) -> types.Message | None:
         """Forward story.
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -70,8 +76,12 @@ class ForwardStory:
                 Unique identifier for the target message thread (topic) of the forum.
                 For supergroups only.
 
-            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+            schedule_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the message will be automatically sent.
+                A :py:obj:`~datetime.timedelta` is counted from now.
+
+            repeat_period (``int``, *optional*):
+                Period after which the message will be sent again in seconds.
 
             paid_message_star_count (``int``, *optional*):
                 The number of Telegram Stars the user agreed to pay to send the messages.
@@ -93,7 +103,8 @@ class ForwardStory:
                 Unique identifier of the message effect to be added to the message; for private chats only.
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent story message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent story message is returned, otherwise,
+            in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -105,18 +116,14 @@ class ForwardStory:
             raw.functions.messages.SendMedia(
                 peer=await self.resolve_peer(chat_id),
                 media=raw.types.InputMediaStory(
-                    peer=await self.resolve_peer(from_chat_id),
-                    id=story_id
+                    peer=await self.resolve_peer(from_chat_id), id=story_id
                 ),
-                silent=disable_notification or None,
+                silent=disable_notification,
                 random_id=self.rnd_id(),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
+                schedule_repeat_period=repeat_period,
                 message="",
-                reply_to=await utils.get_reply_to(
-                    self,
-                    reply_parameters,
-                    message_thread_id
-                ),
+                reply_to=await utils.get_reply_to(self, reply_parameters, message_thread_id),
                 allow_paid_stars=paid_message_star_count,
                 allow_paid_floodskip=allow_paid_broadcast,
                 reply_markup=await reply_markup.write(self) if reply_markup else None,

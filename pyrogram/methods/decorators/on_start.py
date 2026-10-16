@@ -16,13 +16,20 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from .handler_type import HandlerType
+
 
 class OnStart:
-    def on_start(self: Optional["OnStart"] = None) -> Callable:
+    def on_start(self: OnStart | None = None) -> Callable[[HandlerType], HandlerType]:
         """Decorator for handling client start.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
@@ -31,7 +38,7 @@ class OnStart:
         .. include:: /_includes/usable-by/users-bots.rst
         """
 
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: HandlerType) -> HandlerType:
             if isinstance(self, pyrogram.Client):
                 self.add_handler(pyrogram.handlers.StartHandler(func))
             else:

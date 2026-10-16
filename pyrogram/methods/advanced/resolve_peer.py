@@ -16,29 +16,23 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import logging
+from __future__ import annotations as _annotations
+
 import re
-from typing import Union
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import utils
+from pyrogram import raw, utils
 from pyrogram.errors import PeerIdInvalid
-
-log = logging.getLogger(__name__)
 
 
 class ResolvePeer:
-    async def resolve_peer(
-        self: "pyrogram.Client",
-        peer_id: Union[int, str]
-    ) -> Union[raw.base.InputPeer, raw.base.InputUser, raw.base.InputChannel]:
+    async def resolve_peer(self: pyrogram.Client, peer_id: int | str) -> raw.base.InputPeer | None:
         """Get the InputPeer of a known peer id. Useful whenever an InputPeer type is required.
 
         .. note::
 
             This is a utility method intended to be used **only** when working with raw
-            :obj:`functions <pyrogram.api.functions>` (i.e: a Telegram API method you wish to use which is not
+            :obj:`functions <pyrogram.raw.functions>` (i.e: a Telegram API method you wish to use which is not
             available yet in the Client class as an easy-to-use method).
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -49,7 +43,8 @@ class ResolvePeer:
                 Can be a direct id (int), a username (str), a link (str) or a phone number (str).
 
         Returns:
-            :obj:`~pyrogram.raw.base.InputPeer`: On success, the resolved peer id is returned in form of an InputPeer object.
+            :obj:`~pyrogram.raw.base.InputPeer` | ``None``: On success, the resolved peer id is returned in
+            form of an InputPeer object, otherwise, in case *peer_id* is None, None is returned.
 
         Raises:
             KeyError: In case the peer doesn't exist in the internal database.
@@ -63,77 +58,85 @@ class ResolvePeer:
         if peer_id in ("self", "me"):
             return raw.types.InputPeerSelf()
 
-        try:
-            return await self.storage.get_peer_by_id(peer_id)
-        except KeyError:
-            if isinstance(peer_id, str):
-                match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:c/)?)([\w]+)(?:.+)?$", peer_id.lower())
+        if peer_id == "empty":
+            return raw.types.InputPeerEmpty()
 
-                if match:
-                    try:
-                        peer_id = utils.get_channel_id(int(match.group(1)))
-                    except ValueError:
-                        peer_id = match.group(1)
-                else:
-                    peer_id = re.sub(r"[@+\s]", "", peer_id.lower())
+        if isinstance(peer_id, int):
+            try:
+                return await self.storage.get_peer_by_id(peer_id)
+            except KeyError:
+                peer_type = utils.get_peer_type(peer_id)
 
-                try:
-                    int(peer_id)
-                except ValueError:
-                    try:
-                        return await self.storage.get_peer_by_username(peer_id)
-                    except KeyError:
-                        r = await self.invoke(
-                            raw.functions.contacts.ResolveUsername(
-                                username=peer_id
+                if peer_type == "user":
+                    await self.fetch_peers(
+                        await self.invoke(
+                            raw.functions.users.GetUsers(
+                                id=[
+                                    raw.types.InputUser(
+                                        user_id=utils.get_raw_peer_id(peer_id), access_hash=0
+                                    )
+                                ]
                             )
                         )
-
-                        if isinstance(r.peer, raw.types.PeerUser):
-                            return await self.storage.get_peer_by_id(r.peer.user_id)
-                        elif isinstance(r.peer, raw.types.PeerChannel):
-                            return await self.storage.get_peer_by_id(utils.get_channel_id(r.peer.channel_id))
-
-                        return await self.storage.get_peer_by_username(peer_id)
-                else:
-                    try:
-                        return await self.storage.get_peer_by_phone_number(peer_id)
-                    except KeyError:
-                        raise PeerIdInvalid
-
-            peer_type = utils.get_peer_type(peer_id)
-
-            if peer_type == "user":
-                await self.fetch_peers(
+                    )
+                elif peer_type == "chat":
                     await self.invoke(
-                        raw.functions.users.GetUsers(
+                        raw.functions.messages.GetChats(id=[utils.get_raw_peer_id(peer_id)])
+                    )
+                else:
+                    await self.invoke(
+                        raw.functions.channels.GetChannels(
                             id=[
-                                raw.types.InputUser(
-                                    user_id=peer_id,
-                                    access_hash=0
+                                raw.types.InputChannel(
+                                    channel_id=utils.get_raw_peer_id(peer_id), access_hash=0
                                 )
                             ]
                         )
                     )
-                )
-            elif peer_type == "chat":
-                await self.invoke(
-                    raw.functions.messages.GetChats(
-                        id=[-peer_id]
-                    )
-                )
+
+                try:
+                    return await self.storage.get_peer_by_id(peer_id)
+                except KeyError as e:
+                    raise PeerIdInvalid from e
+        elif isinstance(peer_id, str):
+            phone = re.sub(r"[+()\s-]", "", peer_id)
+
+            if phone.isdigit():
+                try:
+                    return await self.storage.get_peer_by_phone_number(phone)
+                except KeyError:
+                    r = await self.invoke(raw.functions.contacts.ResolvePhone(phone=phone))
+
+                    return await self.storage.get_peer_by_id(utils.get_peer_id(r.peer))
             else:
-                await self.invoke(
-                    raw.functions.channels.GetChannels(
-                        id=[
-                            raw.types.InputChannel(
-                                channel_id=utils.get_channel_id(peer_id),
-                                access_hash=0
-                            )
-                        ]
-                    )
-                )
-            try:
-                return await self.storage.get_peer_by_id(peer_id)
-            except KeyError:
-                raise PeerIdInvalid
+                username = None
+                channel_id = None
+
+                match = self.CHANNEL_MESSAGE_LINK_RE.match(peer_id.lower())
+
+                if match:
+                    try:
+                        channel_id = utils.get_channel_id(int(match.group(1)))
+                    except ValueError:
+                        username = match.group(1)
+                else:
+                    username = re.sub(r"[@+\s]", "", peer_id.lower())
+
+                if channel_id:
+                    try:
+                        return await self.storage.get_peer_by_id(channel_id)
+                    except KeyError as e:
+                        raise PeerIdInvalid from e
+                elif username:
+                    try:
+                        return await self.storage.get_peer_by_username(username)
+                    except KeyError:
+                        r = await self.invoke(
+                            raw.functions.contacts.ResolveUsername(username=username)
+                        )
+
+                        return await self.storage.get_peer_by_id(utils.get_peer_id(r.peer))
+                else:
+                    raise PeerIdInvalid
+        else:
+            raise PeerIdInvalid

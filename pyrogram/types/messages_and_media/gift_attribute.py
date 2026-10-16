@@ -16,13 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Dict, List, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class GiftAttribute(Object):
@@ -39,9 +43,8 @@ class GiftAttribute(Object):
             Unique backdrop identifier.
             Available only if the backdrop attribute is available.
 
-        rarity (``int``, *optional*):
-            Rarity of the attribute in permilles.
-            For example, 15 means 1.5%. So only 1.5% of such collectibles have this attribute.
+        rarity (:obj:`~pyrogram.types.UpgradedGiftAttributeRarityPerMille` | :obj:`~pyrogram.types.UpgradedGiftAttributeRarityUncommon` | :obj:`~pyrogram.types.UpgradedGiftAttributeRarityRare` | :obj:`~pyrogram.types.UpgradedGiftAttributeRarityEpic` | :obj:`~pyrogram.types.UpgradedGiftAttributeRarityLegendary`, *optional*):
+            The rarity of the model.
 
         date (:py:obj:`~datetime.datetime`, *optional*):
             Date when the gift was received.
@@ -81,28 +84,33 @@ class GiftAttribute(Object):
 
         sticker (:obj:`~pyrogram.types.Sticker`, *optional*):
             Information about the sticker.
-
-
     """
 
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
-        type: "enums.GiftAttributeType",
-        name: Optional[str] = None,
-        backdrop_id: Optional[int] = None,
-        rarity: Optional[int] = None,
-        date: Optional[datetime] = None,
-        caption: Optional[str] = None,
-        caption_entities: Optional[List["types.MessageEntity"]] = None,
-        from_user: Optional["types.User"] = None,
-        to_user: Optional["types.User"] = None,
-        sticker: Optional["types.Sticker"] = None,
-        center_color: Optional[int] = None,
-        edge_color: Optional[int] = None,
-        pattern_color: Optional[int] = None,
-        text_color: Optional[int] = None
+        client: pyrogram.Client | None = None,
+        type: enums.GiftAttributeType,
+        name: str | None = None,
+        backdrop_id: int | None = None,
+        rarity: (
+            types.UpgradedGiftAttributeRarityPerMille
+            | types.UpgradedGiftAttributeRarityUncommon
+            | types.UpgradedGiftAttributeRarityRare
+            | types.UpgradedGiftAttributeRarityEpic
+            | types.UpgradedGiftAttributeRarityLegendary
+            | None
+        ) = None,
+        date: datetime | None = None,
+        caption: str | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
+        from_user: types.User | None = None,
+        to_user: types.User | None = None,
+        sticker: types.Sticker | None = None,
+        center_color: int | None = None,
+        edge_color: int | None = None,
+        pattern_color: int | None = None,
+        text_color: int | None = None,
     ):
         super().__init__(client)
 
@@ -124,10 +132,10 @@ class GiftAttribute(Object):
     @staticmethod
     async def _parse(
         client,
-        attr: "raw.base.StarGiftAttribute",
-        users: Dict[int, "raw.base.User"],
-        chats: Dict[int, "raw.base.Chat"]
-    ) -> "GiftAttribute":
+        attr: raw.base.StarGiftAttribute,
+        users: dict[int, raw.base.User],
+        chats: dict[int, raw.base.Chat],
+    ) -> GiftAttribute:
         caption = None
         caption_entities = None
         sticker = None
@@ -140,21 +148,21 @@ class GiftAttribute(Object):
             sticker = await types.Sticker._parse(client, doc, attributes)
 
         if isinstance(attr, raw.types.StarGiftAttributeOriginalDetails):
-            caption, caption_entities = (utils.parse_text_with_entities(
-                client, attr.message, users
-            )).values()
+            caption, caption_entities = (
+                await utils.parse_text_with_entities(client, attr.message, users)
+            ).values()
 
             sender_id = utils.get_raw_peer_id(attr.sender_id)
             recipient_id = utils.get_raw_peer_id(attr.recipient_id)
 
-            from_user = types.User._parse(client, users.get(sender_id))
-            to_user = types.User._parse(client, users.get(recipient_id))
+            from_user = await types.User._parse(client, users.get(sender_id))
+            to_user = await types.User._parse(client, users.get(recipient_id))
 
         return GiftAttribute(
             name=getattr(attr, "name", None),
             backdrop_id=getattr(attr, "backdrop_id", None),
             type=enums.GiftAttributeType(type(attr)),
-            rarity=getattr(attr, "rarity_permille", None),
+            rarity=types.UpgradedGiftAttributeRarity._parse(attr.rarity),
             date=utils.timestamp_to_datetime(getattr(attr, "date", None)),
             caption=caption,
             caption_entities=caption_entities,
@@ -165,5 +173,5 @@ class GiftAttribute(Object):
             edge_color=getattr(attr, "edge_color", None),
             pattern_color=getattr(attr, "pattern_color", None),
             text_color=getattr(attr, "text_color", None),
-            client=client
+            client=client,
         )

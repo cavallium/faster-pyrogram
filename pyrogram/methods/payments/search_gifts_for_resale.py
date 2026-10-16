@@ -16,21 +16,28 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, AsyncGenerator
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import enums, raw, types
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
 
 class SearchGiftsForResale:
     async def search_gifts_for_resale(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         gift_id: int,
-        order: "enums.GiftForResaleOrder" = enums.GiftForResaleOrder.CHANGE_DATE,
-        attributes: Optional[List["types.UpgradedGiftAttributeId"]] = None,
+        order: enums.GiftForResaleOrder = enums.GiftForResaleOrder.CHANGE_DATE,
+        for_crafting: bool | None = None,
+        for_stars: bool | None = None,
+        attributes: list[types.UpgradedGiftAttributeId] | None = None,
         limit: int = 0,
-        offset: str = ""
-    ) -> AsyncGenerator["types.Gift", None]:
+        offset: str = "",
+    ) -> AsyncGenerator[types.Gift, None]:
         """Get upgraded gifts that can be bought from other owners.
 
         .. include:: /_includes/usable-by/users.rst
@@ -39,8 +46,14 @@ class SearchGiftsForResale:
             gift_id (``int``):
                 Identifier of the regular gift that was upgraded to a unique gift.
 
-            order (:obj:`~pyrogram.enums.GiftForResaleOrder`):
+            order (:obj:`~pyrogram.enums.GiftForResaleOrder`, *optional*):
                 Order in which the results will be sorted.
+
+            for_crafting (``bool``, *optional*):
+                Pass True to get only gifts suitable for crafting.
+
+            for_stars (``bool``, *optional*):
+                Pass True to get only gifts that can be bought using Telegram Stars.
 
             attributes (List of :obj:`~pyrogram.types.UpgradedGiftAttributeId`, *optional*):
                 Attributes used to filter received gifts.
@@ -78,18 +91,18 @@ class SearchGiftsForResale:
                     limit=limit,
                     sort_by_price=order == enums.GiftForResaleOrder.PRICE,
                     sort_by_num=order == enums.GiftForResaleOrder.NUMBER,
+                    for_craft=for_crafting,
+                    stars_only=for_stars,
                     attributes=[attr.write() for attr in attributes] if attributes else None,
-
                 ),
-                sleep_threshold=60
+                sleep_threshold=60,
             )
 
             users = {i.id: i for i in r.users}
             chats = {i.id: i for i in r.chats}
 
             gifts = [
-                await types.Gift._parse(self, gift, users, chats)
-                for gift in r.gifts
+                await types.Gift._parse(self, gift, users=users, chats=chats) for gift in r.gifts
             ]
 
             if not gifts:

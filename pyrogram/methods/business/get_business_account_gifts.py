@@ -16,25 +16,34 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw, types
+from pyrogram import raw, types, utils
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class GetBusinessAccountGifts:
     async def get_business_account_gifts(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         business_connection_id: str,
-        exclude_unsaved: Optional[bool] = None,
-        exclude_saved: Optional[bool] = None,
-        exclude_unlimited: Optional[bool] = None,
-        exclude_limited: Optional[bool] = None,
-        exclude_upgraded: Optional[bool] = None,
-        sort_by_price: Optional[bool] = None,
+        collection_id: int | None = None,
+        exclude_unsaved: bool | None = None,
+        exclude_saved: bool | None = None,
+        exclude_unlimited: bool | None = None,
+        exclude_upgradable: bool | None = None,
+        exclude_non_upgradable: bool | None = None,
+        exclude_upgraded: bool | None = None,
+        exclude_without_colors: bool | None = None,
+        exclude_hosted: bool | None = None,
+        sort_by_price: bool | None = None,
         limit: int = 0,
         offset: str = "",
-    ):
+    ) -> AsyncGenerator[types.Gift, None]:
         """Return the gifts received and owned by a managed business account.
 
         .. note::
@@ -47,6 +56,9 @@ class GetBusinessAccountGifts:
             business_connection_id (``str``):
                 Unique identifier of business connection on behalf of which to send the request.
 
+            collection_id (``int``, *optional*):
+                Pass collection identifier to get gifts only from the specified collection.
+
             exclude_unsaved (``bool``, *optional*):
                 Pass True to exclude gifts that aren’t saved to the account’s profile page.
 
@@ -56,20 +68,29 @@ class GetBusinessAccountGifts:
             exclude_unlimited (``bool``, *optional*):
                 Pass True to exclude gifts that can be purchased an unlimited number of times.
 
-            exclude_limited (``bool``, *optional*):
-                Pass True to exclude gifts that can be purchased a limited number of times.
+            exclude_upgradable (``bool``, *optional*):
+                Pass true to exclude gifts that can be purchased limited number of times and can be upgraded.
+
+            exclude_non_upgradable (``bool``, *optional*):
+                Pass true to exclude gifts that can be purchased limited number of times and can't be upgraded.
 
             exclude_upgraded (``bool``, *optional*):
                 Pass True to exclude upgraded gifts.
 
+            exclude_without_colors (``bool``, *optional*):
+                Pass True to exclude gifts that can't be used in :meth:`~pyrogram.Client.set_upgraded_gift_colors`.
+
+            exclude_hosted (``bool``, *optional*):
+                Pass True to exclude gifts that are just hosted and are not owned by the owner.
+
             sort_by_price (``bool``, *optional*):
                 Pass True to sort results by gift price instead of send date. Sorting is applied before pagination.
 
-            offset (``str``, *optional*):
-                Offset of the first entry to return as received from the previous request.
-
             limit (``int``, *optional*):
                 The maximum number of gifts to be returned.
+
+            offset (``str``, *optional*):
+                Offset of the first entry to return as received from the previous request.
 
         Returns:
             ``Generator``: A generator yielding :obj:`~pyrogram.types.Gift` objects.
@@ -86,28 +107,39 @@ class GetBusinessAccountGifts:
 
         connection_info = await self.get_business_connection(business_connection_id)
 
+        peer = await self.resolve_peer(connection_info.user.id)
+        raw_peer_id = utils.get_raw_peer_id(peer)
+
         while True:
             r = await self.invoke(
                 raw.functions.payments.GetSavedStarGifts(
-                    peer=await self.resolve_peer(connection_info.user.id),
+                    peer=peer,
                     offset=offset,
                     limit=limit,
                     exclude_unsaved=exclude_unsaved,
                     exclude_saved=exclude_saved,
                     exclude_unlimited=exclude_unlimited,
-                    exclude_limited=exclude_limited,
                     exclude_unique=exclude_upgraded,
-                    sort_by_value=sort_by_price
+                    exclude_upgradable=exclude_upgradable,
+                    exclude_unupgradable=exclude_non_upgradable,
+                    peer_color_available=not exclude_without_colors
+                    if exclude_without_colors is not None
+                    else None,
+                    exclude_hosted=exclude_hosted,
+                    sort_by_value=sort_by_price,
+                    collection_id=collection_id,
                 ),
                 sleep_threshold=60,
-                business_connection_id=business_connection_id
+                business_connection_id=business_connection_id,
             )
 
             users = {i.id: i for i in r.users}
             chats = {i.id: i for i in r.chats}
 
+            receiver = users.get(raw_peer_id) or chats.get(raw_peer_id)
+
             user_star_gifts = [
-                await types.Gift._parse_saved(self, gift, users, chats)
+                await types.Gift._parse(self, gift, receiver, users=users, chats=chats)
                 for gift in r.gifts
             ]
 

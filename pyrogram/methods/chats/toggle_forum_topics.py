@@ -16,19 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import errors
+from pyrogram import errors, raw
 
 
 class ToggleForumTopics:
     async def toggle_forum_topics(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         is_forum: bool = False,
-        has_forum_tabs: bool = False
+        has_forum_tabs: bool = False,
     ) -> bool:
         """Enable or disable forum functionality in a supergroup.
 
@@ -38,11 +37,14 @@ class ToggleForumTopics:
             chat_id (``int`` | ``str``):
                 Unique identifier (int) or username (str) of the target chat.
 
-            enabled (``bool``):
-                The new status. Pass True to enable forum topics.
+            is_forum (``bool``, *optional*):
+                The new status.
+                Pass True to enable forum topics.
+                Defaults to False.
 
-            has_forum_tabs (``bool``):
-                Whether to enable or disable tabs in the forum. Defaults to False.
+            has_forum_tabs (``bool``, *optional*):
+                Whether to enable or disable tabs in the forum.
+                Defaults to False.
 
         Returns:
             ``bool``: True on success. False otherwise.
@@ -51,7 +53,7 @@ class ToggleForumTopics:
             .. code-block:: python
 
                 # Change status of topics to disabled
-                await app.toggle_forum_topics()
+                await app.toggle_forum_topics(is_forum=False)
 
                 # Change status of topics to enabled
                 await app.toggle_forum_topics(is_forum=True)
@@ -59,9 +61,7 @@ class ToggleForumTopics:
         try:
             r = await self.invoke(
                 raw.functions.channels.ToggleForum(
-                    channel=await self.resolve_peer(chat_id),
-                    enabled=is_forum,
-                    tabs=has_forum_tabs
+                    channel=await self.resolve_peer(chat_id), enabled=is_forum, tabs=has_forum_tabs
                 )
             )
 

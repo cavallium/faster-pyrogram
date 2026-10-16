@@ -16,50 +16,57 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from datetime import datetime
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
+
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
 
 log = logging.getLogger(__name__)
 
 
 class SendMessage:
     async def send_message(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         text: str,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        entities: List["types.MessageEntity"] = None,
-        link_preview_options: "types.LinkPreviewOptions" = None,
-        disable_notification: bool = None,
-        message_thread_id: int = None,
-        direct_messages_chat_topic_id: int = None,
-        effect_id: int = None,
-        show_caption_above_media: bool = None,
-        reply_parameters: "types.ReplyParameters" = None,
-        schedule_date: datetime = None,
-        protect_content: bool = None,
-        business_connection_id: str = None,
-        allow_paid_broadcast: bool = None,
-        paid_message_star_count: int = None,
-        reply_markup: Union[
-            "types.InlineKeyboardMarkup",
-            "types.ReplyKeyboardMarkup",
-            "types.ReplyKeyboardRemove",
-            "types.ForceReply"
-        ] = None,
-
-        reply_to_message_id: int = None,
-        reply_to_chat_id: Union[int, str] = None,
-        reply_to_story_id: int = None,
-        quote_text: str = None,
-        quote_entities: List["types.MessageEntity"] = None,
-        quote_offset: int = None,
-        disable_web_page_preview: bool = None, # TODO: Remove later
-    ) -> "types.Message":
+        parse_mode: enums.ParseMode | None = None,
+        entities: list[types.MessageEntity] | None = None,
+        link_preview_options: types.LinkPreviewOptions | None = None,
+        disable_notification: bool | None = None,
+        message_thread_id: int | None = None,
+        direct_messages_topic_id: int | None = None,
+        ephemeral_message_parameters: types.EphemeralMessageParameters | None = None,
+        effect_id: int | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        repeat_period: int | None = None,
+        protect_content: bool | None = None,
+        business_connection_id: str | None = None,
+        allow_paid_broadcast: bool | None = None,
+        paid_message_star_count: int | None = None,
+        suggested_post_parameters: types.SuggestedPostParameters | None = None,
+        reply_markup: (
+            types.InlineKeyboardMarkup
+            | types.ReplyKeyboardMarkup
+            | types.ReplyKeyboardRemove
+            | types.ForceReply
+            | None
+        ) = None,
+        show_caption_above_media: bool | None = None,
+        reply_to_message_id: int | None = None,
+        reply_to_chat_id: int | str | None = None,
+        reply_to_story_id: int | None = None,
+        quote_text: str | None = None,
+        quote_entities: list[types.MessageEntity] | None = None,
+        quote_offset: int | None = None,
+        disable_web_page_preview: bool | None = None,  # TODO: Remove later
+    ) -> types.Message | None:
         """Send text messages.
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -77,7 +84,7 @@ class SendMessage:
                 By default, texts are parsed using both Markdown and HTML styles.
                 You can combine both syntaxes together.
 
-            entities (List of :obj:`~pyrogram.types.MessageEntity`):
+            entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
                 List of special entities that appear in message text, which can be specified instead of *parse_mode*.
 
             link_preview_options (:obj:`~pyrogram.types.LinkPreviewOptions`, *optional*):
@@ -91,9 +98,12 @@ class SendMessage:
                 Unique identifier for the target message thread (topic) of the forum.
                 For forums only.
 
-            direct_messages_chat_topic_id (``int``, *optional*):
+            direct_messages_topic_id (``int``, *optional*):
                 Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For directs only only.
+                For direct chats only.
+
+            ephemeral_message_parameters (:obj:`~pyrogram.types.EphemeralMessageParameters`, *optional*):
+                Parameters of the ephemeral message to send.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -102,8 +112,12 @@ class SendMessage:
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
-            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+            schedule_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the message will be automatically sent.
+                A :py:obj:`~datetime.timedelta` is counted from now.
+
+            repeat_period (``int``, *optional*):
+                Period after which the message will be sent again in seconds.
 
             protect_content (``bool``, *optional*):
                 Protects the contents of the sent message from forwarding and saving.
@@ -120,27 +134,89 @@ class SendMessage:
             paid_message_star_count (``int``, *optional*):
                 The number of Telegram Stars the user agreed to pay to send the messages.
 
+            suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
+                Information about the suggested post.
+
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
                 Additional interface options. An object for an inline keyboard, custom reply keyboard,
                 instructions to remove reply keyboard or to force a reply from the user.
 
+            show_caption_above_media (``bool``, *optional*):
+                Pass True, if the caption must be shown above the message media.
+                This parameter is deprecated and should not be used.
+                Use `link_preview_options` instead.
+
+            reply_to_message_id (``int``, *optional*):
+                If the message is a reply, ID of the original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_chat_id (``int`` | ``str``, *optional*):
+                Unique identifier (int) or username (str) of the chat holding the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_story_id (``int``, *optional*):
+                If the message is a reply to a story, ID of the story.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_text (``str``, *optional*):
+                Text of the quoted part of the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
+                List of special entities that appear in the quote, which can be specified instead of *parse_mode*.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_offset (``int``, *optional*):
+                Offset for quote in original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            disable_web_page_preview (``bool``, *optional*):
+                Disables link previews for links in this message.
+                This parameter is deprecated and should not be used.
+                Use `link_preview_options` instead.
+
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent text message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent text message is returned,
+            otherwise, in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
 
                 # Simple example
-                await app.send_message("me", "Message sent with **Pyrogram**!")
+                await app.send_message("me", "Message sent with **Kurigram**!")
 
                 # Disable web page previews
                 from pyrogram import types
 
-                await app.send_message("me", "https://docs.pyrogram.org",
-                    link_preview_options=types.LinkPreviewOptions(is_disabled=True))
+                await app.send_message(
+                    "me",
+                    "https://docs.pyrogram.org",
+                    link_preview_options=types.LinkPreviewOptions(is_disabled=True)
+                )
 
                 # Reply to a message using its id
-                await app.send_message("me", "this is a reply", reply_to_message_id=123)
+                from pyrogram import types
+
+                await app.send_message(
+                    "me",
+                    "this is a reply",
+                    reply_parameters=types.ReplyParameters(message_id=123)
+                )
+
+                # Simple web page preview
+                from pyrogram import types
+
+                await app.send_message(
+                    "me",
+                    "Look at this preview!",
+                    link_preview_options=types.LinkPreviewOptions(url="https://docs.pyrogram.org")
+                )
 
             .. code-block:: python
 
@@ -163,8 +239,6 @@ class SendMessage:
                             [InlineKeyboardButton("Docs", url="https://docs.pyrogram.org")]
                         ]))
         """
-        link_preview_options = link_preview_options or self.link_preview_options
-
         if any(
             (
                 reply_to_message_id is not None,
@@ -212,9 +286,8 @@ class SendMessage:
                 quote=quote_text,
                 quote_parse_mode=parse_mode,
                 quote_entities=quote_entities,
-                quote_position=quote_offset
+                quote_position=quote_offset,
             )
-
 
         if any(
             (
@@ -233,65 +306,103 @@ class SendMessage:
                 )
 
             link_preview_options = types.LinkPreviewOptions(
-                is_disabled=disable_web_page_preview,
-                show_above_text=show_caption_above_media
+                is_disabled=disable_web_page_preview, show_above_text=show_caption_above_media
             )
 
-        message, entities = (await utils.parse_text_entities(self, text, parse_mode, entities)).values()
+        link_preview_options = link_preview_options or self.link_preview_options
+
+        message, entities = (
+            await utils.parse_text_entities(self, text, parse_mode, entities)
+        ).values()
 
         peer = await self.resolve_peer(chat_id)
-        r = await self.invoke(
-            raw.functions.messages.SendMessage(
+
+        if ephemeral_message_parameters:
+            rpc = raw.functions.ephemeral.SendMessage(
                 peer=peer,
-                no_webpage=getattr(link_preview_options, "is_disabled", None) or None,
-                silent=disable_notification or None,
-                invert_media=getattr(link_preview_options, "show_above_text", None),
+                receiver_id=await self.resolve_peer(ephemeral_message_parameters.receiver_user_id),
+                query_id=int(ephemeral_message_parameters.callback_query_id)
+                if ephemeral_message_parameters.callback_query_id is not None
+                else None,
                 reply_to=await utils.get_reply_to(
-                    self,
-                    reply_parameters,
-                    message_thread_id,
-                    direct_messages_chat_topic_id
+                    self, reply_parameters, message_thread_id, direct_messages_topic_id
+                ),
+                random_id=self.rnd_id(),
+                anchor=ephemeral_message_parameters.replace_callback_query_message,
+                reply_markup=await reply_markup.write(self) if reply_markup else None,
+                message=message,
+                entities=entities,
+            )
+        elif link_preview_options and link_preview_options.url:
+            rpc = raw.functions.messages.SendMedia(
+                peer=peer,
+                media=raw.types.InputMediaWebPage(
+                    url=link_preview_options.url,
+                    force_large_media=link_preview_options.prefer_large_media,
+                    force_small_media=link_preview_options.prefer_small_media,
+                    optional=True,
+                ),
+                silent=disable_notification,
+                invert_media=link_preview_options.show_above_text,
+                reply_to=await utils.get_reply_to(
+                    self, reply_parameters, message_thread_id, direct_messages_topic_id
                 ),
                 random_id=self.rnd_id(),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
+                schedule_repeat_period=repeat_period,
                 allow_paid_floodskip=allow_paid_broadcast,
                 allow_paid_stars=paid_message_star_count,
+                suggested_post=suggested_post_parameters.write()
+                if suggested_post_parameters
+                else None,
                 reply_markup=await reply_markup.write(self) if reply_markup else None,
                 message=message,
                 entities=entities,
                 noforwards=protect_content,
-                effect=effect_id
-            ),
-            business_connection_id=business_connection_id
-        )
+                effect=effect_id,
+            )
+        else:
+            rpc = raw.functions.messages.SendMessage(
+                peer=peer,
+                no_webpage=getattr(link_preview_options, "is_disabled", None),
+                silent=disable_notification,
+                invert_media=getattr(link_preview_options, "show_above_text", None),
+                reply_to=await utils.get_reply_to(
+                    self, reply_parameters, message_thread_id, direct_messages_topic_id
+                ),
+                random_id=self.rnd_id(),
+                schedule_date=utils.datetime_to_timestamp(schedule_date),
+                schedule_repeat_period=repeat_period,
+                allow_paid_floodskip=allow_paid_broadcast,
+                allow_paid_stars=paid_message_star_count,
+                suggested_post=suggested_post_parameters.write()
+                if suggested_post_parameters
+                else None,
+                reply_markup=await reply_markup.write(self) if reply_markup else None,
+                message=message,
+                entities=entities,
+                noforwards=protect_content,
+                effect=effect_id,
+            )
+
+        r = await self.invoke(rpc, business_connection_id=business_connection_id)
 
         if isinstance(r, raw.types.UpdateShortSentMessage):
             peer = await self.resolve_peer(chat_id)
 
-            peer_id = (
-                peer.user_id
-                if isinstance(peer, raw.types.InputPeerUser)
-                else -peer.chat_id
-            )
+            peer_id = peer.user_id if isinstance(peer, raw.types.InputPeerUser) else -peer.chat_id
 
             return types.Message(
                 id=r.id,
-                chat=types.Chat(
-                    id=peer_id,
-                    type=enums.ChatType.PRIVATE,
-                    client=self
-                ),
+                chat=types.Chat(id=peer_id, type=enums.ChatType.PRIVATE, client=self),
                 text=message,
                 date=utils.timestamp_to_datetime(r.date),
                 outgoing=r.out,
                 reply_markup=reply_markup,
-                entities=[
-                    types.MessageEntity._parse(None, entity, {})
-                    for entity in entities
-                ] if entities else None,
-                client=self
+                entities=[await types.MessageEntity._parse(None, entity, {}) for entity in entities]
+                if entities
+                else None,
+                client=self,
             )
 
-        messages = await utils.parse_messages(client=self, messages=r)
-
-        return messages[0] if messages else None
+        return next(iter(await utils.parse_messages(client=self, messages=r)), None)

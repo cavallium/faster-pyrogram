@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,9 +24,7 @@ from pyrogram import raw
 
 class ReorderFolders:
     async def reorder_folders(
-        self: "pyrogram.Client",
-        folder_ids: List[int],
-        main_chat_list_position: int = 0
+        self: pyrogram.Client, folder_ids: list[int], main_chat_list_position: int = 0
     ) -> bool:
         """Change the order of chat folders.
 
@@ -52,10 +50,6 @@ class ReorderFolders:
         if main_chat_list_position:
             folder_ids.insert(main_chat_list_position, 0)
 
-        r = await self.invoke(
-            raw.functions.messages.UpdateDialogFiltersOrder(
-                order=folder_ids
-            )
-        )
+        r = await self.invoke(raw.functions.messages.UpdateDialogFiltersOrder(order=folder_ids))
 
         return r

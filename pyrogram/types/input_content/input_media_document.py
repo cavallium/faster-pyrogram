@@ -16,25 +16,41 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, List, Union, BinaryIO
+from __future__ import annotations as _annotations
+
+import io
+import os
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
+
+import pyrogram
+from pyrogram import raw, utils
+from pyrogram.file_id import FileType
 
 from .input_media import InputMedia
-from ..messages_and_media import MessageEntity
-from ... import enums
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pyrogram._typing import PathType
+
+    from ... import enums
+    from ..messages_and_media import MessageEntity
 
 
 class InputMediaDocument(InputMedia):
     """A generic file to be sent inside an album.
 
     Parameters:
-        media (``str`` | ``BinaryIO``):
+        media (``str`` | ``os.PathLike`` | ``BinaryIO``):
             File to send.
             Pass a file_id as string to send a file that exists on the Telegram servers or
             pass a file path as string to upload a new file that exists on your local machine or
             pass a binary file-like object with its attribute “.name” set for in-memory uploads or
             pass an HTTP URL as a string for Telegram to get a file from the Internet.
 
-        thumb (``str``):
+        thumb (``str`` | ``os.PathLike``):
             Thumbnail of the file sent.
             The thumbnail should be in JPEG format and less than 200 KB in size.
             A thumbnail's width and height should not exceed 320 pixels.
@@ -54,18 +70,78 @@ class InputMediaDocument(InputMedia):
         file_name (``str``, *optional*):
             File name of the document sent.
             Defaults to file's path basename.
+
+    Raises:
+        FileNotFoundError: In case a local ``os.PathLike`` doesn't point to an existing file.
     """
 
     def __init__(
         self,
-        media: Union[str, BinaryIO],
-        thumb: str = None,
+        media: PathType | BinaryIO,
+        thumb: PathType | None = None,
         caption: str = "",
-        parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: List[MessageEntity] = None,
-        file_name: str = None
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[MessageEntity] | None = None,
+        file_name: str | None = None,
     ):
         super().__init__(media, caption, parse_mode, caption_entities)
 
         self.thumb = thumb
         self.file_name = file_name
+
+    async def write(
+        self,
+        *,
+        client: pyrogram.Client,
+        chat_id: int | str | None = None,
+        progress: Callable | None = None,
+        progress_args: tuple = (),
+        **kwargs,
+    ) -> raw.base.InputMedia:
+        if chat_id is None:
+            peer = raw.types.InputPeerSelf()
+        else:
+            peer = await client.resolve_peer(chat_id)
+
+        if isinstance(self.media, io.BytesIO) or Path(self.media).is_file():
+            uploaded_media = await client.invoke(
+                raw.functions.messages.UploadMedia(
+                    peer=peer,
+                    media=raw.types.InputMediaUploadedDocument(
+                        mime_type=client.guess_mime_type(self.media) or "application/zip",
+                        file=await client.save_file(
+                            self.media, progress=progress, progress_args=progress_args
+                        ),
+                        force_file=True,
+                        thumb=await client.save_file(self.thumb),
+                        attributes=[
+                            raw.types.DocumentAttributeFilename(
+                                file_name=utils.get_file_name(self.media, file_name=self.file_name),
+                            ),
+                        ],
+                    ),
+                ),
+            )
+
+            return raw.types.InputMediaDocument(
+                id=raw.types.InputDocument(
+                    id=uploaded_media.document.id,
+                    access_hash=uploaded_media.document.access_hash,
+                    file_reference=uploaded_media.document.file_reference,
+                ),
+            )
+
+        if isinstance(self.media, os.PathLike):
+            raise FileNotFoundError(f"No such file or directory: {self.media}")
+
+        # Only a `str` can name a URL or a file id; anything else was consumed or
+        #  rejected above.
+        if not isinstance(self.media, str):
+            raise TypeError(f"media must be a path, URL, or file id, got: {self.media!r}")
+
+        if re.match("^https?://", self.media):
+            return raw.types.InputMediaDocumentExternal(
+                url=self.media,
+            )
+
+        return utils.get_input_media_from_file_id(self.media, FileType.DOCUMENT)

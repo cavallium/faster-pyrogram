@@ -16,24 +16,23 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
 
 
 class GetChatMenuButton:
     async def get_chat_menu_button(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str] = None,
-    ) -> "types.MenuButton":
+        self: pyrogram.Client,
+        chat_id: int | str | None = None,
+    ) -> types.MenuButton:
         """Get the current value of the bot's menu button in a private chat, or the default menu button.
 
         .. include:: /_includes/usable-by/bots.rst
 
         Parameters:
-            chat_id (``int`` | ``str``):
+            chat_id (``int`` | ``str``, *optional*):
                 Unique identifier (int) or username (str) of the target chat.
                 If not specified, default bot's menu button will be returned.
         """
@@ -45,11 +44,9 @@ class GetChatMenuButton:
                 )
             )
         else:
-            r = (await self.invoke(
-                raw.functions.users.GetFullUser(
-                    id=raw.types.InputUserSelf()
-                )
-            )).full_user.bot_info.menu_button
+            r = (
+                await self.invoke(raw.functions.users.GetFullUser(id=raw.types.InputUserSelf()))
+            ).full_user.bot_info.menu_button
 
         if isinstance(r, raw.types.BotMenuButtonCommands):
             return types.MenuButtonCommands()
@@ -58,9 +55,6 @@ class GetChatMenuButton:
             return types.MenuButtonDefault()
 
         if isinstance(r, raw.types.BotMenuButton):
-            return types.MenuButtonWebApp(
-                text=r.text,
-                web_app=types.WebAppInfo(
-                    url=r.url
-                )
-            )
+            return types.MenuButtonWebApp(text=r.text, web_app=types.WebAppInfo(url=r.url))
+
+        raise TypeError(f"Unknown menu button type {r.__class__.__name__}")

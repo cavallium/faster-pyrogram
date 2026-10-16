@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 from pyrogram import raw, types
 from ..object import Object
@@ -54,10 +54,10 @@ class AvailableEffect(Object):
         id: int,
         emoji: str,
         effect_sticker_id: int,
-        sticker: Optional["types.Sticker"] = None,
-        is_premium: Optional[bool] = None,
-        static_icon_id: Optional[int] = None,
-        effect_animation_id: Optional[int] = None
+        sticker: types.Sticker | None = None,
+        is_premium: bool | None = None,
+        static_icon_id: int | None = None,
+        effect_animation_id: int | None = None,
     ):
         super().__init__()
 
@@ -70,7 +70,9 @@ class AvailableEffect(Object):
         self.effect_animation_id = effect_animation_id
 
     @staticmethod
-    async def _parse(client, effect: "raw.types.AvailableEffect", document: "raw.types.Document" = None) -> "AvailableEffect":
+    async def _parse(
+        client, effect: raw.types.AvailableEffect, document: (raw.types.Document | None) = None
+    ) -> AvailableEffect:
         sticker = None
 
         if document:
@@ -84,5 +86,5 @@ class AvailableEffect(Object):
             sticker=sticker,
             is_premium=getattr(effect, "premium_required", None),
             static_icon_id=getattr(effect, "static_icon_id", None),
-            effect_animation_id=getattr(effect, "effect_animation_id", None)
+            effect_animation_id=getattr(effect, "effect_animation_id", None),
         )

@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import enums, raw, types
@@ -102,27 +102,27 @@ class MediaArea(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         x: float,
         y: float,
         width: float,
         height: float,
         rotation: float,
-        type: "enums.MediaAreaType",
-        radius: float = None,
-        sender_chat: Optional["types.Chat"] = None,
-        message_id: Optional[int] = None,
-        message: Optional["types.Message"] = None,
-        location: Optional["types.Location"] = None,
-        reaction: Optional["types.Reaction"] = None,
-        is_dark: Optional[bool] = None,
-        is_flipped: Optional[bool] = None,
-        url: Optional[str] = None,
-        venue: Optional["types.Venue"] = None,
-        emoji: Optional[str] = None,
-        temperature: Optional[float] = None,
-        color: Optional[int] = None,
-        gift: Optional["types.Gift"] = None
+        type: enums.MediaAreaType,
+        radius: float | None = None,
+        sender_chat: types.Chat | None = None,
+        message_id: int | None = None,
+        message: types.Message | None = None,
+        location: types.Location | None = None,
+        reaction: types.Reaction | None = None,
+        is_dark: bool | None = None,
+        is_flipped: bool | None = None,
+        url: str | None = None,
+        venue: types.Venue | None = None,
+        emoji: str | None = None,
+        temperature: float | None = None,
+        color: int | None = None,
+        gift: types.Gift | None = None,
     ):
         super().__init__(client)
 
@@ -149,10 +149,8 @@ class MediaArea(Object):
 
     @staticmethod
     async def _parse(
-        client: "pyrogram.Client",
-        area: "raw.base.MediaArea",
-        chats: dict = None
-    ) -> "MediaArea":
+        client: pyrogram.Client, area: raw.base.MediaArea, chats: dict[int, raw.base.Chat]
+    ) -> MediaArea:
         sender_chat = None
         message_id = None
         message = None
@@ -168,7 +166,7 @@ class MediaArea(Object):
         gift = None
 
         if isinstance(area, raw.types.MediaAreaChannelPost):
-            sender_chat = types.Chat._parse_channel_chat(client, chats.get(area.channel_id))
+            sender_chat = await types.Chat._parse_channel_chat(client, chats.get(area.channel_id))
             message_id = area.msg_id
 
             try:
@@ -176,7 +174,7 @@ class MediaArea(Object):
             except (ChannelPrivate, ChannelInvalid):
                 pass
         elif isinstance(area, raw.types.MediaAreaGeoPoint):
-            location = types.Location._parse(client, area.geo)
+            location = types.Location._parse(area.geo)
         elif isinstance(area, raw.types.MediaAreaSuggestedReaction):
             reaction = types.Reaction._parse(client, area.reaction)
             is_dark = getattr(area, "dark", None)
@@ -213,35 +211,34 @@ class MediaArea(Object):
             temperature=temperature,
             color=color,
             gift=gift,
-            client=client
+            client=client,
         )
 
     async def write(
-        self, client: "pyrogram.Client"
-    ) -> Optional[
-        Union[
-            "raw.types.InputMediaAreaChannelPost",
-            "raw.types.MediaAreaGeoPoint",
-            "raw.types.MediaAreaSuggestedReaction",
-            "raw.types.MediaAreaUrl",
-            "raw.types.MediaAreaWeather",
-            "raw.types.MediaAreaStarGift"
-        ]
-    ]:
+        self, client: pyrogram.Client
+    ) -> (
+        raw.types.InputMediaAreaChannelPost
+        | raw.types.MediaAreaGeoPoint
+        | raw.types.MediaAreaSuggestedReaction
+        | raw.types.MediaAreaUrl
+        | raw.types.MediaAreaWeather
+        | raw.types.MediaAreaStarGift
+        | None
+    ):
         coordinates = raw.types.MediaAreaCoordinates(
             x=self.x,
             y=self.y,
             w=self.width,
             h=self.height,
             rotation=self.rotation,
-            radius=self.radius
+            radius=self.radius,
         )
 
         if self.type == enums.MediaAreaType.POST:
             return raw.types.InputMediaAreaChannelPost(
                 coordinates=coordinates,
                 channel=await client.resolve_peer(self.sender_chat.id),
-                msg_id=self.message_id
+                msg_id=self.message_id,
             )
         elif self.type == enums.MediaAreaType.LOCATION:
             return raw.types.MediaAreaGeoPoint(
@@ -249,39 +246,31 @@ class MediaArea(Object):
                 geo=raw.types.InputGeoPoint(
                     lat=self.location.latitude,
                     long=self.location.longitude,
-                    accuracy_radius=self.location.accuracy_radius
-                )
+                    accuracy_radius=self.location.accuracy_radius,
+                ),
             )
         elif self.type == enums.MediaAreaType.REACTION:
             if self.reaction.custom_emoji_id:
                 reaction = raw.types.ReactionCustomEmoji(
-                    document_id=self.reaction.custom_emoji_id
+                    document_id=int(self.reaction.custom_emoji_id)
                 )
             else:
-                reaction = raw.types.ReactionEmoji(
-                    emoticon=self.reaction.emoji
-                )
+                reaction = raw.types.ReactionEmoji(emoticon=self.reaction.emoji)
 
             return raw.types.MediaAreaSuggestedReaction(
                 coordinates=coordinates,
                 reaction=reaction,
                 dark=self.is_dark,
-                flipped=self.is_flipped
+                flipped=self.is_flipped,
             )
         elif self.type == enums.MediaAreaType.URL:
-            return raw.types.MediaAreaUrl(
-                coordinates=coordinates,
-                url=self.url
-            )
+            return raw.types.MediaAreaUrl(coordinates=coordinates, url=self.url)
         elif self.type == enums.MediaAreaType.WEATHER:
             return raw.types.MediaAreaWeather(
                 coordinates=coordinates,
                 emoji=self.emoji,
                 temperature_c=self.temperature,
-                color=self.color
+                color=self.color,
             )
         elif self.type == enums.MediaAreaType.GIFT:
-            return raw.types.MediaAreaStarGift(
-                coordinates=coordinates,
-                slug=self.gift.name
-            )
+            return raw.types.MediaAreaStarGift(coordinates=coordinates, slug=self.gift.name)

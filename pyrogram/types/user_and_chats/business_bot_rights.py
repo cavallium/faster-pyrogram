@@ -16,6 +16,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 from pyrogram import raw
 
 from ..object import Object
@@ -72,20 +74,20 @@ class BusinessBotRights(Object):
     def __init__(
         self,
         *,
-        can_reply: bool = None,
-        can_read_messages: bool = None,
-        can_delete_sent_messages: bool = None,
-        can_delete_all_messages: bool = None,
-        can_edit_name: bool = None,
-        can_edit_bio: bool = None,
-        can_edit_profile_photo: bool = None,
-        can_edit_username: bool = None,
-        can_view_gifts: bool = None,
-        can_sell_gifts: bool = None,
-        can_change_gift_settings: bool = None,
-        can_transfer_and_upgrade_gifts: bool = None,
-        can_transfer_stars: bool = None,
-        can_manage_stories: bool = None
+        can_reply: bool | None = None,
+        can_read_messages: bool | None = None,
+        can_delete_sent_messages: bool | None = None,
+        can_delete_all_messages: bool | None = None,
+        can_edit_name: bool | None = None,
+        can_edit_bio: bool | None = None,
+        can_edit_profile_photo: bool | None = None,
+        can_edit_username: bool | None = None,
+        can_view_gifts: bool | None = None,
+        can_sell_gifts: bool | None = None,
+        can_change_gift_settings: bool | None = None,
+        can_transfer_and_upgrade_gifts: bool | None = None,
+        can_transfer_stars: bool | None = None,
+        can_manage_stories: bool | None = None,
     ):
         super().__init__(None)
 
@@ -105,7 +107,7 @@ class BusinessBotRights(Object):
         self.can_manage_stories = can_manage_stories
 
     @staticmethod
-    def _parse(permissions: "raw.types.BusinessBotRights") -> "BusinessBotRights":
+    def _parse(permissions: raw.types.BusinessBotRights) -> BusinessBotRights:
         if isinstance(permissions, raw.types.BusinessBotRights):
             return BusinessBotRights(
                 can_reply=permissions.reply,

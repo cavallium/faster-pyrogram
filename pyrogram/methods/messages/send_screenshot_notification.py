@@ -16,17 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types, utils
 
+
 class SendScreenshotNotification:
     async def send_screenshot_notification(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        reply_parameters: "types.ReplyParameters" = None
-    ) -> "types.Message":
+        self: pyrogram.Client,
+        chat_id: int | str,
+        reply_parameters: types.ReplyParameters | None = None,
+    ) -> types.Message | None:
         """Notify the other user in a private chat that a screenshot of the chat was taken.
 
         .. include:: /_includes/usable-by/users.rst
@@ -41,14 +42,17 @@ class SendScreenshotNotification:
                 Describes reply parameters for the message that is being sent.
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent service message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent service message is returned,
+            otherwise, in case the server answered with no message, None is returned.
         """
 
         r = await self.invoke(
             raw.functions.messages.SendScreenshotNotification(
                 peer=await self.resolve_peer(chat_id),
-                reply_to=await utils.get_reply_to(self, reply_parameters) if reply_parameters else raw.types.InputReplyToMessage(reply_to_msg_id=0),
-                random_id=self.rnd_id()
+                reply_to=await utils.get_reply_to(self, reply_parameters)
+                if reply_parameters
+                else raw.types.InputReplyToMessage(reply_to_msg_id=0),
+                random_id=self.rnd_id(),
             )
         )
 

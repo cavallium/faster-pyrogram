@@ -16,13 +16,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import json
-import os
 import re
 import shutil
-from functools import partial
 from pathlib import Path
-from typing import NamedTuple, List, Tuple
+from typing import TYPE_CHECKING, Final, NamedTuple
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 # from autoflake import fix_code
 # from black import format_str, FileMode
@@ -42,6 +45,16 @@ INT_RE = re.compile(r"int(\d+)")
 
 CORE_TYPES = ["int", "long", "int128", "int256", "double", "bytes", "string", "Bool", "true"]
 
+# The TL core return types have no module under `raw.base`: `Bool`, `int` and `long` decode
+#  to Python builtins, and `future_salts` is hand-written in `pyrogram/raw/core` because its
+#  constructor is parsed manually (see `source/sys_msgs.tl`).
+CORE_RETURN_TYPE_HINTS: Final[Mapping[str, str]] = {
+    "Bool": "bool",
+    "int": "int",
+    "long": "int",
+    "FutureSalts": "raw.core.FutureSalts",
+}
+
 WARNING = """
 # # # # # # # # # # # # # # # # # # # # # # # #
 #               !!! WARNING !!!               #
@@ -49,9 +62,6 @@ WARNING = """
 # All changes made in this file will be lost! #
 # # # # # # # # # # # # # # # # # # # # # # # #
 """.strip()
-
-# noinspection PyShadowingBuiltins
-open = partial(open, encoding="utf-8")
 
 types_to_constructors = {}
 types_to_functions = {}
@@ -61,14 +71,10 @@ namespaces_to_constructors = {}
 namespaces_to_functions = {}
 
 try:
-    with open("docs.json") as f:
+    with open("docs.json", encoding="utf-8") as f:
         docs = json.load(f)
 except FileNotFoundError:
-    docs = {
-        "type": {},
-        "constructor": {},
-        "method": {}
-    }
+    docs = {"type": {}, "constructor": {}, "method": {}}
 
 
 class Combinator(NamedTuple):
@@ -78,7 +84,7 @@ class Combinator(NamedTuple):
     name: str
     id: str
     has_flags: bool
-    args: List[Tuple[str, str]]
+    args: list[tuple[str, str]]
     qualtype: str
     typespace: str
     type: str
@@ -92,6 +98,43 @@ def snake(s: str):
 
 def camel(s: str):
     return "".join([i[0].upper() + i[1:] for i in s.split("_")])
+
+
+def vector_element(vector: str) -> str:
+    """The `X` of a `Vector<X>`"""
+    return vector.split("<")[1][:-1]
+
+
+def qualified_name(qualtype: str) -> str:
+    """`namespace.Name` for a namespaced type, `Name` for a bare one"""
+    namespace, name = qualtype.split(".") if "." in qualtype else ("", qualtype)
+
+    return ".".join([namespace, name]).strip(".")
+
+
+def resolved_return_type(name: str) -> str:
+    """`raw.base.<Type>` for a schema type, the real Python type for a TL core one"""
+    return CORE_RETURN_TYPE_HINTS.get(name, f"raw.base.{qualified_name(name)}")
+
+
+# noinspection PyShadowingBuiltins, PyShadowingNames
+def get_return_type_hint(qualtype: str) -> str:
+    """Get return type hint for generic TLObject"""
+    # `X` is the schema's own type variable, declared `{X:Type}` and bound by the `!X` argument:
+    #  the function returns whatever the query it wraps returns. `ReturnType` names a real object
+    #  the generated module imports, so unlike the branches below it is not quoted.
+    if qualtype == "X":
+        return "ReturnType"
+
+    if qualtype.startswith("Vector"):
+        hint = f"list[{resolved_return_type(vector_element(qualtype))}]"
+    else:
+        hint = resolved_return_type(qualtype)
+
+    # This goes in `class X(TLObject[...])`, a base-class subscript, not an annotation, so
+    #  the future import does not defer it: unquoted, `raw` is `TYPE_CHECKING`-only and it
+    #  raises `NameError: name 'raw' is not defined` at import time.
+    return f'"{hint}"'
 
 
 # noinspection PyShadowingBuiltins, PyShadowingNames
@@ -116,22 +159,26 @@ def get_type_hint(type: str) -> str:
         else:  # bytes and object
             type = "bytes"
 
-    if type in ["Object", "!X"]:
+    if type == "Object":
         return "TLObject"
+
+    # The query a schema-generic function wraps. Carrying the variable here is what binds it,
+    #  so `InvokeWithoutUpdates(query=GetHistory(...))` is a `TLObject` of the query's own type.
+    if type == "!X":
+        return "TLObject[ReturnType]"
 
     if re.match("^vector", type, re.I):
         is_core = True
 
-        sub_type = type.split("<")[1][:-1]
-        type = f"List[{get_type_hint(sub_type)}]"
+        element = get_type_hint(vector_element(type))
+        type = f"list[{element}]"
 
     if is_core:
-        return f"Optional[{type}] = None" if is_flag else type
-    else:
-        ns, name = type.split(".") if "." in type else ("", type)
-        type = '"raw.base.' + ".".join([ns, name]).strip(".") + '"'
+        return f"{type} | None = None" if is_flag else type
 
-        return f'{type}{" = None" if is_flag else ""}'
+    qualname = f"raw.base.{qualified_name(type)}"
+
+    return f"{qualname} | None = None" if is_flag else qualname
 
 
 def sort_args(args):
@@ -199,19 +246,34 @@ def get_references(t: str, kind: str):
     return None, 0
 
 
+def indent_desc(desc: str, indent: str = "    ") -> str:
+    lines = desc.splitlines()
+
+    if len(lines) <= 1:
+        return desc
+
+    first, *rest = lines
+
+    return first + "\n" + "\n".join((indent + line if line.strip() else "") for line in rest)
+
+
 # noinspection PyShadowingBuiltins
 def start(format: bool = False):
     shutil.rmtree(DESTINATION_PATH / "types", ignore_errors=True)
     shutil.rmtree(DESTINATION_PATH / "functions", ignore_errors=True)
     shutil.rmtree(DESTINATION_PATH / "base", ignore_errors=True)
 
-    with open(HOME_PATH / "source/auth_key.tl") as f1, \
-        open(HOME_PATH / "source/sys_msgs.tl") as f2, \
-        open(HOME_PATH / "source/main_api.tl") as f3:
+    with (
+        open(HOME_PATH / "source/auth_key.tl", encoding="utf-8") as f1,
+        open(HOME_PATH / "source/sys_msgs.tl", encoding="utf-8") as f2,
+        open(HOME_PATH / "source/main_api.tl", encoding="utf-8") as f3,
+    ):
         schema = (f1.read() + f2.read() + f3.read()).splitlines()
 
-    with open(HOME_PATH / "template/type.txt") as f1, \
-        open(HOME_PATH / "template/combinator.txt") as f2:
+    with (
+        open(HOME_PATH / "template/type.txt", encoding="utf-8") as f1,
+        open(HOME_PATH / "template/combinator.txt", encoding="utf-8") as f2,
+    ):
         type_tmpl = f1.read()
         combinator_tmpl = f2.read()
 
@@ -276,7 +338,7 @@ def start(format: bool = False):
                 args=args,
                 qualtype=qualtype,
                 typespace=typespace,
-                type=type
+                type=type,
             )
 
             combinators.append(combinator)
@@ -313,7 +375,7 @@ def start(format: bool = False):
     # import json
     # print(json.dumps(namespaces_to_types, indent=2))
 
-    for qualtype in types_to_constructors:
+    for qualtype, qualtype_constructors in types_to_constructors.items():
         typespace, type = qualtype.split(".") if "." in qualtype else ("", qualtype)
         dir_path = DESTINATION_PATH / "base" / typespace
 
@@ -322,9 +384,9 @@ def start(format: bool = False):
         if module == "Updates":
             module = "UpdatesT"
 
-        os.makedirs(dir_path, exist_ok=True)
+        dir_path.mkdir(parents=True, exist_ok=True)
 
-        constructors = sorted(types_to_constructors[qualtype])
+        constructors = sorted(qualtype_constructors)
         constr_count = len(constructors)
         items = "\n            ".join([f"{c}" for c in constructors])
 
@@ -335,26 +397,30 @@ def start(format: bool = False):
         else:
             type_docs = "Telegram API base type."
 
-        docstring = type_docs
+        docstring = indent_desc(type_docs)
 
-        docstring += f"\n\n    Constructors:\n" \
-                     f"        This base type has {constr_count} constructor{'s' if constr_count > 1 else ''} available.\n\n" \
-                     f"        .. currentmodule:: pyrogram.raw.types\n\n" \
-                     f"        .. autosummary::\n" \
-                     f"            :nosignatures:\n\n" \
-                     f"            {items}"
+        docstring += (
+            f"\n\n    Constructors:\n"
+            f"        This base type has {constr_count} constructor{'s' if constr_count > 1 else ''} available.\n\n"
+            f"        .. currentmodule:: pyrogram.raw.types\n\n"
+            f"        .. autosummary::\n"
+            f"            :nosignatures:\n\n"
+            f"            {items}"
+        )
 
         references, ref_count = get_references(qualtype, "types")
 
         if references:
-            docstring += f"\n\n    Functions:\n        This object can be returned by " \
-                         f"{ref_count} function{'s' if ref_count > 1 else ''}.\n\n" \
-                         f"        .. currentmodule:: pyrogram.raw.functions\n\n" \
-                         f"        .. autosummary::\n" \
-                         f"            :nosignatures:\n\n" \
-                         f"            " + references
+            docstring += (
+                f"\n\n    Functions:\n        This object can be returned by "
+                f"{ref_count} function{'s' if ref_count > 1 else ''}.\n\n"
+                f"        .. currentmodule:: pyrogram.raw.functions\n\n"
+                f"        .. autosummary::\n"
+                f"            :nosignatures:\n\n"
+                f"            " + references
+            )
 
-        with open(dir_path / f"{snake(module)}.py", "w") as f:
+        with open(dir_path / f"{snake(module)}.py", "w", encoding="utf-8") as f:
             f.write(
                 type_tmpl.format(
                     notice=notice,
@@ -362,26 +428,25 @@ def start(format: bool = False):
                     docstring=docstring,
                     name=type,
                     qualname=qualtype,
-                    types=", ".join([f"raw.types.{c}" for c in constructors]),
-                    doc_name=snake(type).replace("_", "-")
+                    types=" | ".join([f"raw.types.{c}" for c in constructors]),
+                    doc_name=snake(type).replace("_", "-"),
                 )
             )
 
     for c in combinators:
         sorted_args = sort_args(c.args)
 
-        arguments = (
-            (", *, " if c.args else "") +
-            (", ".join(
-                [f"{i[0]}: {get_type_hint(i[1])}"
-                 for i in sorted_args]
-            ) if sorted_args else "")
+        arguments = (", *, " if c.args else "") + (
+            ", ".join([f"{i[0]}: {get_type_hint(i[1])}" for i in sorted_args])
+            if sorted_args
+            else ""
         )
 
-        fields = "\n        ".join(
-            [f"self.{i[0]} = {i[0]}  # {i[1]}"
-             for i in sorted_args]
-        ) if sorted_args else "pass"
+        fields = (
+            "\n        ".join([f"self.{i[0]} = {i[0]}  # {i[1]}" for i in sorted_args])
+            if sorted_args
+            else "pass"
+        )
 
         docstring = ""
         docstring_args = []
@@ -391,7 +456,7 @@ def start(format: bool = False):
         else:
             combinator_docs = docs["constructor"]
 
-        for i, arg in enumerate(sorted_args):
+        for arg in sorted_args:
             arg_name, arg_type = arg
             is_optional = FLAGS_RE.match(arg_type)
             arg_type = arg_type.split("?")[-1]
@@ -399,7 +464,9 @@ def start(format: bool = False):
             arg_docs = combinator_docs.get(c.qualname, None)
 
             if arg_docs:
-                arg_docs = arg_docs["params"].get(arg_name, "N/A")
+                arg_docs = indent_desc(
+                    arg_docs["params"].get(arg_name, "N/A"), indent="            "
+                )
             else:
                 arg_docs = "N/A"
 
@@ -408,7 +475,7 @@ def start(format: bool = False):
                     arg_name,
                     get_docstring_arg_type(arg_type),
                     ", *optional*" if is_optional else "",
-                    arg_docs
+                    arg_docs,
                 )
             )
 
@@ -420,19 +487,39 @@ def start(format: bool = False):
             else:
                 constructor_docs = "Telegram API type."
 
-            docstring += constructor_docs + "\n"
+            docstring += indent_desc(constructor_docs) + "\n"
             docstring += f"\n    Constructor of :obj:`~pyrogram.raw.base.{c.qualtype}`."
         else:
             function_docs = docs["method"].get(c.qualname, None)
 
             if function_docs:
-                docstring += function_docs["desc"] + "\n"
+                docstring += indent_desc(function_docs.get("desc", "").strip()) + "\n"
+
+                if function_docs.get("usable_by"):
+                    docstring += (
+                        "\n    .. include:: /_includes/usable-by/"
+                        + function_docs["usable_by"]
+                        + ".rst"
+                    )
+
+                if function_docs.get("can_use_without_auth"):
+                    docstring += (
+                        "\n\n    .. note::\n\n        "
+                        "This method can be used by not yet logged in connections."
+                    )
+
+                if function_docs.get("can_use_business_connection"):
+                    docstring += (
+                        "\n\n    .. note::\n\n        "
+                        "This method can be invoked over a `business connection » <https://corefork.telegram.org/api/bots/connected-business-bots>`__"
+                    )
             else:
                 docstring += "Telegram API function."
 
         docstring += f"\n\n    Details:\n        - Layer: ``{layer}``\n        - ID: ``{c.id[2:].upper()}``\n\n"
-        docstring += "    Parameters:\n        " + \
-                     ("\n        ".join(docstring_args) if docstring_args else "No parameters required.\n")
+        docstring += "    Parameters:\n        " + (
+            "\n        ".join(docstring_args) if docstring_args else "No parameters required.\n"
+        )
 
         if c.section == "functions":
             docstring += "\n    Returns:\n        " + get_docstring_arg_type(c.qualtype)
@@ -440,12 +527,14 @@ def start(format: bool = False):
             references, count = get_references(c.qualname, "constructors")
 
             if references:
-                docstring += f"\n    Functions:\n        This object can be returned by " \
-                             f"{count} function{'s' if count > 1 else ''}.\n\n" \
-                             f"        .. currentmodule:: pyrogram.raw.functions\n\n" \
-                             f"        .. autosummary::\n" \
-                             f"            :nosignatures:\n\n" \
-                             f"            " + references
+                docstring += (
+                    f"\n    Functions:\n        This object can be returned by "
+                    f"{count} function{'s' if count > 1 else ''}.\n\n"
+                    f"        .. currentmodule:: pyrogram.raw.functions\n\n"
+                    f"        .. autosummary::\n"
+                    f"            :nosignatures:\n\n"
+                    f"            " + references
+                )
 
         write_types = read_types = "" if c.has_flags else "# No flags\n        "
 
@@ -463,16 +552,21 @@ def start(format: bool = False):
                             continue
 
                         if flag.group(3) == "true" or flag.group(3).startswith("Vector"):
-                            write_flags.append(f"{arg_name} |= (1 << {flag.group(2)}) if self.{i[0]} else 0")
+                            write_flags.append(
+                                f"{arg_name} |= (1 << {flag.group(2)}) if self.{i[0]} else 0"
+                            )
                         else:
                             write_flags.append(
-                                f"{arg_name} |= (1 << {flag.group(2)}) if self.{i[0]} is not None else 0")
+                                f"{arg_name} |= (1 << {flag.group(2)}) if self.{i[0]} is not None else 0"
+                            )
 
-                write_flags = "\n        ".join([
-                    f"{arg_name} = 0",
-                    "\n        ".join(write_flags),
-                    f"b.write(Int({arg_name}))\n        "
-                ])
+                write_flags = "\n        ".join(
+                    [
+                        f"{arg_name} = 0",
+                        "\n        ".join(write_flags),
+                        f"b.write(Int({arg_name}))\n        ",
+                    ]
+                )
 
                 write_types += write_flags
                 read_types += f"\n        {arg_name} = Int.read(b)\n        "
@@ -502,8 +596,13 @@ def start(format: bool = False):
                     )
 
                     read_types += "\n        "
-                    read_types += "{} = TLObject.read(b{}) if flags{} & (1 << {}) else []\n        ".format(
-                        arg_name, f", {sub_type.title()}" if sub_type in CORE_TYPES else "", number, index
+                    read_types += (
+                        "{} = TLObject.read(b{}) if flags{} & (1 << {}) else []\n        ".format(
+                            arg_name,
+                            f", {sub_type.title()}" if sub_type in CORE_TYPES else "",
+                            number,
+                            index,
+                        )
                     )
                 else:
                     write_types += "\n        "
@@ -541,6 +640,15 @@ def start(format: bool = False):
         slots = ", ".join([f'"{i[0]}"' for i in sorted_args])
         return_arguments = ", ".join([f"{i[0]}={i[0]}" for i in sorted_args])
 
+        # Generate generic type hint for functions
+        if c.section == "functions":
+            generic_type = f"[{get_return_type_hint(c.qualtype)}]"
+        else:
+            generic_type = ""
+
+        # Only a schema-generic function writes `ReturnType`, so only its module imports it.
+        return_type_import = ", ReturnType" if c.qualtype == "X" else ""
+
         compiled_combinator = combinator_tmpl.format(
             notice=notice,
             warning=WARNING,
@@ -553,21 +661,23 @@ def start(format: bool = False):
             fields=fields,
             read_types=read_types,
             write_types=write_types,
-            return_arguments=return_arguments
+            return_arguments=return_arguments,
+            generic_type=generic_type,
+            return_type_import=return_type_import,
         )
 
         directory = "types" if c.section == "types" else c.section
 
         dir_path = DESTINATION_PATH / directory / c.namespace
 
-        os.makedirs(dir_path, exist_ok=True)
+        dir_path.mkdir(parents=True, exist_ok=True)
 
         module = c.name
 
         if module == "Updates":
             module = "UpdatesT"
 
-        with open(dir_path / f"{snake(module)}.py", "w") as f:
+        with open(dir_path / f"{snake(module)}.py", "w", encoding="utf-8") as f:
             f.write(compiled_combinator)
 
         d = namespaces_to_constructors if c.section == "types" else namespaces_to_functions
@@ -578,7 +688,9 @@ def start(format: bool = False):
         d[c.namespace].append(c.name)
 
     for namespace, types in namespaces_to_types.items():
-        with open(DESTINATION_PATH / "base" / namespace / "__init__.py", "w") as f:
+        with open(
+            DESTINATION_PATH / "base" / namespace / "__init__.py", "w", encoding="utf-8"
+        ) as f:
             f.write(f"{notice}\n\n")
             f.write(f"{WARNING}\n\n")
 
@@ -594,7 +706,9 @@ def start(format: bool = False):
                 f.write(f"from . import {', '.join(filter(bool, namespaces_to_types))}")
 
     for namespace, types in namespaces_to_constructors.items():
-        with open(DESTINATION_PATH / "types" / namespace / "__init__.py", "w") as f:
+        with open(
+            DESTINATION_PATH / "types" / namespace / "__init__.py", "w", encoding="utf-8"
+        ) as f:
             f.write(f"{notice}\n\n")
             f.write(f"{WARNING}\n\n")
 
@@ -610,7 +724,9 @@ def start(format: bool = False):
                 f.write(f"from . import {', '.join(filter(bool, namespaces_to_constructors))}\n")
 
     for namespace, types in namespaces_to_functions.items():
-        with open(DESTINATION_PATH / "functions" / namespace / "__init__.py", "w") as f:
+        with open(
+            DESTINATION_PATH / "functions" / namespace / "__init__.py", "w", encoding="utf-8"
+        ) as f:
             f.write(f"{notice}\n\n")
             f.write(f"{WARNING}\n\n")
 
@@ -647,7 +763,7 @@ def start(format: bool = False):
 
 
 if "__main__" == __name__:
-    HOME_PATH = Path(".")
+    HOME_PATH = Path()
     DESTINATION_PATH = Path("../../pyrogram/raw")
     NOTICE_PATH = Path("../../NOTICE")
 

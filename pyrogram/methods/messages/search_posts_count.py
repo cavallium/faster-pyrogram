@@ -16,13 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 
 
 class SearchPostsCount:
     async def search_posts_count(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         hashtag: str,
     ) -> int:
         """Get the count of posts with hashtag resulting from a search.
@@ -44,11 +46,11 @@ class SearchPostsCount:
                 offset_rate=0,
                 offset_peer=raw.types.InputPeerEmpty(),
                 offset_id=0,
-                limit=1
+                limit=1,
             )
         )
 
-        if hasattr(r, "count"):
+        if isinstance(r, (raw.types.messages.MessagesSlice, raw.types.messages.ChannelMessages)):
             return r.count
-        else:
-            return len(r.messages)
+
+        return len(r.messages)

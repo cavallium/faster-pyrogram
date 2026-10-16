@@ -16,10 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from io import BytesIO
-from typing import Any
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING, Any
 
 from ..tl_object import TLObject
+
+if TYPE_CHECKING:
+    from io import BytesIO
 
 
 class Bytes(bytes, TLObject):
@@ -37,19 +41,10 @@ class Bytes(bytes, TLObject):
 
         return x
 
-    def __new__(cls, value: bytes) -> bytes:  # type: ignore
+    def __new__(cls, value: bytes) -> bytes:
         length = len(value)
 
         if length <= 253:
-            return (
-                bytes([length])
-                + value
-                + bytes(-(length + 1) % 4)
-            )
+            return bytes([length]) + value + bytes(-(length + 1) % 4)
         else:
-            return (
-                bytes([254])
-                + length.to_bytes(3, "little")
-                + value
-                + bytes(-length % 4)
-            )
+            return bytes([254]) + length.to_bytes(3, "little") + value + bytes(-length % 4)

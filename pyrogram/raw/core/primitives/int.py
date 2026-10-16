@@ -16,20 +16,26 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from io import BytesIO
-from typing import Any
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING, Any
 
 from ..tl_object import TLObject
+
+if TYPE_CHECKING:
+    from io import BytesIO
 
 
 class Int(bytes, TLObject):
     SIZE = 4
 
+    # `signed` has a default, so the override stays call-compatible with the base's
+    #  `*args`; `ty` still rejects any extra named parameter against `*args`.
     @classmethod
-    def read(cls, data: BytesIO, signed: bool = True, *args: Any) -> int:
+    def read(cls, data: BytesIO, signed: bool = True, *args: Any) -> int:  # ty: ignore[invalid-method-override]
         return int.from_bytes(data.read(cls.SIZE), "little", signed=signed)
 
-    def __new__(cls, value: int, signed: bool = True) -> bytes:  # type: ignore
+    def __new__(cls, value: int, signed: bool = True) -> bytes:
         return value.to_bytes(cls.SIZE, "little", signed=signed)
 
 

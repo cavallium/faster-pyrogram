@@ -16,8 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Dict, List, Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -57,12 +56,12 @@ class Checklist(Object):
         self,
         *,
         title: str,
-        entities: Optional[List["types.MessageEntity"]] = None,
-        tasks: Optional[List["types.ChecklistTask"]] = None,
-        others_can_add_tasks: Optional[bool] = None,
-        can_add_tasks: Optional[bool] = None,
-        others_can_mark_tasks_as_done: Optional[bool] = None,
-        can_mark_tasks_as_done: Optional[bool] = None,
+        entities: list[types.MessageEntity] | None = None,
+        tasks: list[types.ChecklistTask] | None = None,
+        others_can_add_tasks: bool | None = None,
+        can_add_tasks: bool | None = None,
+        others_can_mark_tasks_as_done: bool | None = None,
+        can_mark_tasks_as_done: bool | None = None,
     ):
         super().__init__()
 
@@ -75,27 +74,25 @@ class Checklist(Object):
         self.can_mark_tasks_as_done = can_mark_tasks_as_done
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        checklist: "raw.types.MessageMediaToDo",
-        users: Dict[int, "raw.base.User"],
-    ) -> "Checklist":
+    async def _parse(
+        client: pyrogram.Client,
+        checklist: raw.types.MessageMediaToDo,
+        users: dict[int, raw.base.User],
+        chats: dict[int, raw.base.Chat],
+    ) -> Checklist:
         completions = {i.id: i for i in getattr(checklist, "completions", [])}
 
         checklist_tasks = []
 
         for task in checklist.todo.list:
             checklist_tasks.append(
-                types.ChecklistTask._parse(
-                    client,
-                    task,
-                    completions.get(task.id),
-                    users
+                await types.ChecklistTask._parse(
+                    client, task, completions.get(task.id), users, chats
                 )
             )
 
         title, entities = (
-            utils.parse_text_with_entities(client, checklist.todo.title, users)
+            await utils.parse_text_with_entities(client, checklist.todo.title, users)
         ).values()
 
         return Checklist(

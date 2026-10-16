@@ -16,9 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import raw
 
 
 class PaymentOption(Object):
@@ -31,20 +36,13 @@ class PaymentOption(Object):
         url (``str``):
             Payment form URL to be opened in a web view.
     """
-    def __init__(
-        self,
-        *,
-        title: str,
-        url: str
-    ):
+
+    def __init__(self, *, title: str, url: str):
         super().__init__()
 
         self.title = title
         self.url = url
 
     @staticmethod
-    def _parse(option: "raw.base.PaymentFormMethod") -> "PaymentOption":
-        return PaymentOption(
-            title=option.title,
-            url=option.url
-        )
+    def _parse(option: raw.base.PaymentFormMethod) -> PaymentOption:
+        return PaymentOption(title=option.title, url=option.url)

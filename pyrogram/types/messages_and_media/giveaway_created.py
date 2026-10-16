@@ -16,13 +16,12 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 
 from pyrogram import raw
 from ..object import Object
-
 
 
 class GiveawayCreated(Object):
@@ -35,23 +34,15 @@ class GiveawayCreated(Object):
     """
 
     def __init__(
-        self,
-        *,
-        client: "pyrogram.Client" = None,
-        prize_star_count: Optional[int] = None
+        self, *, client: pyrogram.Client | None = None, prize_star_count: int | None = None
     ):
         super().__init__(client)
 
         self.prize_star_count = prize_star_count
 
-
     @staticmethod
-    def _parse(
-        client,
-        giveaway_launch: "raw.types.MessageActionGiveawayLaunch"
-    ) -> "GiveawayCreated":
+    def _parse(client, giveaway_launch: raw.types.MessageActionGiveawayLaunch) -> GiveawayCreated:
         if isinstance(giveaway_launch, raw.types.MessageActionGiveawayLaunch):
             return GiveawayCreated(
-                client=client,
-                prize_star_count=getattr(giveaway_launch, "stars", None)
+                client=client, prize_star_count=getattr(giveaway_launch, "stars", None)
             )

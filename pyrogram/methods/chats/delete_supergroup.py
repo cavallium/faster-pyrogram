@@ -16,17 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
 
 
 class DeleteSupergroup:
-    async def delete_supergroup(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str]
-    ) -> bool:
+    async def delete_supergroup(self: pyrogram.Client, chat_id: int | str) -> bool:
         """Delete a supergroup.
 
         .. include:: /_includes/usable-by/users.rst
@@ -44,9 +41,7 @@ class DeleteSupergroup:
                 await app.delete_supergroup(supergroup_id)
         """
         await self.invoke(
-            raw.functions.channels.DeleteChannel(
-                channel=await self.resolve_peer(chat_id)
-            )
+            raw.functions.channels.DeleteChannel(channel=await self.resolve_peer(chat_id))
         )
 
         return True

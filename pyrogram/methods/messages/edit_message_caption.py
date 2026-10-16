@@ -16,24 +16,30 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Union, List, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import types, enums
 
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
 
 class EditMessageCaption:
     async def edit_message_caption(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         message_id: int,
         caption: str,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: List["types.MessageEntity"] = None,
-        schedule_date: datetime = None,
-        reply_markup: "types.InlineKeyboardMarkup" = None
-    ) -> "types.Message":
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        business_connection_id: str | None = None,
+        show_caption_above_media: bool | None = None,
+        reply_markup: types.InlineKeyboardMarkup | None = None,
+    ) -> types.Message:
         """Edit the caption of media messages.
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -54,11 +60,19 @@ class EditMessageCaption:
                 By default, texts are parsed using both Markdown and HTML styles.
                 You can combine both syntaxes together.
 
-            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`):
+            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
                 List of special entities that appear in the caption, which can be specified instead of *parse_mode*.
 
-            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+            schedule_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the message will be automatically sent.
+                A :py:obj:`~datetime.timedelta` is counted from now.
+
+            business_connection_id (``str``, *optional*):
+                Unique identifier of the business connection on behalf of which the message will be sent.
+
+            show_caption_above_media (``bool``, *optional*):
+                Pass True, if the caption must be shown above the message media.
+                Supported only for animation, photo and video messages.
 
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup`, *optional*):
                 An InlineKeyboardMarkup object.
@@ -71,6 +85,13 @@ class EditMessageCaption:
 
                 await app.edit_message_caption(chat_id, message_id, "new media caption")
         """
+        link_preview_options = self.link_preview_options
+
+        if show_caption_above_media is not None:
+            link_preview_options = types.LinkPreviewOptions(
+                show_above_text=show_caption_above_media
+            )
+
         return await self.edit_message_text(
             chat_id=chat_id,
             message_id=message_id,
@@ -78,5 +99,7 @@ class EditMessageCaption:
             parse_mode=parse_mode,
             entities=caption_entities,
             schedule_date=schedule_date,
-            reply_markup=reply_markup
+            business_connection_id=business_connection_id,
+            link_preview_options=link_preview_options,
+            reply_markup=reply_markup,
         )

@@ -16,11 +16,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from pyrogram import enums, types
 
 from .message_origin import MessageOrigin
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class MessageOriginUser(MessageOrigin):
@@ -36,16 +41,14 @@ class MessageOriginUser(MessageOrigin):
         sender_user (:obj:`~pyrogram.types.User`):
             User that sent the message originally.
     """
+
     def __init__(
         self,
         *,
-        type: "enums.MessageOriginType" = enums.MessageOriginType.USER,
-        date: datetime = None,
-        sender_user: "types.User" = None
+        type: enums.MessageOriginType = enums.MessageOriginType.USER,
+        date: datetime | None = None,
+        sender_user: types.User | None = None,
     ):
-        super().__init__(
-            type=type,
-            date=date
-        )
+        super().__init__(type=type, date=date)
 
         self.sender_user = sender_user

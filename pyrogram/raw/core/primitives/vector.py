@@ -16,13 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from io import BytesIO
-from typing import cast, Union, Any
+from __future__ import annotations as _annotations
 
-from .bool import BoolFalse, BoolTrue, Bool
-from .int import Int, Long
+from typing import TYPE_CHECKING, Any, cast
+
 from ..list import List
 from ..tl_object import TLObject
+from .bool import Bool, BoolFalse, BoolTrue
+from .int import Int, Long
+
+if TYPE_CHECKING:
+    from io import BytesIO
 
 
 class Vector(bytes, TLObject):
@@ -31,7 +35,7 @@ class Vector(bytes, TLObject):
     # Method added to handle the special case when a query returns a bare Vector (of Ints);
     # i.e., RpcResult body starts with 0x1cb5c415 (Vector Id) - e.g., messages.GetMessagesViews.
     @staticmethod
-    def read_bare(b: BytesIO, size: int) -> Union[int, Any]:
+    def read_bare(b: BytesIO, size: int) -> int | Any:
         if size == 4:
             e = int.from_bytes(b.read(4), "little")
             b.seek(-4, 1)
@@ -46,21 +50,20 @@ class Vector(bytes, TLObject):
 
         return TLObject.read(b)
 
+    # `t` is passed positionally by the generated `TLObject.read(b, Int)` dispatch and
+    #  has a default, so the override stays call-compatible; `ty` still rejects any
+    #  extra named parameter against `*args`.
     @classmethod
-    def read(cls, data: BytesIO, t: Any = None, *args: Any) -> List:
+    def read(cls, data: BytesIO, t: Any = None, *args: Any) -> List:  # ty: ignore[invalid-method-override]
         count = Int.read(data)
         left = len(data.read())
         size = (left / count) if count else 0
         data.seek(-left, 1)
 
-        return List(
-            t.read(data) if t
-            else Vector.read_bare(data, size)
-            for _ in range(count)
-        )
+        return List(t.read(data) if t else Vector.read_bare(data, size) for _ in range(count))
 
-    def __new__(cls, value: list, t: Any = None) -> bytes:  # type: ignore
+    def __new__(cls, value: list, t: Any = None) -> bytes:
         return b"".join(
             [Int(cls.ID, False), Int(len(value))]
-            + [cast(bytes, t(i)) if t else i.write() for i in value]
+            + [cast("bytes", t(i)) if t else i.write() for i in value]
         )

@@ -16,18 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw, types, errors
+from pyrogram import errors, raw, types
 
 
 class PromoteChatMember:
     async def promote_chat_member(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        user_id: Union[int, str],
-        privileges: "types.ChatPrivileges" = None,
+        self: pyrogram.Client,
+        chat_id: int | str,
+        user_id: int | str,
+        privileges: types.ChatAdministratorRights | None = None,
     ) -> bool:
         """Promote or demote a user in a supergroup or a channel.
 
@@ -44,7 +44,7 @@ class PromoteChatMember:
                 Unique identifier (int) or username (str) of the target user.
                 For a contact that exists in your Telegram address book you can use his phone number (str).
 
-            privileges (:obj:`~pyrogram.types.ChatPrivileges`, *optional*):
+            privileges (:obj:`~pyrogram.types.ChatAdministratorRights`, *optional*):
                 New user privileges.
 
         Returns:
@@ -59,17 +59,16 @@ class PromoteChatMember:
         chat_id = await self.resolve_peer(chat_id)
         user_id = await self.resolve_peer(user_id)
 
-        # See Chat.promote_member for the reason of this (instead of setting types.ChatPrivileges() as default arg).
+        # See Chat.promote_member for the reason of this (instead of setting types.ChatAdministratorRights() as default arg).
         if privileges is None:
-            privileges = types.ChatPrivileges()
+            privileges = types.ChatAdministratorRights()
 
         try:
-            raw_chat_member = (await self.invoke(
-                raw.functions.channels.GetParticipant(
-                    channel=chat_id,
-                    participant=user_id
+            raw_chat_member = (
+                await self.invoke(
+                    raw.functions.channels.GetParticipant(channel=chat_id, participant=user_id)
                 )
-            )).participant
+            ).participant
         except errors.RPCError:
             raw_chat_member = None
 
@@ -96,9 +95,11 @@ class PromoteChatMember:
                     add_admins=privileges.can_promote_members,
                     manage_call=privileges.can_manage_video_chats,
                     manage_topics=privileges.can_manage_topics,
-                    other=privileges.can_manage_chat
+                    manage_ranks=privileges.can_manage_tags,
+                    manage_welcome_messages=privileges.can_send_welcome_messages,
+                    other=privileges.can_manage_chat,
                 ),
-                rank=rank or ""
+                rank=rank or "",
             )
         )
 

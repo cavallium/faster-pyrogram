@@ -16,6 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from .file_storage import FileStorage
-from .memory_storage import MemoryStorage
-from .storage import Storage
+from .sqlite_storage import SQLiteStorage
+from .storage import Storage, UpdateState
+
+__all__ = ["SQLiteStorage", "Storage", "UpdateState"]

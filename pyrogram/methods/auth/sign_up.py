@@ -16,23 +16,24 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types, utils
 
 log = logging.getLogger(__name__)
 
 
 class SignUp:
     async def sign_up(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         phone_number: str,
         phone_code_hash: str,
         first_name: str,
-        last_name: str = ""
-    ) -> "types.User":
+        last_name: str = "",
+    ) -> types.User:
         """Register a new user in Telegram.
 
         .. include:: /_includes/usable-by/users.rst
@@ -42,7 +43,7 @@ class SignUp:
                 Phone number in international format (includes the country prefix).
 
             phone_code_hash (``str``):
-                Code identifier taken from the result of :meth:`~pyrogram.Client.send_code`.
+                Code identifier taken from the result of :meth:`~pyrogram.Client.send_phone_number_code`.
 
             first_name (``str``):
                 New user first name.
@@ -63,11 +64,11 @@ class SignUp:
                 phone_number=phone_number,
                 first_name=first_name,
                 last_name=last_name,
-                phone_code_hash=phone_code_hash
+                phone_code_hash=phone_code_hash,
             )
         )
 
         await self.storage.user_id(r.user.id)
         await self.storage.is_bot(False)
 
-        return types.User._parse(self, r.user)
+        return utils.require_parsed(await types.User._parse(self, r.user))

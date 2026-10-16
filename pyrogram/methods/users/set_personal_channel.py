@@ -16,17 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union, Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
 
 
 class SetPersonalChannel:
-    async def set_personal_channel(
-        self: "pyrogram.Client",
-        chat_id: Optional[Union[int, str]] = None
-    ) -> bool:
+    async def set_personal_channel(self: pyrogram.Client, chat_id: int | str | None = None) -> bool:
         """Set a personal channel in bio.
 
         .. include:: /_includes/usable-by/users.rst
@@ -35,7 +32,7 @@ class SetPersonalChannel:
         :meth:`~pyrogram.Client.get_personal_channels`.
 
         Parameters:
-            chat_id (``int`` | ``str``):
+            chat_id (``int`` | ``str``, *optional*):
                 Unique identifier (int) or username (str) of the target user or None to remove it.
 
         Returns:
@@ -58,10 +55,4 @@ class SetPersonalChannel:
             if not isinstance(peer, raw.types.InputPeerChannel):
                 return False
 
-        return bool(
-            await self.invoke(
-                raw.functions.account.UpdatePersonalChannel(
-                    channel=peer
-                )
-            )
-        )
+        return bool(await self.invoke(raw.functions.account.UpdatePersonalChannel(channel=peer)))

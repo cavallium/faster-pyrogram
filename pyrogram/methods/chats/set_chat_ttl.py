@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -24,10 +24,8 @@ from pyrogram import raw, types, utils
 
 class SetChatTTL:
     async def set_chat_ttl(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        ttl_seconds: int
-    ) -> "types.Message":
+        self: pyrogram.Client, chat_id: int | str, ttl_seconds: int
+    ) -> types.Message | None:
         """Set the time-to-live for the chat.
 
         .. include:: /_includes/usable-by/users.rst
@@ -41,7 +39,8 @@ class SetChatTTL:
                 Either 86000 for 1 day, 604800 for 1 week or 0 (zero) to disable it.
 
         Returns:
-            ``bool``: True on success.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent service message is returned,
+            otherwise, in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python

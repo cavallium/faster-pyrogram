@@ -16,13 +16,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Optional
+from __future__ import annotations as _annotations
 
-import pyrogram
+from typing import TYPE_CHECKING
+
 from pyrogram import raw, types, utils
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class ChatSettings(Object):
@@ -73,7 +76,7 @@ class ChatSettings(Object):
         request_chat_date (:py:obj:`~datetime.datetime`, *optional*):
             Date when join request was sent.
 
-        business_bot (:obj:`types.User`, *optional*):
+        business_bot (:obj:`~pyrogram.types.User`, *optional*):
             Business bot that manages this chat.
 
         business_bot_manage_url (``str``, *optional*):
@@ -98,27 +101,27 @@ class ChatSettings(Object):
     def __init__(
         self,
         *,
-        can_report_spam: Optional[bool] = None,
-        can_add_contact: Optional[bool] = None,
-        can_block_contact: Optional[bool] = None,
-        can_share_contact: Optional[bool] = None,
-        can_report_geo: Optional[bool] = None,
-        can_invite_members: Optional[bool] = None,
-        is_autoarchived: Optional[bool] = None,
-        is_business_bot_paused: Optional[bool] = None,
-        is_business_bot_can_reply: Optional[bool] = None,
-        need_contacts_exception: Optional[bool] = None,
-        request_chat_broadcast: Optional[bool] = None,
-        geo_distance: Optional[int] = None,
-        request_chat_title: Optional[str] = None,
-        request_chat_date: Optional[datetime] = None,
-        business_bot: Optional["types.User"] = None,
-        business_bot_manage_url: Optional[str] = None,
-        charge_paid_message_stars: Optional[int] = None,
-        registration_date: Optional[str] = None,
-        phone_number_country_code: Optional[str] = None,
-        last_name_change_date: Optional[datetime] = None,
-        last_photo_change_date: Optional[datetime] = None
+        can_report_spam: bool | None = None,
+        can_add_contact: bool | None = None,
+        can_block_contact: bool | None = None,
+        can_share_contact: bool | None = None,
+        can_report_geo: bool | None = None,
+        can_invite_members: bool | None = None,
+        is_autoarchived: bool | None = None,
+        is_business_bot_paused: bool | None = None,
+        is_business_bot_can_reply: bool | None = None,
+        need_contacts_exception: bool | None = None,
+        request_chat_broadcast: bool | None = None,
+        geo_distance: int | None = None,
+        request_chat_title: str | None = None,
+        request_chat_date: datetime | None = None,
+        business_bot: types.User | None = None,
+        business_bot_manage_url: str | None = None,
+        charge_paid_message_stars: int | None = None,
+        registration_date: str | None = None,
+        phone_number_country_code: str | None = None,
+        last_name_change_date: datetime | None = None,
+        last_photo_change_date: datetime | None = None,
     ):
         super().__init__()
 
@@ -145,7 +148,7 @@ class ChatSettings(Object):
         self.last_photo_change_date = last_photo_change_date
 
     @staticmethod
-    def _parse(client, chat_settings: "raw.types.PeerSettings", users) -> Optional["ChatSettings"]:
+    async def _parse(client, chat_settings: raw.types.PeerSettings, users) -> ChatSettings | None:
         if not chat_settings:
             return None
 
@@ -163,12 +166,20 @@ class ChatSettings(Object):
             request_chat_broadcast=getattr(chat_settings, "request_chat_broadcast", None),
             geo_distance=getattr(chat_settings, "geo_distance", None),
             request_chat_title=getattr(chat_settings, "request_chat_title", None),
-            request_chat_date=utils.timestamp_to_datetime(getattr(chat_settings, "request_chat_date", None)),
-            business_bot=types.User._parse(client, users.get(getattr(chat_settings, "business_bot_id", None))),
+            request_chat_date=utils.timestamp_to_datetime(
+                getattr(chat_settings, "request_chat_date", None)
+            ),
+            business_bot=await types.User._parse(
+                client, users.get(getattr(chat_settings, "business_bot_id", None))
+            ),
             business_bot_manage_url=getattr(chat_settings, "business_bot_manage_url", None),
             charge_paid_message_stars=getattr(chat_settings, "charge_paid_message_stars", None),
             registration_date=getattr(chat_settings, "registration_month", None),
             phone_number_country_code=getattr(chat_settings, "phone_country", None),
-            last_name_change_date=utils.timestamp_to_datetime(getattr(chat_settings, "name_change_date", None)),
-            last_photo_change_date=utils.timestamp_to_datetime(getattr(chat_settings, "photo_change_date", None)),
+            last_name_change_date=utils.timestamp_to_datetime(
+                getattr(chat_settings, "name_change_date", None)
+            ),
+            last_photo_change_date=utils.timestamp_to_datetime(
+                getattr(chat_settings, "photo_change_date", None)
+            ),
         )

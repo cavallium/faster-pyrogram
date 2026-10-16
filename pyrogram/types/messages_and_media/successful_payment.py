@@ -16,12 +16,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Optional, Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from pyrogram import raw, types, utils
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class SuccessfulPayment(Object):
@@ -46,8 +50,8 @@ class SuccessfulPayment(Object):
         shipping_option_id (``str``, *optional*):
             Identifier of the shipping option chosen by the user. Only available to the bot that received the payment.
 
-        payment_info (:obj:`~pyrogram.types.PaymentInfo`, *optional*):
-            Payment information provided by the user. Only available to the bot that received the payment.
+        order_info (:obj:`~pyrogram.types.OrderInfo`, *optional*):
+            Order information provided by the user. Only available to the bot that received the payment.
 
         is_recurring (``bool``, *optional*):
             True, if the payment is a recurring payment for a subscription.
@@ -63,18 +67,19 @@ class SuccessfulPayment(Object):
     """
 
     def __init__(
-        self, *,
+        self,
+        *,
         currency: str,
         total_amount: str,
         invoice_payload: str,
         telegram_payment_charge_id: str,
         provider_payment_charge_id: str,
-        shipping_option_id: Optional[str] = None,
-        order_info: Optional["types.OrderInfo"] = None,
-        is_recurring: Optional[bool] = None,
-        is_first_recurring: Optional[bool] = None,
-        invoice_slug: Optional[str] = None,
-        subscription_expiration_date: datetime = None,
+        shipping_option_id: str | None = None,
+        order_info: types.OrderInfo | None = None,
+        is_recurring: bool | None = None,
+        is_first_recurring: bool | None = None,
+        invoice_slug: str | None = None,
+        subscription_expiration_date: datetime | None = None,
     ):
         super().__init__()
 
@@ -92,10 +97,8 @@ class SuccessfulPayment(Object):
 
     @staticmethod
     def _parse(
-        payment: Union[
-            "raw.types.MessageActionPaymentSent",
-            "raw.types.MessageActionPaymentSentMe"
-        ]) -> "SuccessfulPayment":
+        payment: raw.types.MessageActionPaymentSent | raw.types.MessageActionPaymentSentMe,
+    ) -> SuccessfulPayment:
         invoice_payload = None
         telegram_payment_charge_id = None
         provider_payment_charge_id = None
@@ -112,7 +115,7 @@ class SuccessfulPayment(Object):
 
             telegram_payment_charge_id = payment.charge.id
             provider_payment_charge_id = payment.charge.provider_charge_id
-            shipping_option_id = getattr(payment, "shipping_option_id")
+            shipping_option_id = payment.shipping_option_id
 
             if payment.info:
                 payment_info = payment.info
@@ -121,9 +124,7 @@ class SuccessfulPayment(Object):
                     name=getattr(payment_info, "name", None),
                     phone_number=getattr(payment_info, "phone", None),
                     email=getattr(payment_info, "email", None),
-                    shipping_address=types.ShippingAddress._parse(
-                        payment_info.shipping_address
-                    )
+                    shipping_address=types.ShippingAddress._parse(payment_info.shipping_address),
                 )
 
         return SuccessfulPayment(
@@ -137,5 +138,7 @@ class SuccessfulPayment(Object):
             is_recurring=getattr(payment, "recurring_used", None),
             is_first_recurring=getattr(payment, "recurring_init", None),
             invoice_slug=getattr(payment, "invoice_slug", None),
-            subscription_expiration_date=utils.timestamp_to_datetime(payment.subscription_until_date),
+            subscription_expiration_date=utils.timestamp_to_datetime(
+                payment.subscription_until_date
+            ),
         )

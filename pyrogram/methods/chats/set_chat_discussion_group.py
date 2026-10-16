@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,9 +24,10 @@ from pyrogram import raw
 
 class SetChatDiscussionGroup:
     async def set_chat_discussion_group(
-        self: "pyrogram.Client", *,
-        chat_id: Optional[Union[int, str]] = None,
-        discussion_chat_id: Optional[Union[int, str]] = None
+        self: pyrogram.Client,
+        *,
+        chat_id: int | str | None = None,
+        discussion_chat_id: int | str | None = None,
     ) -> bool:
         """Change the discussion group of a channel chat.
 
@@ -41,7 +42,7 @@ class SetChatDiscussionGroup:
 
             discussion_chat_id (``int`` | ``str``, *optional*):
                 Unique identifier (int) or username (str) of a new channel's discussion group.
-                Use the method :meth:`get_suitable_discussion_chats` to find all suitable groups.
+                Use the method :meth:`~pyrogram.Client.get_suitable_discussion_chats` to find all suitable groups.
                 Pass None to remove the discussion group.
 
         Returns:
@@ -79,13 +80,14 @@ class SetChatDiscussionGroup:
             discussion_peer = await self.resolve_peer(discussion_chat_id)
 
             if not isinstance(discussion_peer, raw.types.InputPeerChannel):
-                raise ValueError(f'The discussion_chat_id "{discussion_chat_id}" does not belong to a chat')
+                raise ValueError(
+                    f'The discussion_chat_id "{discussion_chat_id}" does not belong to a chat'
+                )
 
         return bool(
             await self.invoke(
                 raw.functions.channels.SetDiscussionGroup(
-                    broadcast=channel_peer,
-                    group=discussion_peer
+                    broadcast=channel_peer, group=discussion_peer
                 )
             )
         )

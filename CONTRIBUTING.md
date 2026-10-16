@@ -1,0 +1,223 @@
+# Contributing to Kurigram
+
+Thanks for taking the time to contribute! This document covers how to set up a development
+environment, the expected workflow, and what we look for in a pull request.
+
+## Getting started
+
+Kurigram requires Python `>=3.10` and [`uv`](https://docs.astral.sh/uv/getting-started/installation/).
+
+Nothing else has to be set up. Every `make` recipe below runs through `uv run`, which creates
+`.venv` from `uv.lock` and brings it up to date whenever the lock file moves, so there is no
+environment step to forget. To install without running anything:
+
+```bash
+make sync
+```
+
+Development tools live in the `dev` dependency group and are installed by default; the
+documentation build has its own `docs` group, which the docs recipes select on their own. Neither
+is an extra, so `pip install kurigram[dev]` is not a thing. After changing a dependency in
+`pyproject.toml`, run `uv lock` and commit `uv.lock` with the change.
+
+`make docs` builds the documentation once; `make docs-serve` serves it locally and refreshes the
+page while you edit.
+
+### Generated code
+
+`pyrogram/raw/{types,functions,base,all.py}` and `pyrogram/errors/exceptions/` are generated from
+TL schema files and are not tracked in git. Run the generator before working on anything that
+touches type checking or code that imports from `pyrogram.raw`, and again after any change
+under `compiler/api/source`:
+
+```bash
+make api
+```
+
+Never hand-edit files under these paths. If a change appears to require editing generated code,
+the actual fix belongs in the compiler/templates under `compiler/`, or in the code that consumes
+the generated types.
+
+## Development workflow
+
+Run these before opening a pull request:
+
+```bash
+make lint          # ruff check, plus ruff format --check
+make typecheck     # ty check (requires `make api` to have been run first)
+make test-unit     # the offline suite, no relay or session needed
+```
+
+`make test-unit` reports coverage of `pyrogram/` as it runs. Which paths are measured, whether a
+minimum is enforced, and why, all live in the `[tool.coverage]` blocks of `pyproject.toml`.
+
+`make format` rewrites the tree and `make lint` fails on anything it would still change, so
+formatting is not something review has to raise. The line length is 100; `pyproject.toml` carries
+the reasoning next to it.
+
+That 100 is a target for the formatter, not a checked limit, so keep new code inside it by hand.
+The formatter only asks whether a file matches its own output, and a literal already alone on its
+line has no break point left, so an over-long string or f-string passes. `E501` is the rule that
+would measure the column, and it is deliberately not selected: it reports around 2260 lines, and
+all but a handful of them are docstrings copied from the Telegram API documentation.
+
+`make test` runs the full suite, including the integration tests. Those open real sockets and
+take every endpoint from a git-ignored `.env.test` file: a live MTProto or web proxy relay and a
+prepared session, listed in `.env.test.example`. Each one skips by name when its variable is
+absent, so a checkout without that file still runs the whole offline suite.
+
+A test's directory decides its marker, so put it in the tree that matches what it needs:
+`tests/integrations/` when it opens a socket or talks to a real service, `tests/guards/` when it
+sweeps the whole repository instead of exercising one module, `tests/unit/` otherwise. A test
+outside all three is not collected as unmarked, it fails the run:
+
+```
+ERROR: test_example.py is outside tests/guards, tests/integrations, tests/unit - every test lives in one of them.
+```
+
+`make test-guards` runs the guard layer on its own, for working on it; `make test-unit` already
+includes it.
+
+### Dependency ranges
+
+Everything above installs from `uv.lock`, so it only ever exercises one point inside each
+declared range. Two more recipes cover the ends of it, each in an environment of its own
+(`.venv-floor`, `.venv-ceil`) built from `pyproject.toml` rather than the lock file:
+
+```bash
+make test-floor    # oldest allowed version of every dependency, on the oldest supported Python
+make test-ceil     # newest released version of every dependency, on the newest supported Python
+```
+
+CI runs both on every push and again weekly, which is what catches a release published after the
+last `uv lock`. Neither recipe writes `uv.lock`. Run `make test-floor` after raising a floor in
+`pyproject.toml`, and note that the interpreter versions live at the top of the `Makefile` and
+have to move with `requires-python` and the CI matrix.
+
+### Optional: pre-commit hook
+
+The repository ships a `pre-commit` config that runs `make lint` and `make typecheck` on commit,
+the same two checks CI runs, so a breach never reaches review:
+
+```bash
+pre-commit install
+```
+
+### Linting and type checking policy
+
+`ruff`'s selected rule set and `ty`'s rule overrides in `pyproject.toml` are both intentionally
+narrower than "everything the tool can check": they're expanded incrementally, one rule at a
+time, as the codebase is brought into compliance with it. When contributing:
+
+- Don't widen an ignored `ty` rule or narrow the `ruff` rule set just to make a change pass.
+- Fix the underlying issue instead.
+- Don't make unrelated style changes to code outside the rules already enforced; keep pull
+  requests focused on their stated purpose.
+
+## Code style conventions
+
+A few conventions that have come up repeatedly in code review but aren't enforced by `ruff` or
+`ty`, so they're written down here instead:
+
+- **Every new `.py` file carries the licence header** that the rest of the tree carries: copy it
+  from a module in the same package. The only files without one are the empty package
+  `__init__.py` files. Nothing checks this, so a missing header only surfaces in review.
+- **Always use `list[str]` and `int | None`, never `List[str]` and `Optional[int]`.** The
+  `typing` generics are deprecated aliases of the builtins.
+  https://docs.python.org/3/library/typing.html#deprecated-aliases
+- **Every module carries `from __future__ import annotations as _annotations`**, directly below
+  the docstring. The import is what lets an annotation name a type the module imports only under
+  `TYPE_CHECKING`, so nothing in the tree quotes an annotation and `UP037` can stay selected;
+  `tests/guards/test_future_annotations.py` fails on a package module that writes one without it.
+  Keep the alias: the name is never used, and the underscore says the import is there for its
+  side effect alone.
+- **A dependency is declared with a floor, never a ceiling.** `pyproject.toml` carries the
+  reasoning beside the declarations. Where a major version genuinely breaks us, add the upper
+  bound and name the breakage in a comment next to it.
+- **No `assert` for runtime guards in library code.** `assert` statements are stripped when
+  Python runs with `-O`, and raise a bare `AssertionError` with no context for library consumers.
+  Raise `RuntimeError` (or a more specific exception) instead.
+- **When raising with a message, assign it to a variable first**, then raise it, rather than
+  writing the message inline in the `raise` statement:
+
+  ```python
+  msg = f"connection not open (state={self._state})"
+  raise RuntimeError(msg)
+  ```
+
+- **All code references in comments use backticks**, and every reference in the comment, not
+  just the first one. Write ``Call `Client.stop()` before `Client.start()`.``, not
+  `Call Client.stop() before Client.start().`
+- **No em dashes or `--` as punctuation in comments.** Use a comma, colon, parentheses, or a
+  single `-` instead. `tests/guards/test_comment_dashes.py` fails on one, so this is checked
+  rather than caught in review; a `--` that is a flag (`--fix`) or the end-of-options marker
+  (`grep -v -- -`) keeps its dashes. Docstrings are out of scope. The guard reads `#` comments in
+  `.toml`, `.yml`, `.yaml`, the `Makefile` and `.gitignore` as well as `.py`, because a config
+  comment went out with an em dash while the suite was green; the sweep asserts it reached one
+  file of each format, so dropping one fails rather than passing quietly.
+- **Every `# noqa: CODE` carries a reason** after a single `-`, as in
+  ``# noqa: F403 - generated by `make api`, absent from a fresh checkout``. Same shape and
+  same reason as the `# ty: ignore` rule below: `ruff` reads the codes and stops, so the text
+  after them is ours to spend on why the suppression is there.
+- **A re-export is spelled `# noqa: F401` with a reason, never `from .x import Name as Name`.**
+  The redundant alias silences `F401` by looking like a typing convention, and a reader has to
+  know that convention to see it is deliberate at all. Where the module has an `__all__`,
+  listing the name there is better still: nothing is suppressed and the export is declared.
+- **A module's `__all__` covers everything the module defines.** `ruff` holds one half of this:
+  `F401` fails on a name imported and neither used nor listed, `F822` on a listed name that
+  resolves to nothing. Neither looks at a class or function the module defines itself, so a
+  barrel that grows one beside its imports drops it from the public API and nothing says so.
+  `tests/guards/test_public_exports.py` fails on that, on a repeated entry, and on an `__all__`
+  built by concatenation or comprehension, which reads as a declaration while leaving the other
+  two checks nothing to read. Declaring one is not required: the aggregator `__init__.py` files
+  under `pyrogram/methods/` collect mixins for `Client` rather than exporting an API.
+- **Every `# ty: ignore[rule]` carries a reason** after a single `-`, as in
+  `# ty: ignore[unresolved-import] - optional, not a project dependency`. Only the `[rule]`
+  bracket is `ty`'s own syntax; the reason is ours, so nobody has to reconstruct why the
+  ignore is there.
+- **A parameter that needs to distinguish "not passed" from a meaningful `None`** (for example,
+  a `reply_markup` parameter where `None` means "remove the markup") should default to the
+  `object` class itself (not an instance of it) as the "not specified" sentinel, keeping `None`
+  free to carry its own meaning. Check for existing uses of this pattern elsewhere in the method
+  or type before introducing a new one.
+- **Test doubles that stand in for `Client`** are named `FakeClient`, not `Client` or `TestClient`
+  (pytest warns about `Test*` classes that define `__init__`). Most of the test suite already
+  does this: reuse the name rather than inventing one per test file.
+- **Module-level constants that never change** should be annotated `Final`.
+- **An optional third-party import** (a package the project doesn't depend on, used defensively
+  behind a feature that needs it) is marked `# ty: ignore[unresolved-import]`, with the reason
+  saying it's optional and linking to the [docs](https://docs.kurigram.icu) section covering
+  that feature, if there is one.
+- **Never write `or None` on a `raw.*` field the schema declares `flags.N?true`.** That field has
+  no payload: the flag bit is the value, and the generated writer sets the bit from a plain
+  truthiness test, so `False` and `None` write the same bytes and the `or None` reads as a guard
+  that guards nothing. `tests/guards/test_flag_only_fields.py` fails on one, naming the file and
+  the field. The other optional types (`flags.N?Bool`, `?string`, `?Vector<T>`) carry their value
+  separately from the bit, so `or None` there is a real choice and stays.
+
+## Commit and pull request guidelines
+
+- Write commit messages using [Conventional Commits](https://www.conventionalcommits.org/),
+  matching the existing git history: `fix(session): ...`, `feat(deps): ...`, `docs(api): ...`.
+  Name a scope; almost every commit on `dev` carries one, and the few that don't are the ones
+  nobody can place afterwards.
+- **The pull request title matters, not just commit messages.** The project squash-merges, so
+  the PR title becomes the actual commit message on `dev`. Title it the same way you would a
+  commit: `type(scope): description`, describing what the change actually does rather than a
+  generic label. If the branch gains more commits or changes scope before merge, update the title
+  to match; don't leave it describing an earlier, narrower version of the change.
+- Keep pull requests focused on one logical change. Unrelated fixes should be separate PRs.
+- Reference any related issue in the pull request description.
+
+### Before submitting, make sure that
+
+- [ ] `make lint` passes
+- [ ] `make typecheck` passes (after `make api`)
+- [ ] `make test-unit` passes
+- [ ] Tests were added or updated for behavioral changes
+- [ ] The commit message(s) follow Conventional Commits
+
+## Questions
+
+If something is unclear, reach out on the [official chat](https://t.me/kurigram_chat) or follow
+news and announcements on the [official channel](https://t.me/kurigram_news).

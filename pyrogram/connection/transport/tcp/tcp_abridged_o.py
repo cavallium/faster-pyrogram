@@ -16,54 +16,74 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import asyncio
 import logging
-import os
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING
 
-import pyrogram
+from pyrogram.connection.transport.tcp.tcp import (
+    ABRIDGED_OBFUSCATE_TAG,
+    TCP,
+    finalize_obfuscated2_tag,
+    generate_obfuscated2_nonce,
+)
 from pyrogram.crypto import aes
-from .tcp import TCP, Proxy
+
+if TYPE_CHECKING:
+    from pyrogram.connection.proxy import Proxy
 
 log = logging.getLogger(__name__)
 
 
 class TCPAbridgedO(TCP):
-    RESERVED = (b"HEAD", b"POST", b"GET ", b"OPTI", b"\xee" * 4)
-
-    def __init__(self, ipv6: bool, proxy: Proxy, loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
-        super().__init__(ipv6, proxy, loop)
+    def __init__(
+        self,
+        ipv6: bool,
+        proxy: Proxy | None = None,
+        crypto_executor_workers: int = 1,
+        dc_id: int | None = None,
+    ) -> None:
+        super().__init__(ipv6, proxy, crypto_executor_workers, dc_id=dc_id)
 
         self.encrypt = None
         self.decrypt = None
 
-    async def connect(self, address: Tuple[str, int]) -> None:
+    async def connect(self, address: tuple[str, int]) -> None:
+        self.marker_event.clear()
         await super().connect(address)
 
-        while True:
-            nonce = bytearray(os.urandom(64))
-
-            if bytes([nonce[0]]) != b"\xef" and nonce[:4] not in self.RESERVED and nonce[4:8] != b"\x00" * 4:
-                nonce[56] = nonce[57] = nonce[58] = nonce[59] = 0xef
-                break
+        nonce = generate_obfuscated2_nonce()
+        nonce[56:60] = ABRIDGED_OBFUSCATE_TAG
 
         temp = bytearray(nonce[55:7:-1])
 
         self.encrypt = (nonce[8:40], nonce[40:56], bytearray(1))
         self.decrypt = (temp[0:32], temp[32:48], bytearray(1))
 
-        nonce[56:64] = aes.ctr256_encrypt(nonce, *self.encrypt)[56:64]
+        nonce[56:64] = finalize_obfuscated2_tag(nonce, encrypt=self.encrypt)
 
-        await super().send(nonce)
+        await super().send(nonce, wait_for_marker=False)
+        self.marker_event.set()
 
-    async def send(self, data: bytes, *args) -> None:
+    async def send(self, data: bytes, wait_for_marker: bool = True) -> None:
+        if self.encrypt is None:
+            msg = "`send()` requires `connect()` to have run first"
+            raise RuntimeError(msg)
+
         length = len(data) // 4
         data = (bytes([length]) if length <= 126 else b"\x7f" + length.to_bytes(3, "little")) + data
-        payload = await self.loop.run_in_executor(pyrogram.crypto_executor, aes.ctr256_encrypt, data, *self.encrypt)
+        payload = await asyncio.get_running_loop().run_in_executor(
+            self.crypto_executor, aes.ctr256_encrypt, data, *self.encrypt
+        )
 
-        await super().send(payload)
+        await super().send(payload, wait_for_marker)
 
-    async def recv(self, length: int = 0) -> Optional[bytes]:
+    async def recv(self, length: int = 0) -> bytes | None:
+        if self.decrypt is None:
+            msg = "`recv()` requires `connect()` to have run first"
+            raise RuntimeError(msg)
+
         length = await super().recv(1)
 
         if length is None:
@@ -84,4 +104,6 @@ class TCPAbridgedO(TCP):
         if data is None:
             return None
 
-        return await self.loop.run_in_executor(pyrogram.crypto_executor, aes.ctr256_decrypt, data, *self.decrypt)
+        return await asyncio.get_running_loop().run_in_executor(
+            self.crypto_executor, aes.ctr256_decrypt, data, *self.decrypt
+        )

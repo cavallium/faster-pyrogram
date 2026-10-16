@@ -16,14 +16,45 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import asyncio
 import logging
-from typing import Optional, Type
+from typing import Final
 
-from .transport import TCP, TCPAbridged
-from ..session.internals import DataCenter
+from pyrogram.connection.proxy import Proxy, uses_random_padding
+from pyrogram.connection.transport import TCP, TCPAbridged, TCPIntermediatePadded
 
 log = logging.getLogger(__name__)
+
+# tdesktop's `kTestModeDcIdShift`.
+#  https://github.com/telegramdesktop/tdesktop/blob/23dff657fc857c3223fa20472aa8614b9ab2c7eb/Telegram/SourceFiles/mtproto/connection_abstract.h#L29
+_TEST_MODE_DC_ID_SHIFT: Final[int] = 10000
+
+
+def transport_class_for(proxy: Proxy | None, *, default: type[TCP] = TCPAbridged) -> type[TCP]:
+    """The transport a proxy's secret requires, or `default` when it requires none.
+
+    A dd- or ee-prefixed secret asks for random padding, so the secret decides the
+    framing and the caller does not: TDLib builds the same choice into its
+    obfuscated transport's constructor.
+    https://github.com/tdlib/td/blob/d1085f9cebc5a62379991ae1652673954f229c1f/td/mtproto/TcpTransport.h#L102-L103
+    """
+    if uses_random_padding(proxy):
+        return TCPIntermediatePadded
+
+    return default
+
+
+def _protocol_dc_id(dc_id: int, *, test_mode: bool, media: bool) -> int:
+    # Mirrors tdesktop's `SessionPrivate::getProtocolDcId()`: the media cluster
+    #  is the negated dc id, test-mode servers get the shift above. Only the WEB
+    #  proxy scheme embeds this, in the obfuscated2 nonce; the other transports
+    #  address the DC by IP and never see it.
+    #  https://github.com/telegramdesktop/tdesktop/blob/23dff657fc857c3223fa20472aa8614b9ab2c7eb/Telegram/SourceFiles/mtproto/session_private.cpp#L253-L265
+    protocol_dc_id = dc_id + (_TEST_MODE_DC_ID_SHIFT if test_mode else 0)
+
+    return -protocol_dc_id if media else protocol_dc_id
 
 
 class Connection:
@@ -32,45 +63,60 @@ class Connection:
     def __init__(
         self,
         dc_id: int,
+        server_address: str,
+        port: int,
         test_mode: bool,
-        ipv6: bool,
-        proxy: dict,
+        proxy: Proxy | None = None,
         media: bool = False,
-        protocol_factory: Type[TCP] = TCPAbridged,
-        loop: Optional[asyncio.AbstractEventLoop] = None
+        protocol_factory: type[TCP] = TCPAbridged,
+        crypto_executor_workers: int = 1,
     ) -> None:
         self.dc_id = dc_id
+        self.server_address = server_address
+        self.port = port
         self.test_mode = test_mode
-        self.ipv6 = ipv6
+        self.ipv6 = ":" in server_address
         self.proxy = proxy
         self.media = media
-        self.protocol_factory = protocol_factory
+        self.crypto_executor_workers = crypto_executor_workers
 
-        self.address = DataCenter(dc_id, test_mode, ipv6, media)
-        self.protocol: Optional[TCP] = None
+        # The proxy secret overrides whatever framing the caller asked for, so a
+        #  proxy is the only thing a caller has to pass to reach one.
+        self.protocol_factory = transport_class_for(proxy, default=protocol_factory)
 
-        if isinstance(loop, asyncio.AbstractEventLoop):
-            self.loop = loop
-        else:
-            self.loop = asyncio.get_event_loop()
+        if self.protocol_factory is not protocol_factory:
+            log.debug(
+                "Proxy secret asks for random padding, so %s frames this connection",
+                self.protocol_factory.__name__,
+            )
+
+        self.protocol: TCP | None = None
+        self._protocol_dc_id = _protocol_dc_id(dc_id, test_mode=test_mode, media=media)
 
     async def connect(self) -> None:
-        for i in range(Connection.MAX_CONNECTION_ATTEMPTS):
-            self.protocol = self.protocol_factory(ipv6=self.ipv6, proxy=self.proxy, loop=self.loop)
+        for _ in range(Connection.MAX_CONNECTION_ATTEMPTS):
+            self.protocol = self.protocol_factory(
+                ipv6=self.ipv6,
+                proxy=self.proxy,
+                crypto_executor_workers=self.crypto_executor_workers,
+                dc_id=self._protocol_dc_id,
+            )
 
             try:
                 log.info("Connecting...")
-                await self.protocol.connect(self.address)
+                await self.protocol.connect((self.server_address, self.port))
             except OSError as e:
                 log.warning("Unable to connect due to network issues: %s", e)
                 await self.protocol.close()
                 await asyncio.sleep(1)
             else:
-                log.info("Connected! %s DC%s%s - IPv%s",
-                         "Test" if self.test_mode else "Production",
-                         self.dc_id,
-                         " (media)" if self.media else "",
-                         "6" if self.ipv6 else "4")
+                log.info(
+                    "Connected! %s DC%s%s - IPv%s",
+                    "Test" if self.test_mode else "Production",
+                    self.dc_id,
+                    " (media)" if self.media else "",
+                    "6" if self.ipv6 else "4",
+                )
                 break
         else:
             log.warning("Connection failed! Trying again...")
@@ -83,5 +129,5 @@ class Connection:
     async def send(self, data: bytes) -> None:
         await self.protocol.send(data)
 
-    async def recv(self) -> Optional[bytes]:
+    async def recv(self) -> bytes | None:
         return await self.protocol.recv()

@@ -1,20 +1,22 @@
-#  Pyrogram - Telegram MTProto API Client Library for Python
+#  Kurigram - Telegram MTProto API Client Library for Python
+#
 #  Copyright (C) 2017-present Dan <https://github.com/delivrance>
+#  Copyright (C) 2024-present KurimuzonAkuma <https://github.com/KurimuzonAkuma>
 #
-#  This file is part of Pyrogram.
+#  This file is part of Kurigram.
 #
-#  Pyrogram is free software: you can redistribute it and/or modify
+#  Kurigram is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Lesser General Public License as published
 #  by the Free Software Foundation, either version 3 of the License, or
 #  (at your option) any later version.
 #
-#  Pyrogram is distributed in the hope that it will be useful,
+#  Kurigram is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #  GNU Lesser General Public License for more details.
 #
 #  You should have received a copy of the GNU Lesser General Public License
-#  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+#  along with Kurigram. If not, see <https://www.gnu.org/licenses/>.
 
 from enum import auto
 
@@ -33,8 +35,14 @@ class MessageServiceType(AutoName):
     NEW_CHAT_MEMBERS = auto()
     "New members join"
 
-    LEFT_CHAT_MEMBERS = auto()
-    "Left chat members"
+    LEFT_CHAT_MEMBER = auto()
+    "Left chat member"
+
+    CHAT_OWNER_LEFT = auto()
+    "Chat owner left"
+
+    CHAT_OWNER_CHANGED = auto()
+    "Chat owner changed"
 
     NEW_CHAT_TITLE = auto()
     "New chat title"
@@ -46,22 +54,22 @@ class MessageServiceType(AutoName):
     "Deleted chat photo"
 
     FORUM_TOPIC_CREATED = auto()
-    "a new forum topic created in the chat"
+    "New forum topic created in the chat"
 
     FORUM_TOPIC_CLOSED = auto()
-    "a new forum topic closed in the chat"
+    "New forum topic closed in the chat"
 
     FORUM_TOPIC_REOPENED = auto()
-    "a new forum topic reopened in the chat"
+    "New forum topic reopened in the chat"
 
     FORUM_TOPIC_EDITED = auto()
-    "a new forum topic renamed in the chat"
+    "New forum topic renamed in the chat"
 
     GENERAL_FORUM_TOPIC_HIDDEN = auto()
-    "a general forum topic hidden in the chat"
+    "General forum topic hidden in the chat"
 
     GENERAL_FORUM_TOPIC_UNHIDDEN = auto()
-    "a general forum topic unhidden in the chat"
+    "General forum topic unhidden in the chat"
 
     GROUP_CHAT_CREATED = auto()
     "Group chat created"
@@ -90,7 +98,16 @@ class MessageServiceType(AutoName):
     GIVEAWAY_COMPLETED = auto()
     "Giveaway completed"
 
-    GIFT_CODE = auto()
+    MANAGED_BOT_CREATED = auto()
+    "Managed bot created"
+
+    POLL_OPTION_ADDED = auto()
+    "Poll option added"
+
+    POLL_OPTION_DELETED = auto()
+    "Poll option deleted"
+
+    PREMIUM_GIFT_CODE = auto()
     "Gift code"
 
     GIFTED_PREMIUM = auto()
@@ -98,6 +115,9 @@ class MessageServiceType(AutoName):
 
     GIFTED_STARS = auto()
     "Gifted stars"
+
+    GIFTED_GRAMS = auto()
+    "Gifted TON Grams"
 
     VIDEO_CHAT_STARTED = auto()
     "Video chat started"
@@ -132,11 +152,26 @@ class MessageServiceType(AutoName):
     REFUNDED_PAYMENT = auto()
     "Refunded payment"
 
-    CHAT_TTL_CHANGED = auto()
+    SUGGESTED_POST_APPROVAL_FAILED = auto()
+    "Suggested post approval failed"
+
+    SUGGESTED_POST_APPROVED = auto()
+    "Suggested post approved"
+
+    SUGGESTED_POST_DECLINED = auto()
+    "Suggested post declined"
+
+    SUGGESTED_POST_PAID = auto()
+    "Suggested post paid"
+
+    SUGGESTED_POST_REFUNDED = auto()
+    "Suggested post refunded"
+
+    SET_MESSAGE_AUTO_DELETE_TIME = auto()
     "Chat TTL changed"
 
-    BOOST_APPLY = auto()
-    "Boost apply"
+    CHAT_BOOST = auto()
+    "Boost applied to the chat"
 
     GIFT = auto()
     "Star gift"
@@ -157,10 +192,13 @@ class MessageServiceType(AutoName):
     "Proximity alert triggered"
 
     HISTORY_CLEARED = auto()
-    "History clear"
+    "Chat history cleared"
 
     SUGGEST_PROFILE_PHOTO = auto()
     "Suggest profile photo"
+
+    SUGGEST_BIRTHDAY = auto()
+    "Suggest birthday"
 
     CHAT_SET_BACKGROUND = auto()
     "Set chat background"
@@ -185,3 +223,30 @@ class MessageServiceType(AutoName):
 
     CHECKLIST_TASKS_ADDED = auto()
     "Checklist tasks added"
+
+    COMMUNITY_CHAT_ADDED = auto()
+    "Community chat added"
+
+    COMMUNITY_CHAT_REMOVED = auto()
+    "Community chat removed"
+
+    COMMUNITY_CHAT_JOINED = auto()
+    "Joined in chat via community"
+
+    UPGRADED_GIFT_PURCHASE_OFFER = auto()
+    "Upgraded gift purchase offer"
+
+    UPGRADED_GIFT_PURCHASE_OFFER_REJECTED = auto()
+    "Upgraded gift purchase offer declined"
+
+    CHAT_HAS_PROTECTED_CONTENT_TOGGLED = auto()
+    "Chat has protected content toggled"
+
+    CHAT_HAS_PROTECTED_CONTENT_DISABLE_REQUESTED = auto()
+    "Chat has protected content disable requested"
+
+    TON_WALLET_TRANSFER = auto()
+    "A transfer with the TON wallet of the current user"
+
+    TON_CONNECT_REQUEST = auto()
+    "A request from a dApp was received through TON Connect"

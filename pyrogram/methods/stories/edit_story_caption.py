@@ -16,20 +16,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
 
+
 class EditStoryCaption:
     async def edit_story_caption(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         story_id: int,
         caption: str,
-        parse_mode: "enums.ParseMode" = None,
-        caption_entities: List["types.MessageEntity"] = None,
-    ) -> "types.Story":
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
+    ) -> types.Story:
         """Edit the caption of story.
 
         .. include:: /_includes/usable-by/users.rst
@@ -49,7 +50,7 @@ class EditStoryCaption:
                 By default, texts are parsed using both Markdown and HTML styles.
                 You can combine both syntaxes together.
 
-            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`):
+            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
                 List of special entities that appear in the caption, which can be specified instead of *parse_mode*.
 
         Returns:
@@ -61,23 +62,23 @@ class EditStoryCaption:
                 await app.edit_story(chat_id, story_id, "new media caption")
         """
 
-        message, entities = (await utils.parse_text_entities(self, caption, parse_mode, caption_entities)).values()
+        message, entities = (
+            await utils.parse_text_entities(self, caption, parse_mode, caption_entities)
+        ).values()
 
         r = await self.invoke(
             raw.functions.stories.EditStory(
                 peer=await self.resolve_peer(chat_id),
                 id=story_id,
                 caption=message,
-                entities=entities,
+                entities=entities or [],
             )
         )
 
         for i in r.updates:
             if isinstance(i, raw.types.UpdateStory):
                 return await types.Story._parse(
-                    self,
-                    i.story,
-                    i.peer,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats}
+                    self, i.story, i.peer, {i.id: i for i in r.users}, {i.id: i for i in r.chats}
                 )
+
+        raise ValueError("The response contains no story update")

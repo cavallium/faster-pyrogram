@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types
@@ -24,8 +24,8 @@ from pyrogram import raw, types
 
 class GetOwnedBots:
     async def get_owned_bots(
-        self: "pyrogram.Client",
-    ) -> List["types.User"]:
+        self: pyrogram.Client,
+    ) -> list[types.User]:
         """Returns the list of bots owned by the current user.
 
         .. include:: /_includes/usable-by/users.rst
@@ -41,4 +41,4 @@ class GetOwnedBots:
 
         bots = await self.invoke(raw.functions.bots.GetAdminedBots())
 
-        return types.List([types.User._parse(self, bot) for bot in bots])
+        return types.List([await types.User._parse(self, bot) for bot in bots])

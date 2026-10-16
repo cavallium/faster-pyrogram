@@ -16,10 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import types, raw
+from pyrogram import raw, types
+
 from ..object import Object
 from ..update import Update
 
@@ -44,11 +45,11 @@ class ShippingQuery(Object, Update):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         id: str,
-        from_user: "types.User",
+        from_user: types.User,
         invoice_payload: str,
-        shipping_address: Optional["types.ShippingAddress"] = None
+        shipping_address: types.ShippingAddress | None = None,
     ):
         super().__init__(client)
 
@@ -59,10 +60,8 @@ class ShippingQuery(Object, Update):
 
     @staticmethod
     async def _parse(
-        client: "pyrogram.Client",
-        shipping_query: "raw.types.UpdateBotShippingQuery",
-        users: dict
-    ) -> "ShippingQuery":
+        client: pyrogram.Client, shipping_query: raw.types.UpdateBotShippingQuery, users: dict
+    ) -> ShippingQuery:
         # Try to decode shipping query payload into string. If that fails, fallback to bytes instead of decoding by
         # ignoring/replacing errors, this way, button clicks will still work.
         try:
@@ -72,18 +71,18 @@ class ShippingQuery(Object, Update):
 
         return ShippingQuery(
             id=str(shipping_query.query_id),
-            from_user=types.User._parse(client, users[shipping_query.user_id]),
+            from_user=await types.User._parse(client, users[shipping_query.user_id]),
             invoice_payload=payload,
             shipping_address=types.ShippingAddress._parse(shipping_query.shipping_address),
-            client=client
+            client=client,
         )
 
     async def answer(
         self,
         ok: bool,
-        shipping_options: "types.ShippingOptions" = None,
-        error_message: str = None
-    ):
+        shipping_options: list[types.ShippingOption] | None = None,
+        error_message: str | None = None,
+    ) -> bool:
         """Bound method *answer* of :obj:`~pyrogram.types.ShippingQuery`.
 
         Use this method as a shortcut for:
@@ -104,7 +103,7 @@ class ShippingQuery(Object, Update):
             ok (``bool``):
                 Pass True if delivery to the specified address is possible and False if there are any problems (for example, if delivery to the specified address is not possible).
 
-            shipping_options (:obj:`~pyrogram.types.ShippingOptions`, *optional*):
+            shipping_options (List of :obj:`~pyrogram.types.ShippingOption`, *optional*):
                 Required if ok is True. A JSON-serialized array of available shipping options.
 
             error_message (``str``, *optional*):
@@ -117,5 +116,5 @@ class ShippingQuery(Object, Update):
             shipping_query_id=self.id,
             ok=ok,
             shipping_options=shipping_options,
-            error_message=error_message
+            error_message=error_message,
         )

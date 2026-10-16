@@ -16,9 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import types
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import types
 
 
 class KeyboardButtonRequestChat(Object):
@@ -47,23 +52,40 @@ class KeyboardButtonRequestChat(Object):
             Pass True to request a chat with the bot as a member.
             Otherwise, no additional restrictions are applied.
 
-        user_administrator_rights (:obj:`~pyrogram.types.ChatPrivileges`, *optional*):
+        user_administrator_rights (:obj:`~pyrogram.types.ChatAdministratorRights`, *optional*):
             Privileged actions that an user administrator is able to take.
 
-        bot_administrator_rights (:obj:`~pyrogram.types.ChatPrivileges`, *optional*):
+        bot_administrator_rights (:obj:`~pyrogram.types.ChatAdministratorRights`, *optional*):
             Privileged actions that an bot administrator is able to take.
+
+        request_title (``bool``, *optional*):
+            Pass True to request the chats' title
+            If not specified, the title won't be requested.
+
+        request_username (``bool``, *optional*):
+            Pass True to request the chats' username
+            If not specified, the username won't be requested.
+
+        request_photo (``bool``, *optional*):
+            Pass True to request the chats' photo
+            If not specified, the photo won't be requested.
     """
 
     def __init__(
-        self, *,
+        self,
+        *,
         button_id: int,
         chat_is_channel: bool,
-        chat_is_forum: bool = None,
-        chat_has_username: bool = None,
-        chat_is_created: bool = None,
-        bot_is_member: bool = None,
-        user_administrator_rights: "types.ChatPrivileges" = None,
-        bot_administrator_rights: "types.ChatPrivileges" = None
+        chat_is_forum: bool | None = None,
+        chat_has_username: bool | None = None,
+        chat_is_created: bool | None = None,
+        bot_is_member: bool | None = None,
+        user_administrator_rights: types.ChatAdministratorRights | None = None,
+        bot_administrator_rights: types.ChatAdministratorRights | None = None,
+        request_title: bool | None = None,
+        request_username: bool | None = None,
+        request_photo: bool | None = None,
+        max_quantity: int = 1,  # Telegram ignores this field for chats
     ):
         super().__init__()
 
@@ -75,3 +97,7 @@ class KeyboardButtonRequestChat(Object):
         self.chat_is_forum = chat_is_forum
         self.user_administrator_rights = user_administrator_rights
         self.bot_administrator_rights = bot_administrator_rights
+        self.request_title = request_title
+        self.request_username = request_username
+        self.request_photo = request_photo
+        self.max_quantity = max_quantity

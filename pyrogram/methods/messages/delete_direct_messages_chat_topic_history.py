@@ -16,21 +16,25 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, utils
 
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
 
 class DeleteDirectMessagesChatTopicHistory:
     async def delete_direct_messages_chat_topic_history(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        topic_id: int = None,
+        self: pyrogram.Client,
+        chat_id: int | str,
+        topic_id: int | None = None,
         max_id: int = 0,
-        min_date: datetime = None,
-        max_date: datetime = None,
+        min_date: datetime | timedelta | None = None,
+        max_date: datetime | timedelta | None = None,
     ) -> int:
         """Delete messages in the topic in a channel direct messages chat administered by the current user.
 
@@ -40,17 +44,19 @@ class DeleteDirectMessagesChatTopicHistory:
             chat_id (``int`` | ``str``):
                 Unique identifier (int) or username (str) of the target chat.
 
-            topic_id (``int``):
+            topic_id (``int``, *optional*):
                 Identifier of the topic which messages will be fetched.
 
             max_id (``int``, *optional*):
                 Maximum ID of message to delete.
 
-            min_date (:py:obj:`~datetime.datetime`, *optional*):
+            min_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Delete all messages newer than this time.
+                A :py:obj:`~datetime.timedelta` is counted from now.
 
-            max_date (:py:obj:`~datetime.datetime`, *optional*):
+            max_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Delete all messages older than this time.
+                A :py:obj:`~datetime.timedelta` is counted from now.
 
         Returns:
             ``int``: Amount of affected messages
@@ -67,7 +73,7 @@ class DeleteDirectMessagesChatTopicHistory:
                 peer=await self.resolve_peer(topic_id),
                 max_id=max_id,
                 min_date=utils.datetime_to_timestamp(min_date),
-                max_date=utils.datetime_to_timestamp(max_date)
+                max_date=utils.datetime_to_timestamp(max_date),
             )
         )
 

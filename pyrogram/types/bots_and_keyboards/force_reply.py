@@ -16,6 +16,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 
@@ -41,11 +43,7 @@ class ForceReply(Object):
             The placeholder to be shown in the input field when the reply is active; 1-64 characters.
     """
 
-    def __init__(
-        self,
-        selective: bool = None,
-        placeholder: str = None
-    ):
+    def __init__(self, selective: bool | None = None, placeholder: str | None = None):
         super().__init__()
 
         self.selective = selective
@@ -53,14 +51,11 @@ class ForceReply(Object):
 
     @staticmethod
     def read(b):
-        return ForceReply(
-            selective=b.selective,
-            placeholder=b.placeholder
-        )
+        return ForceReply(selective=b.selective, placeholder=b.placeholder)
 
-    async def write(self, _: "pyrogram.Client"):
+    async def write(self, _: pyrogram.Client):
         return raw.types.ReplyKeyboardForceReply(
             single_use=True,
-            selective=self.selective or None,
-            placeholder=self.placeholder or None
+            selective=self.selective,
+            placeholder=self.placeholder or None,
         )

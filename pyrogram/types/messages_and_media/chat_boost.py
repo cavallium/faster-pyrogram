@@ -16,12 +16,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, types, utils
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class ChatBoost(Object):
@@ -69,13 +73,13 @@ class ChatBoost(Object):
         date: datetime,
         expire_date: datetime,
         multiplier: int,
-        from_user: Optional["types.User"] = None,
-        is_gift: Optional[bool] = None,
-        is_giveaway: Optional[bool] = None,
-        is_unclaimed: Optional[bool] = None,
-        giveaway_message_id: Optional[int] = None,
-        used_gift_slug: Optional[str] = None,
-        stars: Optional[int] = None
+        from_user: types.User | None = None,
+        is_gift: bool | None = None,
+        is_giveaway: bool | None = None,
+        is_unclaimed: bool | None = None,
+        giveaway_message_id: int | None = None,
+        used_gift_slug: str | None = None,
+        stars: int | None = None,
     ):
         super().__init__()
 
@@ -92,17 +96,17 @@ class ChatBoost(Object):
         self.stars = stars
 
     @staticmethod
-    def _parse(client: "pyrogram.Client", boost: "raw.types.Boost", users) -> "ChatBoost":
+    async def _parse(client: pyrogram.Client, boost: raw.types.Boost, users) -> ChatBoost:
         return ChatBoost(
             id=boost.id,
             date=utils.timestamp_to_datetime(boost.date),
             expire_date=utils.timestamp_to_datetime(boost.expires),
             multiplier=getattr(boost, "multiplier", 1),
-            from_user=types.User._parse(client, users.get(boost.user_id)),
+            from_user=await types.User._parse(client, users.get(boost.user_id)),
             is_gift=getattr(boost, "gift", None),
             is_giveaway=getattr(boost, "giveaway", None),
             is_unclaimed=getattr(boost, "unclaimed", None),
             giveaway_message_id=getattr(boost, "giveaway_msg_id", None),
             used_gift_slug=getattr(boost, "used_gift_slug", None),
-            stars=getattr(boost, "stars", None)
+            stars=getattr(boost, "stars", None),
         )

@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,9 +24,9 @@ from pyrogram import raw
 
 class SetAdministratorTitle:
     async def set_administrator_title(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        user_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
+        user_id: int | str,
         title: str,
     ) -> bool:
         """Set a custom title (rank) to an administrator of a supergroup.
@@ -44,7 +44,7 @@ class SetAdministratorTitle:
                 Unique identifier (int) or username (str) of the target user.
                 For a contact that exists in your Telegram address book you can use his phone number (str).
 
-            title (``str``, *optional*):
+            title (``str``):
                 A custom title that will be shown to all members instead of "Owner" or "Admin".
                 Pass None or "" (empty string) to remove the custom title.
 
@@ -59,26 +59,24 @@ class SetAdministratorTitle:
         chat_id = await self.resolve_peer(chat_id)
         user_id = await self.resolve_peer(user_id)
 
-        r = (await self.invoke(
-            raw.functions.channels.GetParticipant(
-                channel=chat_id,
-                participant=user_id
+        r = (
+            await self.invoke(
+                raw.functions.channels.GetParticipant(channel=chat_id, participant=user_id)
             )
-        )).participant
+        ).participant
 
         if isinstance(r, raw.types.ChannelParticipantCreator):
             admin_rights = raw.types.ChatAdminRights()
         elif isinstance(r, raw.types.ChannelParticipantAdmin):
             admin_rights = r.admin_rights
         else:
-            raise ValueError("Custom titles can only be applied to owners or administrators of supergroups")
+            raise ValueError(
+                "Custom titles can only be applied to owners or administrators of supergroups"
+            )
 
         await self.invoke(
             raw.functions.channels.EditAdmin(
-                channel=chat_id,
-                user_id=user_id,
-                admin_rights=admin_rights,
-                rank=title
+                channel=chat_id, user_id=user_id, admin_rights=admin_rights, rank=title
             )
         )
 

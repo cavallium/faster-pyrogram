@@ -16,15 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 
 
 class SetAccountTTL:
-    async def set_account_ttl(
-        self: "pyrogram.Client",
-        days: int
-    ):
+    async def set_account_ttl(self: pyrogram.Client, days: int) -> bool:
         """Set days to live of account.
 
         .. note::
@@ -47,9 +46,7 @@ class SetAccountTTL:
                 await app.set_account_ttl(365)
         """
         r = await self.invoke(
-            raw.functions.account.SetAccountTTL(
-                ttl=raw.types.AccountDaysTTL(days=days)
-            )
+            raw.functions.account.SetAccountTTL(ttl=raw.types.AccountDaysTTL(days=days))
         )
 
         return r

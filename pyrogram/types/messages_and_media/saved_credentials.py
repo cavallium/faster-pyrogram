@@ -16,9 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import raw
 
 
 class SavedCredentials(Object):
@@ -31,20 +36,13 @@ class SavedCredentials(Object):
         title (``str``):
             Title of the saved credentials.
     """
-    def __init__(
-        self,
-        *,
-        id: str,
-        title: str
-    ):
+
+    def __init__(self, *, id: str, title: str):
         super().__init__()
 
         self.id = id
         self.title = title
 
     @staticmethod
-    def _parse(credential: "raw.base.PaymentSavedCredentials") -> "SavedCredentials":
-        return SavedCredentials(
-            id=credential.id,
-            title=credential.title
-        )
+    def _parse(credential: raw.base.PaymentSavedCredentials) -> SavedCredentials:
+        return SavedCredentials(id=credential.id, title=credential.title)

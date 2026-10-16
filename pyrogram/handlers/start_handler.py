@@ -16,12 +16,20 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable
+from __future__ import annotations as _annotations
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from .handler import Handler
 
+if TYPE_CHECKING:
+    import pyrogram
 
-class StartHandler(Handler):
+StartCallbackType = Callable[["pyrogram.Client"], Any]
+
+
+class StartHandler(Handler[StartCallbackType]):
     """The Start handler class. Used to handle client start. It is intended to be used with
     :meth:`~pyrogram.Client.add_handler`
 
@@ -39,5 +47,5 @@ class StartHandler(Handler):
             is established.
     """
 
-    def __init__(self, callback: Callable):
+    def __init__(self, callback: StartCallbackType) -> None:
         super().__init__(callback)

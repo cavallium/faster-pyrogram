@@ -16,6 +16,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 from pyrogram import raw
 
 from ..object import Object
@@ -33,26 +35,16 @@ class LabeledPrice(Object):
 
     """
 
-    def __init__(
-        self,
-        label: str,
-        amount: int
-    ):
+    def __init__(self, label: str, amount: int):
         super().__init__()
 
         self.label = label
         self.amount = amount
 
     @staticmethod
-    def _parse(labeled_price: "raw.types.LabeledPrice") -> "LabeledPrice":
+    def _parse(labeled_price: raw.types.LabeledPrice) -> LabeledPrice:
         if isinstance(labeled_price, raw.types.LabeledPrice):
-            return LabeledPrice(
-                label=labeled_price.label,
-                amount=labeled_price.amount
-            )
+            return LabeledPrice(label=labeled_price.label, amount=labeled_price.amount)
 
     def write(self):
-        return raw.types.LabeledPrice(
-            label=self.label,
-            amount=self.amount
-        )
+        return raw.types.LabeledPrice(label=self.label, amount=self.amount)

@@ -16,11 +16,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from pyrogram import enums, types
 
 from .message_origin import MessageOrigin
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class MessageOriginChannel(MessageOrigin):
@@ -42,19 +47,17 @@ class MessageOriginChannel(MessageOrigin):
         author_signature (``str``, *optional*):
             Signature of the original post author.
     """
+
     def __init__(
         self,
         *,
-        type: "enums.MessageOriginType" = enums.MessageOriginType.CHANNEL,
-        date: datetime = None,
-        chat: "types.Chat" = None,
-        message_id: int = None,
-        author_signature: str = None
+        type: enums.MessageOriginType = enums.MessageOriginType.CHANNEL,
+        date: datetime | None = None,
+        chat: types.Chat | None = None,
+        message_id: int | None = None,
+        author_signature: str | None = None,
     ):
-        super().__init__(
-            type=type,
-            date=date
-        )
+        super().__init__(type=type, date=date)
 
         self.chat = chat
         self.message_id = message_id

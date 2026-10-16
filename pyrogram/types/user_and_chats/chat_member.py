@@ -16,12 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Union, Dict
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw, types, utils, enums
+from pyrogram import enums, raw, types, utils
+
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class ChatMember(Object):
@@ -30,6 +35,9 @@ class ChatMember(Object):
     Parameters:
         status (:obj:`~pyrogram.enums.ChatMemberStatus`):
             The member's status in the chat.
+
+        tag (``str``, *optional*):
+            Tag of the member.
 
         user (:obj:`~pyrogram.types.User`, *optional*):
             Information about the user.
@@ -68,7 +76,7 @@ class ChatMember(Object):
         permissions (:obj:`~pyrogram.types.ChatPermissions`, *optional*):
             Restricted only. Restricted actions that a non-administrator user is allowed to take.
 
-        privileges (:obj:`~pyrogram.types.ChatPrivileges`, *optional*):
+        privileges (:obj:`~pyrogram.types.ChatAdministratorRights`, *optional*):
             Administrators only. Privileged actions that an administrator is able to take.
 
         subscription_until_date (:py:obj:`~datetime.datetime`, *optional*):
@@ -78,25 +86,27 @@ class ChatMember(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
-        status: "enums.ChatMemberStatus",
-        user: "types.User" = None,
-        chat: "types.Chat" = None,
-        custom_title: str = None,
-        until_date: datetime = None,
-        joined_date: datetime = None,
-        invited_by: "types.User" = None,
-        promoted_by: "types.User" = None,
-        restricted_by: "types.User" = None,
-        is_member: bool = None,
-        can_be_edited: bool = None,
-        permissions: "types.ChatPermissions" = None,
-        privileges: "types.ChatPrivileges" = None,
-        subscription_until_date: datetime = None
+        client: pyrogram.Client | None = None,
+        status: enums.ChatMemberStatus,
+        tag: str | None = None,
+        user: types.User | None = None,
+        chat: types.Chat | None = None,
+        custom_title: str | None = None,
+        until_date: datetime | None = None,
+        joined_date: datetime | None = None,
+        invited_by: types.User | None = None,
+        promoted_by: types.User | None = None,
+        restricted_by: types.User | None = None,
+        is_member: bool | None = None,
+        can_be_edited: bool | None = None,
+        permissions: types.ChatPermissions | None = None,
+        privileges: types.ChatAdministratorRights | None = None,
+        subscription_until_date: datetime | None = None,
     ):
         super().__init__(client)
 
         self.status = status
+        self.tag = tag
         self.user = user
         self.chat = chat
         self.custom_title = custom_title
@@ -112,72 +122,82 @@ class ChatMember(Object):
         self.subscription_until_date = subscription_until_date
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        member: Union["raw.base.ChatParticipant", "raw.base.ChannelParticipant"],
-        users: Dict[int, "raw.base.User"],
-        chats: Dict[int, "raw.base.Chat"]
-    ) -> "ChatMember":
+    async def _parse(
+        client: pyrogram.Client,
+        member: raw.base.ChatParticipant | raw.base.ChannelParticipant,
+        users: dict[int, raw.base.User],
+        chats: dict[int, raw.base.Chat],
+    ) -> ChatMember:
         # Chat participants
         if isinstance(member, raw.types.ChatParticipant):
             return ChatMember(
                 status=enums.ChatMemberStatus.MEMBER,
-                user=types.User._parse(client, users[member.user_id]),
+                tag=member.rank,
+                user=await types.User._parse(client, users[member.user_id]),
                 joined_date=utils.timestamp_to_datetime(member.date),
-                invited_by=types.User._parse(client, users[member.inviter_id]),
-                client=client
+                invited_by=await types.User._parse(client, users[member.inviter_id]),
+                client=client,
             )
         elif isinstance(member, raw.types.ChatParticipantAdmin):
             return ChatMember(
                 status=enums.ChatMemberStatus.ADMINISTRATOR,
-                user=types.User._parse(client, users[member.user_id]),
+                tag=member.rank,
+                user=await types.User._parse(client, users[member.user_id]),
                 joined_date=utils.timestamp_to_datetime(member.date),
-                invited_by=types.User._parse(client, users[member.inviter_id]),
-                client=client
+                invited_by=await types.User._parse(client, users[member.inviter_id]),
+                client=client,
             )
         elif isinstance(member, raw.types.ChatParticipantCreator):
             return ChatMember(
                 status=enums.ChatMemberStatus.OWNER,
-                user=types.User._parse(client, users[member.user_id]),
-                client=client
+                tag=member.rank,
+                user=await types.User._parse(client, users[member.user_id]),
+                client=client,
             )
 
         # Channel participants
         if isinstance(member, raw.types.ChannelParticipant):
             return ChatMember(
                 status=enums.ChatMemberStatus.MEMBER,
-                user=types.User._parse(client, users[member.user_id]),
+                tag=member.rank,
+                user=await types.User._parse(client, users[member.user_id]),
                 joined_date=utils.timestamp_to_datetime(member.date),
-                subscription_until_date=utils.timestamp_to_datetime(getattr(member, "subscription_until_date", None)),
-                client=client
+                subscription_until_date=utils.timestamp_to_datetime(
+                    getattr(member, "subscription_until_date", None)
+                ),
+                client=client,
             )
         elif isinstance(member, raw.types.ChannelParticipantAdmin):
             return ChatMember(
                 status=enums.ChatMemberStatus.ADMINISTRATOR,
-                user=types.User._parse(client, users[member.user_id]),
+                tag=member.rank,
+                user=await types.User._parse(client, users[member.user_id]),
                 joined_date=utils.timestamp_to_datetime(member.date),
-                promoted_by=types.User._parse(client, users[member.promoted_by]),
+                promoted_by=await types.User._parse(client, users[member.promoted_by]),
                 invited_by=(
-                    types.User._parse(client, users[member.inviter_id])
-                    if member.inviter_id else None
+                    await types.User._parse(client, users[member.inviter_id])
+                    if member.inviter_id
+                    else None
                 ),
                 custom_title=member.rank,
                 can_be_edited=member.can_edit,
-                privileges=types.ChatPrivileges._parse(member.admin_rights),
-                client=client
+                privileges=types.ChatAdministratorRights._parse(member.admin_rights),
+                client=client,
             )
         elif isinstance(member, raw.types.ChannelParticipantBanned):
             peer = member.peer
             peer_id = utils.get_raw_peer_id(peer)
 
             user = (
-                types.User._parse(client, users[peer_id])
-                if isinstance(peer, raw.types.PeerUser) else None
+                await types.User._parse(client, users[peer_id])
+                if isinstance(peer, raw.types.PeerUser)
+                else None
             )
 
             chat = (
-                types.Chat._parse_chat(client, chats[peer_id])
-                if not isinstance(peer, raw.types.PeerUser) else None
+                await types.Chat._parse_chat(client, chats[peer_id])
+                if not isinstance(peer, raw.types.PeerUser)
+                else None
             )
 
             return ChatMember(
@@ -186,49 +206,53 @@ class ChatMember(Object):
                     if member.banned_rights.view_messages
                     else enums.ChatMemberStatus.RESTRICTED
                 ),
+                tag=member.rank,
                 user=user,
                 chat=chat,
                 until_date=utils.timestamp_to_datetime(member.banned_rights.until_date),
                 joined_date=utils.timestamp_to_datetime(member.date),
                 is_member=not member.left,
-                restricted_by=types.User._parse(client, users[member.kicked_by]),
+                restricted_by=await types.User._parse(client, users[member.kicked_by]),
                 permissions=types.ChatPermissions._parse(member.banned_rights),
-                client=client
+                client=client,
             )
         elif isinstance(member, raw.types.ChannelParticipantCreator):
             return ChatMember(
                 status=enums.ChatMemberStatus.OWNER,
-                user=types.User._parse(client, users[member.user_id]),
+                tag=member.rank,
+                user=await types.User._parse(client, users[member.user_id]),
                 custom_title=member.rank,
-                privileges=types.ChatPrivileges._parse(member.admin_rights),
-                client=client
+                privileges=types.ChatAdministratorRights._parse(member.admin_rights),
+                client=client,
             )
         elif isinstance(member, raw.types.ChannelParticipantLeft):
             peer = member.peer
             peer_id = utils.get_raw_peer_id(peer)
 
             user = (
-                types.User._parse(client, users[peer_id])
-                if isinstance(peer, raw.types.PeerUser) else None
+                await types.User._parse(client, users[peer_id])
+                if isinstance(peer, raw.types.PeerUser)
+                else None
             )
 
             chat = (
-                types.Chat._parse_chat(client, chats[peer_id])
-                if not isinstance(peer, raw.types.PeerUser) else None
+                await types.Chat._parse_chat(client, chats[peer_id])
+                if not isinstance(peer, raw.types.PeerUser)
+                else None
             )
 
             return ChatMember(
-                status=enums.ChatMemberStatus.LEFT,
-                user=user,
-                chat=chat,
-                client=client
+                status=enums.ChatMemberStatus.LEFT, user=user, chat=chat, client=client
             )
         elif isinstance(member, raw.types.ChannelParticipantSelf):
             return ChatMember(
                 status=enums.ChatMemberStatus.MEMBER,
-                user=types.User._parse(client, users[member.user_id]),
+                tag=member.rank,
+                user=await types.User._parse(client, users[member.user_id]),
                 joined_date=utils.timestamp_to_datetime(member.date),
-                invited_by=types.User._parse(client, users[member.inviter_id]),
-                subscription_until_date=utils.timestamp_to_datetime(getattr(member, "subscription_until_date", None)),
-                client=client
+                invited_by=await types.User._parse(client, users[member.inviter_id]),
+                subscription_until_date=utils.timestamp_to_datetime(
+                    getattr(member, "subscription_until_date", None)
+                ),
+                client=client,
             )

@@ -16,18 +16,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union, AsyncGenerator
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import types, raw
+from pyrogram import raw, types
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class GetCallMembers:
     async def get_call_members(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        limit: int = 0
-    ) -> AsyncGenerator["types.GroupCallMember", None]:
+        self: pyrogram.Client, chat_id: int | str, limit: int = 0
+    ) -> AsyncGenerator[types.GroupCallMember, None]:
         """Get the members list of a chat call.
 
         A chat can be either a basic group or a supergroup.
@@ -73,19 +76,15 @@ class GetCallMembers:
         while True:
             r = await self.invoke(
                 raw.functions.phone.GetGroupParticipants(
-                    call=full_chat.call,
-                    ids=[],
-                    sources=[],
-                    offset=offset,
-                    limit=limit
+                    call=full_chat.call, ids=[], sources=[], offset=offset, limit=limit
                 ),
-                sleep_threshold=60
+                sleep_threshold=60,
             )
 
             users = {u.id: u for u in r.users}
             chats = {c.id: c for c in r.chats}
             members = [
-                types.GroupCallMember._parse(self, member, users, chats)
+                await types.GroupCallMember._parse(self, member, users, chats)
                 for member in r.participants
             ]
 

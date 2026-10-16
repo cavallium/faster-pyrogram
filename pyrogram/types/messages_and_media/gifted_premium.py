@@ -16,8 +16,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import random
-from typing import Dict, List, Optional
 
 from pyrogram import raw, types, utils
 
@@ -50,6 +51,9 @@ class GiftedPremium(Object):
         month_count (``int``):
             Number of months the Telegram Premium subscription will be active.
 
+        day_count (``int``):
+            Number of days the Telegram Premium subscription will be active.
+
         sticker (:obj:`~pyrogram.types.Sticker`):
             A sticker to be shown in the message.
 
@@ -59,19 +63,21 @@ class GiftedPremium(Object):
         caption_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
             Entities of the text message.
     """
+
     def __init__(
         self,
         *,
-        gifter: Optional["types.User"] = None,
-        receiver: "types.User",
-        currency: Optional[str] = None,
-        amount: Optional[int] = None,
-        cryptocurrency: Optional[str] = None,
-        cryptocurrency_amount: Optional[int] = None,
-        month_count: Optional[int] = None,
-        sticker: Optional["types.Sticker"] = None,
-        caption: Optional[str] = None,
-        caption_entities: Optional[List["types.MessageEntity"]] = None
+        gifter: types.User | None = None,
+        receiver: types.User,
+        currency: str | None = None,
+        amount: int | None = None,
+        cryptocurrency: str | None = None,
+        cryptocurrency_amount: int | None = None,
+        month_count: int | None = None,
+        day_count: int | None = None,
+        sticker: types.Sticker | None = None,
+        caption: str | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
     ):
         super().__init__()
 
@@ -82,6 +88,7 @@ class GiftedPremium(Object):
         self.cryptocurrency = cryptocurrency
         self.cryptocurrency_amount = cryptocurrency_amount
         self.month_count = month_count
+        self.day_count = day_count
         self.sticker = sticker
         self.caption = caption
         self.caption_entities = caption_entities
@@ -89,41 +96,40 @@ class GiftedPremium(Object):
     @staticmethod
     async def _parse(
         client,
-        action: "raw.types.MessageActionGiftPremium",
-        gifter: "raw.base.User",
-        receiver: "raw.base.User",
-        users: Dict[int, "raw.base.User"]
-    ) -> "GiftedPremium":
+        action: raw.types.MessageActionGiftPremium,
+        gifter: raw.base.User,
+        receiver: raw.base.User,
+        users: dict[int, raw.base.User],
+    ) -> GiftedPremium:
         raw_stickers = await client.invoke(
             raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(),
-                hash=0
+                stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
             )
         )
 
-        caption, caption_entities = (utils.parse_text_with_entities(client, getattr(action, "message", None), users)).values()
+        caption, caption_entities = (
+            await utils.parse_text_with_entities(client, getattr(action, "message", None), users)
+        ).values()
 
         return GiftedPremium(
-            gifter=types.User._parse(client, gifter),
-            receiver=types.User._parse(client, receiver),
+            gifter=await types.User._parse(client, gifter),
+            receiver=await types.User._parse(client, receiver),
             currency=action.currency,
             amount=action.amount,
             cryptocurrency=getattr(action, "crypto_currency", None),
             cryptocurrency_amount=getattr(action, "crypto_amount", None),
-            month_count=action.months,
+            day_count=action.days,
+            month_count=utils.get_premium_duration_month_count(action.days),
             sticker=random.choice(
                 types.List(
                     [
                         await types.Sticker._parse(
-                            client,
-                            doc,
-                            {
-                                type(i): i for i in doc.attributes
-                            }
-                        ) for doc in raw_stickers.documents
+                            client, doc, {type(i): i for i in doc.attributes}
+                        )
+                        for doc in raw_stickers.documents
                     ]
                 )
             ),
             caption=caption,
-            caption_entities=caption_entities
+            caption_entities=caption_entities,
         )

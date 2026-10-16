@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,11 +24,11 @@ from pyrogram import raw
 
 class AnswerPreCheckoutQuery:
     async def answer_pre_checkout_query(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         pre_checkout_query_id: str,
-        ok: Optional[bool] = None,
-        error_message: Optional[str] = None
-    ):
+        ok: bool | None = None,
+        error_message: str | None = None,
+    ) -> bool:
         """Send answers to pre-checkout queries.
 
         .. include:: /_includes/usable-by/bots.rst
@@ -59,8 +59,6 @@ class AnswerPreCheckoutQuery:
         """
         return await self.invoke(
             raw.functions.messages.SetBotPrecheckoutResults(
-                query_id=int(pre_checkout_query_id),
-                success=ok,
-                error=error_message
+                query_id=int(pre_checkout_query_id), success=ok, error=error_message
             )
         )

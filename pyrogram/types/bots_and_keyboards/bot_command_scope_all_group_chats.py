@@ -16,17 +16,19 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
+
 from .bot_command_scope import BotCommandScope
 
 
 class BotCommandScopeAllGroupChats(BotCommandScope):
-    """Represents the scope of bot commands, covering all group and supergroup chats.
-    """
+    """Represents the scope of bot commands, covering all group and supergroup chats."""
 
     def __init__(self):
         super().__init__("all_group_chats")
 
-    async def write(self, client: "pyrogram.Client") -> "raw.base.BotCommandScope":
+    async def write(self, client: pyrogram.Client) -> raw.base.BotCommandScope:
         return raw.types.BotCommandScopeChats()

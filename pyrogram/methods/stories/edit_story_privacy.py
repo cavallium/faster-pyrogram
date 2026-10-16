@@ -16,20 +16,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import enums, raw, types
 
+
 class EditStoryPrivacy:
     async def edit_story_privacy(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         story_id: int,
-        privacy: "enums.StoriesPrivacyRules" = enums.StoriesPrivacyRules.PUBLIC,
-        allowed_users: List[Union[int, str]] = None,
-        disallowed_users: List[Union[int, str]] = None,
-    ) -> "types.Story":
+        privacy: enums.StoriesPrivacyRules = enums.StoriesPrivacyRules.PUBLIC,
+        allowed_users: list[int | str] | None = None,
+        disallowed_users: list[int | str] | None = None,
+    ) -> types.Story:
         """Edit the privacy of story.
 
         .. include:: /_includes/usable-by/users.rst
@@ -98,18 +99,20 @@ class EditStoryPrivacy:
             _allowed_users = []
             _allowed_chats = []
 
-            for user in allowed_users:
-                peer = await self.resolve_peer(user)
-                if isinstance(peer, raw.types.InputPeerUser):
-                    _allowed_users.append(peer)
-                elif isinstance(peer, (raw.types.InputPeerChat, raw.types.InputPeerChannel)):
-                    _allowed_chats.append(peer)
+            if allowed_users:
+                for user in allowed_users:
+                    peer = await self.resolve_peer(user)
+                    if isinstance(peer, raw.types.InputPeerUser):
+                        _allowed_users.append(peer)
+                    elif isinstance(peer, (raw.types.InputPeerChat, raw.types.InputPeerChannel)):
+                        _allowed_chats.append(peer)
 
             if _allowed_users:
                 privacy_rules.append(raw.types.InputPrivacyValueAllowUsers(users=_allowed_users))
             if _allowed_chats:
-                privacy_rules.append(raw.types.InputPrivacyValueAllowChatParticipants(chats=_allowed_chats))
-
+                privacy_rules.append(
+                    raw.types.InputPrivacyValueAllowChatParticipants(chats=_allowed_chats)
+                )
 
         r = await self.invoke(
             raw.functions.stories.EditStory(
@@ -122,9 +125,7 @@ class EditStoryPrivacy:
         for i in r.updates:
             if isinstance(i, raw.types.UpdateStory):
                 return await types.Story._parse(
-                    self,
-                    i.story,
-                    i.peer,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats}
+                    self, i.story, i.peer, {i.id: i for i in r.users}, {i.id: i for i in r.chats}
                 )
+
+        raise ValueError("The response contains no story update")

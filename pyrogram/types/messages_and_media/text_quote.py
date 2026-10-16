@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict, List, Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types
@@ -44,12 +44,14 @@ class TextQuote(Object):
             Otherwise, the quote was added automatically by the server.
 
     """
+
     def __init__(
-        self, *,
-        text: Optional[str] = None,
-        entities: Optional[List["types.MessageEntity"]] = None,
-        position: Optional[int] = None,
-        is_manual: Optional[bool] = None
+        self,
+        *,
+        text: str | None = None,
+        entities: list[types.MessageEntity] | None = None,
+        position: int | None = None,
+        is_manual: bool | None = None,
     ):
         super().__init__()
 
@@ -59,19 +61,19 @@ class TextQuote(Object):
         self.is_manual = is_manual
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        users: Dict[int, "raw.types.User"],
-        reply_to: "raw.types.MessageReplyHeader"
-    ) -> "TextQuote":
+    async def _parse(
+        client: pyrogram.Client,
+        users: dict[int, raw.types.User],
+        reply_to: raw.types.MessageReplyHeader,
+    ) -> TextQuote:
         if isinstance(reply_to, raw.types.MessageReplyHeader):
             entities = types.List(
                 filter(
                     lambda x: x is not None,
                     [
-                        types.MessageEntity._parse(client, entity, users)
+                        await types.MessageEntity._parse(client, entity, users)
                         for entity in getattr(reply_to, "quote_entities", [])
-                    ]
+                    ],
                 )
             )
 
@@ -79,5 +81,5 @@ class TextQuote(Object):
                 text=Str(reply_to.quote_text).init(entities) or None,
                 entities=entities or None,
                 position=reply_to.quote_offset or 0,
-                is_manual=reply_to.quote
+                is_manual=reply_to.quote,
             )

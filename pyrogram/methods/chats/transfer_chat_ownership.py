@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, utils
@@ -24,9 +24,9 @@ from pyrogram import raw, utils
 
 class TransferChatOwnership:
     async def transfer_chat_ownership(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        user_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
+        user_id: int | str,
         password: str,
     ) -> bool:
         """Change the owner of a chat or channel.
@@ -72,8 +72,8 @@ class TransferChatOwnership:
             raise ValueError("The user_id must belong to a user.")
 
         r = await self.invoke(
-            raw.functions.channels.EditCreator(
-                channel=peer_channel,
+            raw.functions.messages.EditChatCreator(
+                peer=peer_channel,
                 user_id=peer_user,
                 password=utils.compute_password_check(
                     await self.invoke(raw.functions.account.GetPassword()), password

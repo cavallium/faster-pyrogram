@@ -16,13 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Match
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types, enums
+from pyrogram import enums, raw, types
+
 from ..object import Object
 from ..update import Update
+
+if TYPE_CHECKING:
+    from re import Match
 
 
 class InlineQuery(Object, Update):
@@ -51,20 +56,20 @@ class InlineQuery(Object, Update):
 
         matches (List of regex Matches, *optional*):
             A list containing all `Match Objects <https://docs.python.org/3/library/re.html#match-objects>`_ that match
-            the query of this inline query. Only applicable when using :obj:`Filters.regex <pyrogram.Filters.regex>`.
+            the query of this inline query. Only applicable when using :obj:`filters.regex <pyrogram.filters.regex>`.
     """
 
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         id: str,
-        from_user: "types.User",
+        from_user: types.User,
         query: str,
         offset: str,
-        chat_type: "enums.ChatType",
-        location: "types.Location" = None,
-        matches: List[Match] = None
+        chat_type: enums.ChatType,
+        location: types.Location | None = None,
+        matches: list[Match] | None = None,
     ):
         super().__init__(client)
 
@@ -77,7 +82,9 @@ class InlineQuery(Object, Update):
         self.matches = matches
 
     @staticmethod
-    def _parse(client, inline_query: raw.types.UpdateBotInlineQuery, users: dict) -> "InlineQuery":
+    async def _parse(
+        client, inline_query: raw.types.UpdateBotInlineQuery, users: dict
+    ) -> InlineQuery:
         peer_type = inline_query.peer_type
         chat_type = None
 
@@ -94,27 +101,23 @@ class InlineQuery(Object, Update):
 
         return InlineQuery(
             id=str(inline_query.query_id),
-            from_user=types.User._parse(client, users[inline_query.user_id]),
+            from_user=await types.User._parse(client, users[inline_query.user_id]),
             query=inline_query.query,
             offset=inline_query.offset,
             chat_type=chat_type,
-            location=types.Location(
-                longitude=inline_query.geo.long,
-                latitude=inline_query.geo.lat,
-                client=client
-            ) if inline_query.geo else None,
-            client=client
+            location=types.Location._parse(inline_query.geo),
+            client=client,
         )
 
     async def answer(
         self,
-        results: List["types.InlineQueryResult"],
+        results: list[types.InlineQueryResult],
         cache_time: int = 300,
         is_gallery: bool = False,
         is_personal: bool = False,
         next_offset: str = "",
         switch_pm_text: str = "",
-        switch_pm_parameter: str = ""
+        switch_pm_parameter: str = "",
     ):
         """Bound method *answer* of :obj:`~pyrogram.types.InlineQuery`.
 
@@ -177,5 +180,5 @@ class InlineQuery(Object, Update):
             is_personal=is_personal,
             next_offset=next_offset,
             switch_pm_text=switch_pm_text,
-            switch_pm_parameter=switch_pm_parameter
+            switch_pm_parameter=switch_pm_parameter,
         )

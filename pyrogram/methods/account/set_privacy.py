@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types, enums
@@ -24,23 +24,23 @@ from pyrogram import raw, types, enums
 
 class SetPrivacy:
     async def set_privacy(
-        self: "pyrogram.Client",
-        key: "enums.PrivacyKey",
-        rules: List[Union[
-            "types.InputPrivacyRuleAllowAll",
-            "types.InputPrivacyRuleAllowBots",
-            "types.InputPrivacyRuleAllowChats",
-            "types.InputPrivacyRuleAllowCloseFriends",
-            "types.InputPrivacyRuleAllowContacts",
-            "types.InputPrivacyRuleAllowPremium",
-            "types.InputPrivacyRuleAllowUsers",
-            "types.InputPrivacyRuleDisallowAll",
-            "types.InputPrivacyRuleDisallowBots",
-            "types.InputPrivacyRuleDisallowChats",
-            "types.InputPrivacyRuleDisallowContacts",
-            "types.InputPrivacyRuleDisallowUsers"
-        ]],
-    ):
+        self: pyrogram.Client,
+        key: enums.PrivacyKey,
+        rules: list[
+            types.InputPrivacyRuleAllowAll
+            | types.InputPrivacyRuleAllowBots
+            | types.InputPrivacyRuleAllowChats
+            | types.InputPrivacyRuleAllowCloseFriends
+            | types.InputPrivacyRuleAllowContacts
+            | types.InputPrivacyRuleAllowPremium
+            | types.InputPrivacyRuleAllowUsers
+            | types.InputPrivacyRuleDisallowAll
+            | types.InputPrivacyRuleDisallowBots
+            | types.InputPrivacyRuleDisallowChats
+            | types.InputPrivacyRuleDisallowContacts
+            | types.InputPrivacyRuleDisallowUsers
+        ],
+    ) -> list[types.PrivacyRule]:
         """Set account privacy rules.
 
         .. include:: /_includes/usable-by/users.rst
@@ -65,12 +65,13 @@ class SetPrivacy:
         """
         r = await self.invoke(
             raw.functions.account.SetPrivacy(
-                key=key.value(),
-                rules=[await rule.write(self) for rule in rules]
+                key=key.value(), rules=[await rule.write(self) for rule in rules]
             )
         )
 
         users = {i.id: i for i in r.users}
         chats = {i.id: i for i in r.chats}
 
-        return types.List(types.PrivacyRule._parse(self, rule, users, chats) for rule in r.rules)
+        return types.List(
+            [await types.PrivacyRule._parse(self, rule, users, chats) for rule in r.rules]
+        )

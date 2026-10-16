@@ -16,8 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import re
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import errors, raw, types, utils
@@ -25,12 +24,12 @@ from pyrogram import errors, raw, types, utils
 
 class TransferGift:
     async def transfer_gift(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         owned_gift_id: str,
-        new_owner_chat_id: Union[int, str],
+        new_owner_chat_id: int | str,
         # stars_count: int = None,
-        business_connection_id: str = None
-    ) -> Optional["types.Message"]:
+        business_connection_id: str | None = None,
+    ) -> types.Message | None:
         """Transfers an owned unique gift to another user.
 
         .. note::
@@ -42,7 +41,7 @@ class TransferGift:
 
         Parameters:
             owned_gift_id (``str``):
-                Unique identifier of the regular gift that should be transferred.
+                Unique identifier of the gift that should be transferred.
                 For a user gift, you can use the message ID (int) of the gift message.
                 For a channel gift, you can use the packed format `chatID_savedID` (str).
                 For a upgraded gift, you can use the gift link.
@@ -57,7 +56,8 @@ class TransferGift:
                 For bots only.
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise,
+            in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -65,58 +65,34 @@ class TransferGift:
                 # Transfer gift to another user
                 await app.transfer_gift(owned_gift_id="123", new_owner_chat_id=123)
         """
-        if not isinstance(owned_gift_id, str):
-            raise ValueError(f"owned_gift_id has to be str, but {type(owned_gift_id)} was provided")
-
-        saved_gift_match = re.match(r"^(-\d+)_(\d+)$", owned_gift_id)
-        slug_match = self.UPGRADED_GIFT_RE.match(owned_gift_id)
-
-        if saved_gift_match:
-            stargift = raw.types.InputSavedStarGiftChat(
-                peer=await self.resolve_peer(saved_gift_match.group(1)),
-                saved_id=int(saved_gift_match.group(2))
-            )
-        elif slug_match:
-            stargift = raw.types.InputSavedStarGiftSlug(
-                slug=slug_match.group(1)
-            )
-        else:
-            stargift = raw.types.InputSavedStarGiftUser(
-                msg_id=int(owned_gift_id)
-            )
+        stargift = await utils.get_input_stargift(self, owned_gift_id)
 
         peer = await self.resolve_peer(new_owner_chat_id)
 
         try:
             r = await self.invoke(
-                raw.functions.payments.TransferStarGift(
-                    stargift=stargift,
-                    to_id=peer
-                ),
-                business_connection_id=business_connection_id
+                raw.functions.payments.TransferStarGift(stargift=stargift, to_id=peer),
+                business_connection_id=business_connection_id,
             )
         except errors.PaymentRequired:
-            invoice = raw.types.InputInvoiceStarGiftTransfer(
-                stargift=stargift,
-                to_id=peer
-            )
+            invoice = raw.types.InputInvoiceStarGiftTransfer(stargift=stargift, to_id=peer)
 
             r = await self.invoke(
                 raw.functions.payments.SendStarsForm(
-                    form_id=(await self.invoke(
-                        raw.functions.payments.GetPaymentForm(
-                            invoice=invoice
-                        ),
-                        business_connection_id=business_connection_id
-                    )).form_id,
-                    invoice=invoice
+                    form_id=(
+                        await self.invoke(
+                            raw.functions.payments.GetPaymentForm(invoice=invoice),
+                            business_connection_id=business_connection_id,
+                        )
+                    ).form_id,
+                    invoice=invoice,
                 ),
-                business_connection_id=business_connection_id
+                business_connection_id=business_connection_id,
             )
 
         messages = await utils.parse_messages(
             client=self,
-            messages=r.updates if isinstance(r, raw.types.payments.PaymentResult) else r
+            messages=r.updates if isinstance(r, raw.types.payments.PaymentResult) else r,
         )
 
         return messages[0] if messages else None

@@ -16,7 +16,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw, types
+from __future__ import annotations as _annotations
+
+from pyrogram import enums, raw, types
 
 from ..object import Object
 
@@ -31,6 +33,12 @@ class KeyboardButton(Object):
         text (``str``):
             Text of the button. If none of the optional fields are used, it will be sent as a message when
             the button is pressed.
+
+        icon_custom_emoji_id (``str``, *optional*):
+            Identifier of the custom emoji that must be shown on the button.
+
+        style (:obj:`~pyrogram.enums.ButtonStyle`, *optional*):
+            Style of the button.
 
         request_contact (``bool``, *optional*):
             If True, the user's phone number will be sent as a contact when the button is pressed.
@@ -54,147 +62,231 @@ class KeyboardButton(Object):
             Tapping on a chat will send its identifier to the bot in a `chat_shared` service message.
             Available in private chats only.
 
+        request_managed_bot (:obj:`~pyrogram.types.KeyboardButtonRequestManagedBot`, *optional*):
+            If specified, pressing the button will ask the user to create and share a bot that will be managed by the current bot.
+            Available for bots that enabled management of other bots in the @BotFather Mini App.
+            Available in private chats only.
+
         web_app (:obj:`~pyrogram.types.WebAppInfo`, *optional*):
             If specified, the described `Web App <https://core.telegram.org/bots/webapps>`_ will be launched when the
             button is pressed.
             The Web App will be able to send a `web_app_data` service message.
             Available in private chats only.
     """
+
     def __init__(
         self,
         text: str,
-        request_contact: bool = None,
-        request_location: bool = None,
-        request_poll: "types.KeyboardButtonPollType" = None,
-        request_users: "types.KeyboardButtonRequestUsers" = None,
-        request_chat: "types.KeyboardButtonRequestChat" = None,
-        web_app: "types.WebAppInfo" = None,
+        icon_custom_emoji_id: str | None = None,
+        style: enums.ButtonStyle = enums.ButtonStyle.DEFAULT,
+        request_contact: bool | None = None,
+        request_location: bool | None = None,
+        request_poll: types.KeyboardButtonPollType | None = None,
+        request_users: types.KeyboardButtonRequestUsers | None = None,
+        request_chat: types.KeyboardButtonRequestChat | None = None,
+        request_managed_bot: types.KeyboardButtonRequestManagedBot | None = None,
+        web_app: types.WebAppInfo | None = None,
     ):
         super().__init__()
 
         self.text = str(text)
+        self.icon_custom_emoji_id = icon_custom_emoji_id
+        self.style = style
         self.request_contact = request_contact
         self.request_location = request_location
         self.request_poll = request_poll
         self.request_users = request_users
         self.request_chat = request_chat
+        self.request_managed_bot = request_managed_bot
         self.web_app = web_app
 
     @staticmethod
-    def read(b):
-        if isinstance(b, raw.types.KeyboardButton):
-            return b.text
+    def read(button: raw.base.KeyboardButton):
+        button_text = button.text
+        button_type = button.type
+        button_style = enums.ButtonStyle.DEFAULT
 
-        if isinstance(b, raw.types.KeyboardButtonRequestPhone):
+        icon_custom_emoji_id = None
+
+        if button.style:
+            if button.style.bg_primary:
+                button_style = enums.ButtonStyle.PRIMARY
+            elif button.style.bg_danger:
+                button_style = enums.ButtonStyle.DANGER
+            elif button.style.bg_success:
+                button_style = enums.ButtonStyle.SUCCESS
+
+            if button.style.icon:
+                icon_custom_emoji_id = str(button.style.icon)
+
+        if isinstance(button_type, raw.types.ButtonTypeDefault):
             return KeyboardButton(
-                text=b.text,
-                request_contact=True
+                text=button_text, style=button_style, icon_custom_emoji_id=icon_custom_emoji_id
             )
-
-        if isinstance(b, raw.types.KeyboardButtonRequestGeoLocation):
+        if isinstance(button_type, raw.types.ButtonTypeRequestGeoLocation):
             return KeyboardButton(
-                text=b.text,
-                request_location=True
+                text=button_text,
+                request_location=True,
+                style=button_style,
+                icon_custom_emoji_id=icon_custom_emoji_id,
             )
-
-        if isinstance(b, raw.types.KeyboardButtonRequestPoll):
-            return KeyboardButton(
-                text=b.text,
-                request_poll=types.KeyboardButtonPollType(is_quiz=b.quiz)
-            )
-
-        if isinstance(b, raw.types.KeyboardButtonRequestPeer):
-            if isinstance(b.peer_type, (raw.types.RequestPeerTypeBroadcast, raw.types.RequestPeerTypeChat)):
-                user_privileges = getattr(b.peer_type, "user_admin_rights", None)
-                bot_privileges = getattr(b.peer_type, "bot_admin_rights", None)
-
+        if isinstance(button_type, raw.types.ButtonTypeRequestPeer):
+            if isinstance(
+                button_type.peer_type,
+                (raw.types.RequestPeerTypeBroadcast, raw.types.RequestPeerTypeChat),
+            ):
                 return KeyboardButton(
-                    text=b.text,
+                    text=button_text,
+                    style=button_style,
+                    icon_custom_emoji_id=icon_custom_emoji_id,
                     request_chat=types.KeyboardButtonRequestChat(
-                        button_id=b.button_id,
-                        chat_is_channel=isinstance(b.peer_type, raw.types.RequestPeerTypeBroadcast),
-                        chat_is_created=getattr(b.peer_type, "creator", None),
-                        bot_is_member=getattr(b.peer_type, "bot_participant", None),
-                        chat_has_username=getattr(b.peer_type, "has_username", None),
-                        chat_is_forum=getattr(b.peer_type, "forum", None),
-                        user_administrator_rights=types.ChatPrivileges._parse(user_privileges),
-                        bot_administrator_rights=types.ChatPrivileges._parse(bot_privileges)
-                    )
+                        button_id=button_type.button_id,
+                        chat_is_channel=isinstance(
+                            button_type.peer_type, raw.types.RequestPeerTypeBroadcast
+                        ),
+                        chat_is_created=button_type.peer_type.creator,
+                        bot_is_member=getattr(button_type.peer_type, "bot_participant", None),
+                        chat_has_username=button_type.peer_type.has_username,
+                        chat_is_forum=getattr(button_type.peer_type, "forum", None),
+                        user_administrator_rights=types.ChatAdministratorRights._parse(
+                            button_type.peer_type.user_admin_rights
+                        ),
+                        bot_administrator_rights=types.ChatAdministratorRights._parse(
+                            button_type.peer_type.bot_admin_rights
+                        ),
+                        max_quantity=button_type.max_quantity,
+                    ),
                 )
 
-            if isinstance(b.peer_type, raw.types.RequestPeerTypeUser):
+            if isinstance(button_type.peer_type, raw.types.RequestPeerTypeUser):
                 return KeyboardButton(
-                    text=b.text,
+                    text=button_text,
+                    style=button_style,
+                    icon_custom_emoji_id=icon_custom_emoji_id,
                     request_users=types.KeyboardButtonRequestUsers(
-                        button_id=b.button_id,
-                        user_is_bot=getattr(b.peer_type, "bot", None),
-                        user_is_premium=getattr(b.peer_type, "premium", None),
-                        max_quantity=getattr(b, "max_quantity", None)
-                    )
+                        button_id=button_type.button_id,
+                        user_is_bot=button_type.peer_type.bot,
+                        user_is_premium=button_type.peer_type.premium,
+                        max_quantity=button_type.max_quantity,
+                    ),
                 )
 
-        if isinstance(b, raw.types.KeyboardButtonSimpleWebView):
+            if isinstance(button_type.peer_type, raw.types.RequestPeerTypeCreateBot):
+                return KeyboardButton(
+                    text=button_text,
+                    style=button_style,
+                    icon_custom_emoji_id=icon_custom_emoji_id,
+                    request_managed_bot=types.KeyboardButtonRequestManagedBot(
+                        button_id=button_type.button_id,
+                        suggested_name=button_type.peer_type.suggested_name,
+                        suggested_username=button_type.peer_type.suggested_username,
+                    ),
+                )
+
+        if isinstance(button_type, raw.types.ButtonTypeRequestPhone):
             return KeyboardButton(
-                text=b.text,
-                web_app=types.WebAppInfo(
-                    url=b.url
-                )
+                text=button_text,
+                request_contact=True,
+                style=button_style,
+                icon_custom_emoji_id=icon_custom_emoji_id,
+            )
+        if isinstance(button_type, raw.types.ButtonTypeRequestPoll):
+            return KeyboardButton(
+                text=button_text,
+                request_poll=types.KeyboardButtonPollType(is_quiz=button_type.quiz),
+                style=button_style,
+                icon_custom_emoji_id=icon_custom_emoji_id,
+            )
+        if isinstance(button_type, raw.types.ButtonTypeSimpleWebView):
+            return KeyboardButton(
+                text=button_text,
+                style=button_style,
+                icon_custom_emoji_id=icon_custom_emoji_id,
+                web_app=types.WebAppInfo(url=button_type.url),
             )
 
-    def write(self):
-        if self.request_contact:
-            return raw.types.KeyboardButtonRequestPhone(text=self.text)
-        elif self.request_location:
-            return raw.types.KeyboardButtonRequestGeoLocation(text=self.text)
-        elif self.request_poll:
-            return raw.types.KeyboardButtonRequestPoll(
-                text=self.text,
-                quiz=self.request_poll.is_quiz
+    def write(self) -> raw.types.KeyboardButton:
+        if self.style is enums.ButtonStyle.LINK:
+            # `keyboardButtonStyle` carries no `link` flag, so the style would go out empty.
+            #  `compiler/api/source/main_api.tl:2188`
+            raise ValueError("`ButtonStyle.LINK` is only available on `RichMessageButton`")
+
+        style = (
+            raw.types.KeyboardButtonStyle(
+                bg_primary=self.style == enums.ButtonStyle.PRIMARY,
+                bg_danger=self.style == enums.ButtonStyle.DANGER,
+                bg_success=self.style == enums.ButtonStyle.SUCCESS,
+                icon=int(self.icon_custom_emoji_id)
+                if self.icon_custom_emoji_id is not None
+                else None,
             )
+            if self.style != enums.ButtonStyle.DEFAULT or self.icon_custom_emoji_id is not None
+            else None
+        )
+
+        button_type = raw.types.ButtonTypeDefault()
+
+        if self.request_contact:
+            button_type = raw.types.ButtonTypeRequestPhone()
+
+        elif self.request_location:
+            button_type = raw.types.ButtonTypeRequestGeoLocation()
+
+        elif self.request_poll:
+            button_type = raw.types.ButtonTypeRequestPoll(quiz=self.request_poll.is_quiz)
+
         elif self.request_chat:
             user_privileges = self.request_chat.user_administrator_rights
             bot_privileges = self.request_chat.bot_administrator_rights
 
-            user_admin_rights = raw.types.ChatAdminRights(
-                change_info=user_privileges.can_change_info,
-                post_messages=user_privileges.can_post_messages,
-                post_stories=user_privileges.can_post_stories,
-                edit_messages=user_privileges.can_edit_messages,
-                edit_stories=user_privileges.can_post_stories,
-                delete_messages=user_privileges.can_delete_messages,
-                delete_stories=user_privileges.can_delete_stories,
-                ban_users=user_privileges.can_restrict_members,
-                invite_users=user_privileges.can_invite_users,
-                pin_messages=user_privileges.can_pin_messages,
-                add_admins=user_privileges.can_promote_members,
-                anonymous=user_privileges.is_anonymous,
-                manage_call=user_privileges.can_manage_video_chats,
-                other=user_privileges.can_manage_chat
-            ) if user_privileges else None
+            user_admin_rights = (
+                raw.types.ChatAdminRights(
+                    change_info=user_privileges.can_change_info,
+                    post_messages=user_privileges.can_post_messages,
+                    post_stories=user_privileges.can_post_stories,
+                    edit_messages=user_privileges.can_edit_messages,
+                    edit_stories=user_privileges.can_post_stories,
+                    delete_messages=user_privileges.can_delete_messages,
+                    delete_stories=user_privileges.can_delete_stories,
+                    ban_users=user_privileges.can_restrict_members,
+                    invite_users=user_privileges.can_invite_users,
+                    pin_messages=user_privileges.can_pin_messages,
+                    add_admins=user_privileges.can_promote_members,
+                    anonymous=user_privileges.is_anonymous,
+                    manage_call=user_privileges.can_manage_video_chats,
+                    other=user_privileges.can_manage_chat,
+                )
+                if user_privileges
+                else None
+            )
 
-            bot_admin_rights = raw.types.ChatAdminRights(
-                change_info=bot_privileges.can_change_info,
-                post_messages=bot_privileges.can_post_messages,
-                post_stories=bot_privileges.can_post_stories,
-                edit_messages=bot_privileges.can_edit_messages,
-                edit_stories=bot_privileges.can_post_stories,
-                delete_messages=bot_privileges.can_delete_messages,
-                delete_stories=bot_privileges.can_delete_stories,
-                ban_users=bot_privileges.can_restrict_members,
-                invite_users=bot_privileges.can_invite_users,
-                pin_messages=bot_privileges.can_pin_messages,
-                add_admins=bot_privileges.can_promote_members,
-                anonymous=bot_privileges.is_anonymous,
-                manage_call=bot_privileges.can_manage_video_chats,
-                other=bot_privileges.can_manage_chat
-            ) if bot_privileges else None
+            bot_admin_rights = (
+                raw.types.ChatAdminRights(
+                    change_info=bot_privileges.can_change_info,
+                    post_messages=bot_privileges.can_post_messages,
+                    post_stories=bot_privileges.can_post_stories,
+                    edit_messages=bot_privileges.can_edit_messages,
+                    edit_stories=bot_privileges.can_post_stories,
+                    delete_messages=bot_privileges.can_delete_messages,
+                    delete_stories=bot_privileges.can_delete_stories,
+                    ban_users=bot_privileges.can_restrict_members,
+                    invite_users=bot_privileges.can_invite_users,
+                    pin_messages=bot_privileges.can_pin_messages,
+                    add_admins=bot_privileges.can_promote_members,
+                    anonymous=bot_privileges.is_anonymous,
+                    manage_call=bot_privileges.can_manage_video_chats,
+                    other=bot_privileges.can_manage_chat,
+                )
+                if bot_privileges
+                else None
+            )
 
             if self.request_chat.chat_is_channel:
                 peer_type = raw.types.RequestPeerTypeBroadcast(
                     creator=self.request_chat.chat_is_created,
                     has_username=self.request_chat.chat_has_username,
                     user_admin_rights=user_admin_rights,
-                    bot_admin_rights=bot_admin_rights
+                    bot_admin_rights=bot_admin_rights,
                 )
             else:
                 peer_type = raw.types.RequestPeerTypeChat(
@@ -203,26 +295,42 @@ class KeyboardButton(Object):
                     has_username=self.request_chat.chat_has_username,
                     forum=self.request_chat.chat_is_forum,
                     user_admin_rights=user_admin_rights,
-                    bot_admin_rights=bot_admin_rights
+                    bot_admin_rights=bot_admin_rights,
                 )
 
-            return raw.types.KeyboardButtonRequestPeer(
-                text=self.text,
+            button_type = raw.types.InputButtonTypeRequestPeer(
                 button_id=self.request_chat.button_id,
                 peer_type=peer_type,
-                max_quantity=1
+                max_quantity=self.request_chat.max_quantity,
+                name_requested=self.request_chat.request_title,
+                username_requested=self.request_chat.request_username,
+                photo_requested=self.request_chat.request_photo,
             )
+
+        elif self.request_managed_bot:
+            button_type = raw.types.InputButtonTypeRequestPeer(
+                button_id=self.request_managed_bot.button_id,
+                peer_type=raw.types.RequestPeerTypeCreateBot(
+                    bot_managed=True,
+                    suggested_name=self.request_managed_bot.suggested_name,
+                    suggested_username=self.request_managed_bot.suggested_username,
+                ),
+                max_quantity=1,
+            )
+
         elif self.request_users:
-            return raw.types.KeyboardButtonRequestPeer(
-                text=self.text,
+            button_type = raw.types.InputButtonTypeRequestPeer(
                 button_id=self.request_users.button_id,
                 peer_type=raw.types.RequestPeerTypeUser(
-                    bot=self.request_users.user_is_bot,
-                    premium=self.request_users.user_is_premium
+                    bot=self.request_users.user_is_bot, premium=self.request_users.user_is_premium
                 ),
-                max_quantity=self.request_users.max_quantity
+                max_quantity=self.request_users.max_quantity,
+                name_requested=self.request_users.request_name,
+                username_requested=self.request_users.request_username,
+                photo_requested=self.request_users.request_photo,
             )
+
         elif self.web_app:
-            return raw.types.KeyboardButtonSimpleWebView(text=self.text, url=self.web_app.url)
-        else:
-            return raw.types.KeyboardButton(text=self.text)
+            button_type = raw.types.ButtonTypeSimpleWebView(url=self.web_app.url)
+
+        return raw.types.KeyboardButton(text=self.text, type=button_type, style=style)

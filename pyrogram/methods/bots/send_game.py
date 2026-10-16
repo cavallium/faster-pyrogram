@@ -16,35 +16,37 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from typing import Union
 
 import pyrogram
 from pyrogram import raw, types, utils
 
 log = logging.getLogger(__name__)
 
+
 class SendGame:
     async def send_game(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         game_short_name: str,
-        disable_notification: bool = None,
-        message_thread_id: int = None,
-        effect_id: int = None,
-        reply_parameters: "types.ReplyParameters" = None,
-        protect_content: bool = None,
-        allow_paid_broadcast: bool = None,
-        reply_markup: Union[
-            "types.InlineKeyboardMarkup",
-            "types.ReplyKeyboardMarkup",
-            "types.ReplyKeyboardRemove",
-            "types.ForceReply",
-        ] = None,
-
-        reply_to_message_id: int = None,
-        reply_to_chat_id: Union[int, str] = None,
-    ) -> "types.Message":
+        disable_notification: bool | None = None,
+        message_thread_id: int | None = None,
+        effect_id: int | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        protect_content: bool | None = None,
+        allow_paid_broadcast: bool | None = None,
+        reply_markup: (
+            types.InlineKeyboardMarkup
+            | types.ReplyKeyboardMarkup
+            | types.ReplyKeyboardRemove
+            | types.ForceReply
+            | None
+        ) = None,
+        reply_to_message_id: int | None = None,
+        reply_to_chat_id: int | str | None = None,
+    ) -> types.Message | None:
         """Send a game.
 
         .. include:: /_includes/usable-by/bots.rst
@@ -86,8 +88,19 @@ class SendGame:
                 An object for an inline keyboard. If empty, one ‘Play game_title’ button will be shown automatically.
                 If not empty, the first button must launch the game.
 
+            reply_to_message_id (``int``, *optional*):
+                If the message is a reply, ID of the original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_chat_id (``int`` | ``str``, *optional*):
+                Unique identifier (int) or username (str) of the chat holding the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent game message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent game message is returned,
+            otherwise, in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -106,8 +119,7 @@ class SendGame:
                 )
 
             reply_parameters = types.ReplyParameters(
-                chat_id=reply_to_chat_id,
-                message_id=reply_to_message_id
+                chat_id=reply_to_chat_id, message_id=reply_to_message_id
             )
 
         r = await self.invoke(
@@ -115,22 +127,17 @@ class SendGame:
                 peer=await self.resolve_peer(chat_id),
                 media=raw.types.InputMediaGame(
                     id=raw.types.InputGameShortName(
-                        bot_id=raw.types.InputUserSelf(),
-                        short_name=game_short_name
+                        bot_id=raw.types.InputUserSelf(), short_name=game_short_name
                     ),
                 ),
                 message="",
-                silent=disable_notification or None,
-                reply_to=await utils.get_reply_to(
-                    self,
-                    reply_parameters,
-                    message_thread_id
-                ),
+                silent=disable_notification,
+                reply_to=await utils.get_reply_to(self, reply_parameters, message_thread_id),
                 random_id=self.rnd_id(),
                 noforwards=protect_content,
                 allow_paid_floodskip=allow_paid_broadcast,
                 reply_markup=await reply_markup.write(self) if reply_markup else None,
-                effect=effect_id
+                effect=effect_id,
             )
         )
 

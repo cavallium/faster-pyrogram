@@ -16,27 +16,39 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, Union
+from __future__ import annotations as _annotations
 
-from pyrogram import enums, types
+from typing import TYPE_CHECKING
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import enums, types
 
 
 class ReplyParameters(Object):
     """Describes reply parameters for the message that is being sent.
 
     Parameters:
-        message_id  (``int``, *optional*):
-            Identifier of the message that will be replied to in the current chat, or in the chat chat_id if it is specified.
+        message_id (``int``, *optional*):
+            Identifier of the message that will be replied to in the current chat, or in the chat *chat_id* if it is specified.
+            Required if *ephemeral_message_id* isn't specified.
 
-        story_id  (``int``, *optional*):
+        story_id (``int``, *optional*):
             Unique identifier for the story in the chat.
 
         chat_id (``int`` | ``str``, *optional*):
+            If the message to be replied to is from a different chat.
             Unique identifier (int) or username (str) of the target chat.
             For your personal cloud (Saved Messages) you can simply use "me" or "self".
             For a contact that exists in your Telegram address book you can use his phone number (str).
+            Not supported for messages sent on behalf of a business account and messages from channel direct messages chats.
+
+        ephemeral_message_id (``int``, *optional*):
+            Identifier of the incoming ephemeral message that will be replied to in the current chat.
+            A reply to an ephemeral message must itself be an ephemeral message.
+            An ephemeral message may only be replied to within 15 seconds of being sent.
+            Required if *message_id* isn't specified.
 
         quote (``str``, *optional*):
             Quoted part of the message to be replied to, 0-1024 characters after entities parsing.
@@ -52,25 +64,37 @@ class ReplyParameters(Object):
 
         quote_position (``int``, *optional*):
             Position of the quote in the original message in UTF-16 code units.
+
+        checklist_task_id (``int``, *optional*):
+            Identifier of the specific checklist task to be replied to.
+
+        poll_option_id (``str``, *optional*):
+            Persistent identifier of the specific poll option to be replied to.
     """
 
     def __init__(
         self,
         *,
-        message_id: Optional[int] = None,
-        story_id: Optional[int] = None,
-        chat_id: Optional[Union[int, str]] = None,
-        quote: Optional[str] = None,
-        quote_parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
-        quote_position: Optional[int] = None
+        message_id: int | None = None,
+        story_id: int | None = None,
+        chat_id: int | str | None = None,
+        ephemeral_message_id: int | None = None,
+        quote: str | None = None,
+        quote_parse_mode: enums.ParseMode | None = None,
+        quote_entities: list[types.MessageEntity] | None = None,
+        quote_position: int | None = None,
+        checklist_task_id: int | None = None,
+        poll_option_id: str | None = None,
     ):
         super().__init__()
 
         self.message_id = message_id
         self.story_id = story_id
         self.chat_id = chat_id
+        self.ephemeral_message_id = ephemeral_message_id
         self.quote = quote
         self.quote_parse_mode = quote_parse_mode
         self.quote_entities = quote_entities
         self.quote_position = quote_position
+        self.checklist_task_id = checklist_task_id
+        self.poll_option_id = poll_option_id

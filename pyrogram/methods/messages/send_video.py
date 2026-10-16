@@ -16,65 +16,78 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
 import os
 import re
-from datetime import datetime
-from typing import BinaryIO, Callable, List, Optional, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
 
 import pyrogram
 from pyrogram import StopTransmission, enums, raw, types, utils
 from pyrogram.errors import FilePartMissing
 from pyrogram.file_id import FileType
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from datetime import datetime, timedelta
+
+    from pyrogram._typing import PathType
+
 log = logging.getLogger(__name__)
+
 
 class SendVideo:
     async def send_video(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        video: Union[str, BinaryIO],
+        self: pyrogram.Client,
+        chat_id: int | str,
+        video: PathType | BinaryIO,
         caption: str = "",
-        parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: List["types.MessageEntity"] = None,
-        has_spoiler: bool = None,
-        ttl_seconds: int = None,
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
+        has_spoiler: bool | None = None,
+        ttl_seconds: int | None = None,
+        view_once: bool | None = None,
         duration: int = 0,
         width: int = 0,
         height: int = 0,
-        video_start_timestamp: int = None,
-        video_cover: Union[str, BinaryIO] = None,
-        thumb: Union[str, BinaryIO] = None,
-        file_name: str = None,
+        video_start_timestamp: int | None = None,
+        video_cover: PathType | BinaryIO | None = None,
+        thumb: PathType | BinaryIO | None = None,
+        file_name: str | None = None,
         supports_streaming: bool = True,
-        disable_notification: bool = None,
-        message_thread_id: int = None,
-        direct_messages_chat_topic_id: int = None,
-        effect_id: int = None,
-        show_caption_above_media: bool = None,
-        reply_parameters: "types.ReplyParameters" = None,
-        schedule_date: datetime = None,
-        protect_content: bool = None,
+        disable_notification: bool | None = None,
+        message_thread_id: int | None = None,
+        direct_messages_topic_id: int | None = None,
+        ephemeral_message_parameters: types.EphemeralMessageParameters | None = None,
+        effect_id: int | None = None,
+        show_caption_above_media: bool | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        repeat_period: int | None = None,
+        protect_content: bool | None = None,
         no_sound: bool = True,
-        business_connection_id: str = None,
-        allow_paid_broadcast: bool = None,
-        paid_message_star_count: int = None,
-        reply_markup: Union[
-            "types.InlineKeyboardMarkup",
-            "types.ReplyKeyboardMarkup",
-            "types.ReplyKeyboardRemove",
-            "types.ForceReply"
-        ] = None,
-        progress: Callable = None,
+        business_connection_id: str | None = None,
+        allow_paid_broadcast: bool | None = None,
+        paid_message_star_count: int | None = None,
+        suggested_post_parameters: types.SuggestedPostParameters | None = None,
+        reply_markup: (
+            types.InlineKeyboardMarkup
+            | types.ReplyKeyboardMarkup
+            | types.ReplyKeyboardRemove
+            | types.ForceReply
+            | None
+        ) = None,
+        progress: Callable | None = None,
         progress_args: tuple = (),
-
-        reply_to_message_id: int = None,
-        reply_to_chat_id: Union[int, str] = None,
-        reply_to_story_id: int = None,
-        quote_text: str = None,
-        quote_entities: List["types.MessageEntity"] = None,
-        quote_offset: int = None,
-    ) -> Optional["types.Message"]:
+        reply_to_message_id: int | None = None,
+        reply_to_chat_id: int | str | None = None,
+        reply_to_story_id: int | None = None,
+        quote_text: str | None = None,
+        quote_entities: list[types.MessageEntity] | None = None,
+        quote_offset: int | None = None,
+    ) -> types.Message | None:
         """Send video files.
 
         .. note::
@@ -90,7 +103,7 @@ class SendVideo:
                 For your personal cloud (Saved Messages) you can simply use "me" or "self".
                 For a contact that exists in your Telegram address book you can use his phone number (str).
 
-            video (``str`` | ``BinaryIO``):
+            video (``str`` | ``os.PathLike`` | ``BinaryIO``):
                 Video to send.
                 Pass a file_id as string to send a video that exists on the Telegram servers,
                 pass an HTTP URL as a string for Telegram to get a video from the Internet,
@@ -104,7 +117,7 @@ class SendVideo:
                 By default, texts are parsed using both Markdown and HTML styles.
                 You can combine both syntaxes together.
 
-            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`):
+            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
                 List of special entities that appear in the caption, which can be specified instead of *parse_mode*.
 
             has_spoiler (``bool``, *optional*):
@@ -114,6 +127,10 @@ class SendVideo:
                 Self-Destruct Timer.
                 If you set a timer, the video will self-destruct in *ttl_seconds*
                 seconds after it was viewed.
+
+            view_once (``bool``, *optional*):
+                Self-Destruct Timer.
+                If True, the photo will self-destruct after it was viewed.
 
             duration (``int``, *optional*):
                 Duration of sent video in seconds.
@@ -127,14 +144,14 @@ class SendVideo:
             video_start_timestamp (``int``, *optional*):
                 Video startpoint, in seconds.
 
-            video_cover (``str`` | ``BinaryIO``, *optional*):
+            video_cover (``str`` | ``os.PathLike`` | ``BinaryIO``, *optional*):
                 Video cover.
                 Pass a file_id as string to attach a photo that exists on the Telegram servers,
                 pass an HTTP URL as a string for Telegram to get a photo from the Internet,
                 pass a file path as string to upload a new photo that exists on your local machine, or
                 pass a binary file-like object with its attribute ".name" set for in-memory uploads.
 
-            thumb (``str`` | ``BinaryIO``, *optional*):
+            thumb (``str`` | ``os.PathLike`` | ``BinaryIO``, *optional*):
                 Thumbnail of the video sent.
                 The thumbnail should be in JPEG format and less than 200 KB in size.
                 A thumbnail's width and height should not exceed 320 pixels.
@@ -156,9 +173,12 @@ class SendVideo:
                 Unique identifier for the target message thread (topic) of the forum.
                 For forums only.
 
-            direct_messages_chat_topic_id (``int``, *optional*):
+            direct_messages_topic_id (``int``, *optional*):
                 Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For directs only only.
+                For direct chats only.only.
+
+            ephemeral_message_parameters (:obj:`~pyrogram.types.EphemeralMessageParameters`, *optional*):
+                Parameters of the ephemeral message to send.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -170,8 +190,12 @@ class SendVideo:
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
-            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+            schedule_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the message will be automatically sent.
+                A :py:obj:`~datetime.timedelta` is counted from now.
+
+            repeat_period (``int``, *optional*):
+                Period after which the message will be sent again in seconds.
 
             protect_content (``bool``, *optional*):
                 Protects the contents of the sent message from forwarding and saving.
@@ -192,6 +216,9 @@ class SendVideo:
             paid_message_star_count (``int``, *optional*):
                 The number of Telegram Stars the user agreed to pay to send the messages.
 
+            suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
+                Information about the suggested post.
+
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
                 Additional interface options. An object for an inline keyboard, custom reply keyboard,
                 instructions to remove reply keyboard or to force a reply from the user.
@@ -206,6 +233,36 @@ class SendVideo:
                 Extra custom arguments for the progress callback function.
                 You can pass anything you need to be available in the progress callback scope; for example, a Message
                 object or a Client instance in order to edit the message with the updated progress status.
+
+            reply_to_message_id (``int``, *optional*):
+                If the message is a reply, ID of the original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_chat_id (``int`` | ``str``, *optional*):
+                Unique identifier (int) or username (str) of the chat holding the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_story_id (``int``, *optional*):
+                If the message is a reply to a story, ID of the story.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_text (``str``, *optional*):
+                Text of the quoted part of the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
+                List of special entities that appear in the quote, which can be specified instead of *parse_mode*.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_offset (``int``, *optional*):
+                Offset for quote in original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
 
         Other Parameters:
             current (``int``):
@@ -222,6 +279,9 @@ class SendVideo:
             :obj:`~pyrogram.types.Message` | ``None``: On success, the sent video message is returned, otherwise, in
             case the upload is deliberately stopped with :meth:`~pyrogram.Client.stop_transmission`, None is returned.
 
+        Raises:
+            FileNotFoundError: In case a local ``os.PathLike`` doesn't point to an existing file.
+
         Example:
             .. code-block:: python
 
@@ -233,6 +293,9 @@ class SendVideo:
 
                 # Send self-destructing video
                 await app.send_video("me", "video.mp4", ttl_seconds=10)
+
+                # Send view-once video
+                await app.send_video("me", "video.mp4", view_once=True)
 
                 # Add video_cover to the video
                 await app.send_video(channel_id, "video.mp4", video_cover="photo.jpg")
@@ -290,7 +353,7 @@ class SendVideo:
                 quote=quote_text,
                 quote_parse_mode=parse_mode,
                 quote_entities=quote_entities,
-                quote_position=quote_offset
+                quote_position=quote_offset,
             )
 
         file = None
@@ -300,34 +363,35 @@ class SendVideo:
 
         try:
             if video_cover is not None:
-                if isinstance(video_cover, str):
+                if isinstance(video_cover, (str, os.PathLike)):
                     if os.path.isfile(video_cover):
                         vcover_media = await self.invoke(
                             raw.functions.messages.UploadMedia(
                                 peer=peer,
                                 media=raw.types.InputMediaUploadedPhoto(
                                     file=await self.save_file(video_cover)
-                                )
+                                ),
                             )
                         )
-                    elif re.match("^https?://", video_cover):
+                    elif isinstance(video_cover, str) and re.match("^https?://", video_cover):
                         vcover_media = await self.invoke(
                             raw.functions.messages.UploadMedia(
-                                peer=peer,
-                                media=raw.types.InputMediaPhotoExternal(
-                                    url=video_cover
-                                )
+                                peer=peer, media=raw.types.InputMediaPhotoExternal(url=video_cover)
                             )
                         )
+                    elif isinstance(video_cover, str):
+                        vcover_file = utils.get_input_media_from_file_id(
+                            video_cover, FileType.PHOTO
+                        ).id
                     else:
-                        vcover_file = utils.get_input_media_from_file_id(video_cover, FileType.PHOTO).id
+                        raise FileNotFoundError(f"No such file or directory: {video_cover}")
                 else:
                     vcover_media = await self.invoke(
                         raw.functions.messages.UploadMedia(
                             peer=peer,
                             media=raw.types.InputMediaUploadedPhoto(
                                 file=await self.save_file(video_cover)
-                            )
+                            ),
                         )
                     )
 
@@ -335,17 +399,19 @@ class SendVideo:
                     vcover_file = raw.types.InputPhoto(
                         id=vcover_media.photo.id,
                         access_hash=vcover_media.photo.access_hash,
-                        file_reference=vcover_media.photo.file_reference
+                        file_reference=vcover_media.photo.file_reference,
                     )
 
-            if isinstance(video, str):
+            if isinstance(video, (str, os.PathLike)):
                 if os.path.isfile(video):
                     thumb = await self.save_file(thumb)
-                    file = await self.save_file(video, progress=progress, progress_args=progress_args)
+                    file = await self.save_file(
+                        video, progress=progress, progress_args=progress_args
+                    )
                     media = raw.types.InputMediaUploadedDocument(
                         mime_type=self.guess_mime_type(video) or "video/mp4",
                         file=file,
-                        ttl_seconds=ttl_seconds,
+                        ttl_seconds=(1 << 31) - 1 if view_once else ttl_seconds,
                         spoiler=has_spoiler,
                         thumb=thumb,
                         video_cover=vcover_file,
@@ -353,31 +419,42 @@ class SendVideo:
                         nosound_video=no_sound,
                         attributes=[
                             raw.types.DocumentAttributeVideo(
-                                supports_streaming=supports_streaming or None,
+                                supports_streaming=supports_streaming,
                                 duration=duration,
                                 w=width,
-                                h=height
+                                h=height,
                             ),
-                            raw.types.DocumentAttributeFilename(file_name=file_name or os.path.basename(video))
-                        ]
+                            raw.types.DocumentAttributeFilename(
+                                file_name=file_name or Path(video).name
+                            ),
+                        ],
                     )
-                elif re.match("^https?://", video):
+                elif isinstance(video, str) and re.match("^https?://", video):
                     media = raw.types.InputMediaDocumentExternal(
                         url=video,
-                        ttl_seconds=ttl_seconds,
+                        ttl_seconds=(1 << 31) - 1 if view_once else ttl_seconds,
                         spoiler=has_spoiler,
                         video_cover=vcover_file,
-                        video_timestamp=video_start_timestamp
+                        video_timestamp=video_start_timestamp,
                     )
+                elif isinstance(video, str):
+                    media = utils.get_input_media_from_file_id(
+                        video,
+                        FileType.VIDEO,
+                        ttl_seconds=(1 << 31) - 1 if view_once else ttl_seconds,
+                        has_spoiler=has_spoiler,
+                    )
+                    media.video_cover = vcover_file
+                    media.video_timestamp = video_start_timestamp
                 else:
-                    media = utils.get_input_media_from_file_id(video, FileType.VIDEO, ttl_seconds=ttl_seconds, has_spoiler=has_spoiler)
+                    raise FileNotFoundError(f"No such file or directory: {video}")
             else:
                 thumb = await self.save_file(thumb)
                 file = await self.save_file(video, progress=progress, progress_args=progress_args)
                 media = raw.types.InputMediaUploadedDocument(
                     mime_type=self.guess_mime_type(file_name or video.name) or "video/mp4",
                     file=file,
-                    ttl_seconds=ttl_seconds,
+                    ttl_seconds=(1 << 31) - 1 if view_once else ttl_seconds,
                     spoiler=has_spoiler,
                     thumb=thumb,
                     video_cover=vcover_file,
@@ -385,42 +462,70 @@ class SendVideo:
                     nosound_video=no_sound,
                     attributes=[
                         raw.types.DocumentAttributeVideo(
-                            supports_streaming=supports_streaming or None,
+                            supports_streaming=supports_streaming,
                             duration=duration,
                             w=width,
-                            h=height
+                            h=height,
                         ),
-                        raw.types.DocumentAttributeFilename(file_name=file_name or video.name)
-                    ]
+                        raw.types.DocumentAttributeFilename(file_name=file_name or video.name),
+                    ],
                 )
 
             while True:
                 try:
-                    r = await self.invoke(
-                        raw.functions.messages.SendMedia(
+                    if ephemeral_message_parameters:
+                        rpc = raw.functions.ephemeral.SendMessage(
+                            peer=peer,
+                            receiver_id=await self.resolve_peer(
+                                ephemeral_message_parameters.receiver_user_id
+                            ),
+                            query_id=int(ephemeral_message_parameters.callback_query_id)
+                            if ephemeral_message_parameters.callback_query_id is not None
+                            else None,
+                            media=media,
+                            reply_to=await utils.get_reply_to(
+                                self, reply_parameters, message_thread_id, direct_messages_topic_id
+                            ),
+                            random_id=self.rnd_id(),
+                            invert_media=show_caption_above_media,
+                            anchor=ephemeral_message_parameters.replace_callback_query_message,
+                            reply_markup=await reply_markup.write(self) if reply_markup else None,
+                            **await utils.parse_text_entities(
+                                self, caption, parse_mode, caption_entities
+                            ),
+                        )
+                    else:
+                        rpc = raw.functions.messages.SendMedia(
                             peer=peer,
                             media=media,
-                            silent=disable_notification or None,
+                            silent=disable_notification,
                             invert_media=show_caption_above_media,
                             reply_to=await utils.get_reply_to(
-                                self,
-                                reply_parameters,
-                                message_thread_id,
-                                direct_messages_chat_topic_id
+                                self, reply_parameters, message_thread_id, direct_messages_topic_id
                             ),
                             random_id=self.rnd_id(),
                             schedule_date=utils.datetime_to_timestamp(schedule_date),
+                            schedule_repeat_period=repeat_period,
                             noforwards=protect_content,
                             allow_paid_floodskip=allow_paid_broadcast,
                             allow_paid_stars=paid_message_star_count,
+                            suggested_post=suggested_post_parameters.write()
+                            if suggested_post_parameters
+                            else None,
                             reply_markup=await reply_markup.write(self) if reply_markup else None,
                             effect=effect_id,
-                            **await utils.parse_text_entities(self, caption, parse_mode, caption_entities)
-                        ),
-                        business_connection_id=business_connection_id
-                    )
+                            **await utils.parse_text_entities(
+                                self, caption, parse_mode, caption_entities
+                            ),
+                        )
+
+                    r = await self.invoke(rpc, business_connection_id=business_connection_id)
                 except FilePartMissing as e:
-                    await self.save_file(video, file_id=file.id, file_part=e.value)
+                    # The error names the missing part; without it there is nothing to resave.
+                    if e.file_part is None:
+                        raise
+
+                    await self.save_file(video, file_id=file.id, file_part=e.file_part)
                 else:
                     messages = await utils.parse_messages(client=self, messages=r)
 

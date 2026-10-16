@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,7 +24,7 @@ from pyrogram import raw
 
 class GetBusinessAccountStarBalance:
     async def get_business_account_star_balance(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         business_connection_id: str,
     ) -> int:
         """Return the amount of Telegram Stars owned by a managed business account.
@@ -54,7 +54,7 @@ class GetBusinessAccountStarBalance:
             raw.functions.payments.GetStarsStatus(
                 peer=await self.resolve_peer(connection_info.user.id),
             ),
-            business_connection_id=business_connection_id
+            business_connection_id=business_connection_id,
         )
 
         return r.balance.amount

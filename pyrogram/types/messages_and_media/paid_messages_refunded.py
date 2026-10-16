@@ -16,9 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import raw
 
 
 class PaidMessagesRefunded(Object):
@@ -32,12 +37,7 @@ class PaidMessagesRefunded(Object):
             The number of refunded Telegram Stars.
     """
 
-    def __init__(
-        self,
-        *,
-        message_count: int,
-        star_count: int
-    ):
+    def __init__(self, *, message_count: int, star_count: int):
 
         super().__init__()
 
@@ -45,10 +45,5 @@ class PaidMessagesRefunded(Object):
         self.star_count = star_count
 
     @staticmethod
-    def _parse(
-        action: "raw.types.MessageActionPaidMessagesRefunded"
-    ) -> "PaidMessagesRefunded":
-        return PaidMessagesRefunded(
-            message_count=action.count,
-            star_count=action.stars
-        )
+    def _parse(action: raw.types.MessageActionPaidMessagesRefunded) -> PaidMessagesRefunded:
+        return PaidMessagesRefunded(message_count=action.count, star_count=action.stars)

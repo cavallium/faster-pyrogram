@@ -16,11 +16,27 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import BinaryIO, List, Optional, Union
+from __future__ import annotations as _annotations
 
-from ... import enums
-from ..messages_and_media import MessageEntity
+import io
+import os
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
+
+import pyrogram
+from pyrogram import raw, utils
+from pyrogram.file_id import FileType
+
 from .input_media import InputMedia
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pyrogram._typing import PathType
+
+    from ... import enums
+    from ..messages_and_media import MessageEntity
 
 
 class InputMediaVideo(InputMedia):
@@ -29,7 +45,7 @@ class InputMediaVideo(InputMedia):
     It is intended to be used with :obj:`~pyrogram.Client.send_media_group` or :obj:`~pyrogram.Client.send_paid_media`.
 
     Parameters:
-        media (``str`` | ``BinaryIO``):
+        media (``str`` | ``os.PathLike`` | ``BinaryIO``):
             Video to send.
             Pass a file_id as string to send a video that exists on the Telegram servers or
             pass a file path as string to upload a new video that exists on your local machine or
@@ -79,30 +95,33 @@ class InputMediaVideo(InputMedia):
         video_start_timestamp (``int``, *optional*):
             Video startpoint, in seconds.
 
-        video_cover (``str`` | ``BinaryIO``, *optional*):
+        video_cover (``str`` | ``os.PathLike`` | ``BinaryIO``, *optional*):
             Video cover.
             Pass a file_id as string to attach a photo that exists on the Telegram servers,
             pass an HTTP URL as a string for Telegram to get a photo from the Internet,
             pass a file path as string to upload a new photo that exists on your local machine, or
             pass a binary file-like object with its attribute ".name" set for in-memory uploads.
+
+    Raises:
+        FileNotFoundError: In case a local ``os.PathLike`` doesn't point to an existing file.
     """
 
     def __init__(
         self,
-        media: Union[str, BinaryIO],
-        thumb: str = None,
+        media: PathType | BinaryIO,
+        thumb: PathType | None = None,
         caption: str = "",
-        parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: List[MessageEntity] = None,
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[MessageEntity] | None = None,
         width: int = 0,
         height: int = 0,
         duration: int = 0,
-        file_name: str = None,
+        file_name: str | None = None,
         supports_streaming: bool = True,
-        has_spoiler: bool = None,
-        no_sound: bool = None,
-        video_start_timestamp: int = None,
-        video_cover: Union[str, BinaryIO] = None,
+        has_spoiler: bool | None = None,
+        no_sound: bool | None = None,
+        video_start_timestamp: int | None = None,
+        video_cover: PathType | BinaryIO | None = None,
     ):
         super().__init__(media, caption, parse_mode, caption_entities)
 
@@ -116,3 +135,129 @@ class InputMediaVideo(InputMedia):
         self.no_sound = no_sound
         self.video_start_timestamp = video_start_timestamp
         self.video_cover = video_cover
+
+    async def write(
+        self,
+        *,
+        client: pyrogram.Client,
+        chat_id: int | str | None = None,
+        progress: Callable | None = None,
+        progress_args: tuple = (),
+        ttl_seconds: int | None = None,
+        **kwargs,
+    ) -> raw.base.InputMedia:
+        if chat_id is None:
+            peer = raw.types.InputPeerSelf()
+        else:
+            peer = await client.resolve_peer(chat_id)
+
+        input_video_cover = None
+
+        if self.video_cover is not None:
+            if isinstance(self.video_cover, io.BytesIO) or Path(self.video_cover).is_file():
+                uploaded_media = await client.invoke(
+                    raw.functions.messages.UploadMedia(
+                        peer=peer,
+                        media=raw.types.InputMediaUploadedPhoto(
+                            file=await client.save_file(self.video_cover)
+                        ),
+                    )
+                )
+
+                input_video_cover = raw.types.InputPhoto(
+                    id=uploaded_media.photo.id,
+                    access_hash=uploaded_media.photo.access_hash,
+                    file_reference=uploaded_media.photo.file_reference,
+                )
+            elif isinstance(self.video_cover, os.PathLike):
+                raise FileNotFoundError(f"No such file or directory: {self.video_cover}")
+            # Only a `str` can name a URL or a file id; anything else was consumed or
+            #  rejected above.
+            elif not isinstance(self.video_cover, str):
+                raise TypeError(
+                    f"video_cover must be a path, URL, or file id, got: {self.video_cover!r}"
+                )
+            elif re.match("^https?://", self.video_cover):
+                uploaded_media = await client.invoke(
+                    raw.functions.messages.UploadMedia(
+                        peer=peer, media=raw.types.InputMediaPhotoExternal(url=self.video_cover)
+                    )
+                )
+
+                input_video_cover = raw.types.InputPhoto(
+                    id=uploaded_media.photo.id,
+                    access_hash=uploaded_media.photo.access_hash,
+                    file_reference=uploaded_media.photo.file_reference,
+                )
+            else:
+                input_video_cover = utils.get_input_media_from_file_id(
+                    self.video_cover, FileType.PHOTO
+                ).id
+
+        if isinstance(self.media, io.BytesIO) or Path(self.media).is_file():
+            uploaded_media = await client.invoke(
+                raw.functions.messages.UploadMedia(
+                    peer=peer,
+                    media=raw.types.InputMediaUploadedDocument(
+                        mime_type=client.guess_mime_type(self.media) or "video/mp4",
+                        file=await client.save_file(
+                            self.media, progress=progress, progress_args=progress_args
+                        ),
+                        spoiler=self.has_spoiler,
+                        thumb=await client.save_file(self.thumb),
+                        video_cover=input_video_cover,
+                        video_timestamp=self.video_start_timestamp,
+                        nosound_video=self.no_sound,
+                        attributes=[
+                            raw.types.DocumentAttributeVideo(
+                                supports_streaming=self.supports_streaming,
+                                duration=self.duration,
+                                w=self.width,
+                                h=self.height,
+                            ),
+                            raw.types.DocumentAttributeFilename(
+                                file_name=utils.get_file_name(self.media, file_name=self.file_name),
+                            ),
+                        ],
+                        ttl_seconds=ttl_seconds,
+                    ),
+                ),
+            )
+
+            return raw.types.InputMediaDocument(
+                id=raw.types.InputDocument(
+                    id=uploaded_media.document.id,
+                    access_hash=uploaded_media.document.access_hash,
+                    file_reference=uploaded_media.document.file_reference,
+                ),
+                spoiler=self.has_spoiler,
+                ttl_seconds=ttl_seconds,
+                video_cover=input_video_cover,
+                video_timestamp=self.video_start_timestamp,
+            )
+
+        if isinstance(self.media, os.PathLike):
+            raise FileNotFoundError(f"No such file or directory: {self.media}")
+
+        # Only a `str` can name a URL or a file id; anything else was consumed or
+        #  rejected above.
+        if not isinstance(self.media, str):
+            raise TypeError(f"media must be a path, URL, or file id, got: {self.media!r}")
+
+        if re.match("^https?://", self.media):
+            return raw.types.InputMediaDocumentExternal(
+                url=self.media,
+                spoiler=self.has_spoiler,
+                ttl_seconds=ttl_seconds,
+                video_cover=input_video_cover,
+                video_timestamp=self.video_start_timestamp,
+            )
+
+        return utils.get_input_media_from_file_id(
+            self.media,
+            FileType.VIDEO,
+            has_spoiler=self.has_spoiler,
+            ttl_seconds=ttl_seconds,
+            video_cover=input_video_cover,
+            video_start_timestamp=self.video_start_timestamp,
+        )

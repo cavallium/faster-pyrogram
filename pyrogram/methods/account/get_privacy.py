@@ -16,15 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw, types, enums
 
 
 class GetPrivacy:
-    async def get_privacy(
-        self: "pyrogram.Client",
-        key: "enums.PrivacyKey"
-    ):
+    async def get_privacy(self: pyrogram.Client, key: enums.PrivacyKey) -> list[types.PrivacyRule]:
         """Get account privacy rules.
 
         .. include:: /_includes/usable-by/users.rst
@@ -43,13 +42,11 @@ class GetPrivacy:
 
                 await app.get_privacy(enums.PrivacyKey.PHONE_NUMBER)
         """
-        r = await self.invoke(
-            raw.functions.account.GetPrivacy(
-                key=key.value()
-            )
-        )
+        r = await self.invoke(raw.functions.account.GetPrivacy(key=key.value()))
 
         users = {i.id: i for i in r.users}
         chats = {i.id: i for i in r.chats}
 
-        return types.List(types.PrivacyRule._parse(self, rule, users, chats) for rule in r.rules)
+        return types.List(
+            [await types.PrivacyRule._parse(self, rule, users, chats) for rule in r.rules]
+        )

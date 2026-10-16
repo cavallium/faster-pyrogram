@@ -16,6 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from .base_type_meta import BaseTypeMeta
 from .future_salt import FutureSalt
 from .future_salts import FutureSalts
 from .gzip_packed import GzipPacked
@@ -25,7 +26,30 @@ from .msg_container import MsgContainer
 from .primitives.bool import Bool, BoolFalse, BoolTrue
 from .primitives.bytes import Bytes
 from .primitives.double import Double
-from .primitives.int import Int, Long, Int128, Int256
+from .primitives.int import Int, Int128, Int256, Long
 from .primitives.string import String
 from .primitives.vector import Vector
-from .tl_object import TLObject
+from .tl_object import ReturnType, TLObject
+
+__all__ = [
+    "FutureSalt",
+    "FutureSalts",
+    "GzipPacked",
+    "List",
+    "Message",
+    "MsgContainer",
+    "Bool",
+    "BoolFalse",
+    "BoolTrue",
+    "Bytes",
+    "Double",
+    "Int",
+    "Long",
+    "Int128",
+    "Int256",
+    "String",
+    "Vector",
+    "BaseTypeMeta",
+    "TLObject",
+    "ReturnType",
+]

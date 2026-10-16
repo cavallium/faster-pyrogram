@@ -16,17 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
 
 
 class SetUsername:
-    async def set_username(
-        self: "pyrogram.Client",
-        username: Optional[str]
-    ) -> bool:
+    async def set_username(self: pyrogram.Client, username: str | None) -> bool:
         """Set your own username.
 
         This method only works for users, not bots. Bot usernames must be changed via Bot Support or by recreating
@@ -49,9 +46,5 @@ class SetUsername:
         """
 
         return bool(
-            await self.invoke(
-                raw.functions.account.UpdateUsername(
-                    username=username or ""
-                )
-            )
+            await self.invoke(raw.functions.account.UpdateUsername(username=username or ""))
         )

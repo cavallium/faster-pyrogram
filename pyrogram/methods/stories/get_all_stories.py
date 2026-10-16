@@ -16,20 +16,24 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncGenerator, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class GetAllStories:
     async def get_all_stories(
-        self: "pyrogram.Client",
-        next: Optional[bool] = None,
-        hidden: Optional[bool] = None,
-        state: Optional[str] = None,
-    ) -> AsyncGenerator["types.Story", None]:
+        self: pyrogram.Client,
+        next: bool | None = None,
+        hidden: bool | None = None,
+        state: str | None = None,
+    ) -> AsyncGenerator[types.Story, None]:
         """Get all active or hidden stories that displayed on the action bar on the homescreen.
 
         .. include:: /_includes/usable-by/users.rst
@@ -60,11 +64,7 @@ class GetAllStories:
         """
 
         r = await self.invoke(
-            raw.functions.stories.GetAllStories(
-                next=next,
-                hidden=hidden,
-                state=state
-            )
+            raw.functions.stories.GetAllStories(next=next, hidden=hidden, state=state)
         )
 
         users = {i.id: i for i in r.users}
@@ -72,10 +72,4 @@ class GetAllStories:
 
         for peer_story in r.peer_stories:
             for story in peer_story.stories:
-                yield await types.Story._parse(
-                    self,
-                    story,
-                    peer_story.peer,
-                    users,
-                    chats
-                )
+                yield await types.Story._parse(self, story, peer_story.peer, users, chats)

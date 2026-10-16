@@ -16,12 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import pyrogram
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pyrogram
 
 
 class Disconnect:
     async def disconnect(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
     ):
         """Disconnect the client from Telegram servers.
 
@@ -37,4 +42,5 @@ class Disconnect:
 
         await self.session.stop()
         await self.storage.close()
+        self.session = None
         self.is_connected = False

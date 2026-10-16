@@ -16,8 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
+
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import raw
 
 
 class ForumTopicCreated(Object):
@@ -34,17 +40,11 @@ class ForumTopicCreated(Object):
         icon_color (``int``):
             Color of the topic icon in decimal format.
 
-        custom_emoji_id (``int``, *optional*):
+        custom_emoji_id (``str``, *optional*):
             Unique identifier of the custom emoji shown as the topic icon.
     """
 
-    def __init__(
-        self, *,
-        id: int,
-        title: str,
-        icon_color: int,
-        custom_emoji_id: int = None
-    ):
+    def __init__(self, *, id: int, title: str, icon_color: int, custom_emoji_id: str | None = None):
         super().__init__()
 
         self.id = id
@@ -53,10 +53,12 @@ class ForumTopicCreated(Object):
         self.custom_emoji_id = custom_emoji_id
 
     @staticmethod
-    def _parse(message: "raw.base.Message") -> "ForumTopicCreated":
+    def _parse(message: raw.base.Message) -> ForumTopicCreated:
+        custom_emoji_id = getattr(message.action, "icon_emoji_id", None)
+
         return ForumTopicCreated(
             id=getattr(message, "id", None),
             title=getattr(message.action, "title", None),
             icon_color=getattr(message.action, "icon_color", None),
-            custom_emoji_id=getattr(message.action, "icon_emoji_id", None)
+            custom_emoji_id=str(custom_emoji_id) if custom_emoji_id else None,
         )

@@ -16,26 +16,32 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import AsyncGenerator, Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, types, utils
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+    from datetime import datetime, timedelta
+
 
 async def get_chunk(
     *,
-    client: "pyrogram.Client",
-    chat_id: Union[int, str],
+    client: pyrogram.Client,
+    chat_id: int | str,
     topic_id: int,
     limit: int = 0,
     offset: int = 0,
     from_message_id: int = 0,
-    from_date: datetime = utils.zero_datetime(),
+    from_date: datetime | timedelta | None = None,
     min_id: int = 0,
     max_id: int = 0,
-    reverse: bool = False
+    reverse: bool = False,
 ):
+    from_date = from_date or utils.zero_datetime()
     from_message_id = from_message_id or (1 if reverse else 0)
 
     messages = await client.invoke(
@@ -48,9 +54,9 @@ async def get_chunk(
             max_id=max_id,
             min_id=min_id,
             hash=0,
-            parent_peer=await client.resolve_peer(chat_id)
+            parent_peer=await client.resolve_peer(chat_id),
         ),
-        sleep_threshold=60
+        sleep_threshold=60,
     )
 
     messages = await utils.parse_messages(client, messages, replies=0)
@@ -59,19 +65,20 @@ async def get_chunk(
 
     return messages
 
+
 class GetDirectMessagesChatTopicHistory:
     async def get_direct_messages_chat_topic_history(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         topic_id: int,
         limit: int = 0,
         offset: int = 0,
         offset_id: int = 0,
-        offset_date: datetime = utils.zero_datetime(),
+        offset_date: datetime | timedelta | None = None,
         min_id: int = 0,
         max_id: int = 0,
-        reverse: bool = False
-    ) -> AsyncGenerator["types.Message", None]:
+        reverse: bool = False,
+    ) -> AsyncGenerator[types.Message, None]:
         """Return messages in the topic in a channel direct messages chat administered by the current user.
 
         The messages are returned in reverse chronological order.
@@ -96,8 +103,9 @@ class GetDirectMessagesChatTopicHistory:
             offset_id (``int``, *optional*):
                 Identifier of the first message to be returned.
 
-            offset_date (:py:obj:`~datetime.datetime`, *optional*):
+            offset_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Pass a date as offset to retrieve only older messages starting from that date.
+                A :py:obj:`~datetime.timedelta` is counted from now.
 
             min_id (``int``, *optional*):
                 If a positive value was provided, the method will return only messages with IDs more than min_id.
@@ -132,7 +140,7 @@ class GetDirectMessagesChatTopicHistory:
                 from_date=offset_date,
                 max_id=max_id,
                 min_id=min_id,
-                reverse=reverse
+                reverse=reverse,
             )
 
             if not messages:

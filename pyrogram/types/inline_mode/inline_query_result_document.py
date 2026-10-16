@@ -16,10 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, List
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw, types, utils, enums
+from pyrogram import enums, raw, types, utils
+
 from .inline_query_result import InlineQueryResult
 
 
@@ -78,16 +79,16 @@ class InlineQueryResultDocument(InlineQueryResult):
         document_url: str,
         title: str,
         mime_type: str = "application/zip",
-        id: str = None,
+        id: str | None = None,
         caption: str = "",
-        parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: List["types.MessageEntity"] = None,
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
         description: str = "",
-        reply_markup: "types.InlineKeyboardMarkup" = None,
-        input_message_content: "types.InputMessageContent" = None,
-        thumb_url: str = None,
+        reply_markup: types.InlineKeyboardMarkup | None = None,
+        input_message_content: types.InputMessageContent | None = None,
+        thumb_url: str | None = None,
         thumb_width: int = 0,
-        thumb_height: int = 0
+        thumb_height: int = 0,
     ):
         super().__init__("file", id, input_message_content, reply_markup)
 
@@ -102,29 +103,29 @@ class InlineQueryResultDocument(InlineQueryResult):
         self.thumb_width = thumb_width
         self.thumb_height = thumb_height
 
-    async def write(self, client: "pyrogram.Client"):
+    async def write(self, client: pyrogram.Client):
         document = raw.types.InputWebDocument(
-            url=self.document_url,
-            size=0,
-            mime_type=self.mime_type,
-            attributes=[]
+            url=self.document_url, size=0, mime_type=self.mime_type, attributes=[]
         )
 
-        thumb = raw.types.InputWebDocument(
-            url=self.thumb_url,
-            size=0,
-            mime_type="image/jpeg",
-            attributes=[
-                raw.types.DocumentAttributeImageSize(
-                    w=self.thumb_width,
-                    h=self.thumb_height
-                )
-            ]
-        ) if self.thumb_url else None
+        thumb = (
+            raw.types.InputWebDocument(
+                url=self.thumb_url,
+                size=0,
+                mime_type="image/jpeg",
+                attributes=[
+                    raw.types.DocumentAttributeImageSize(w=self.thumb_width, h=self.thumb_height)
+                ],
+            )
+            if self.thumb_url
+            else None
+        )
 
-        message, entities = (await utils.parse_text_entities(
-            client, self.caption, self.parse_mode, self.caption_entities
-        )).values()
+        message, entities = (
+            await utils.parse_text_entities(
+                client, self.caption, self.parse_mode, self.caption_entities
+            )
+        ).values()
 
         return raw.types.InputBotInlineResult(
             id=self.id,
@@ -137,9 +138,11 @@ class InlineQueryResultDocument(InlineQueryResult):
                 await self.input_message_content.write(client, self.reply_markup)
                 if self.input_message_content
                 else raw.types.InputBotInlineMessageMediaAuto(
-                    reply_markup=await self.reply_markup.write(client) if self.reply_markup else None,
+                    reply_markup=await self.reply_markup.write(client)
+                    if self.reply_markup
+                    else None,
                     message=message,
-                    entities=entities
+                    entities=entities,
                 )
-            )
+            ),
         )

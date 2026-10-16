@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -25,9 +25,8 @@ from pyrogram import types
 
 class GetBotDefaultPrivileges:
     async def get_bot_default_privileges(
-        self: "pyrogram.Client",
-        for_channels: bool = None
-    ) -> Optional["types.ChatPrivileges"]:
+        self: pyrogram.Client, for_channels: bool | None = None
+    ) -> types.ChatAdministratorRights | None:
         """Get the current default privileges of the bot.
 
         .. include:: /_includes/usable-by/bots.rst
@@ -38,7 +37,8 @@ class GetBotDefaultPrivileges:
                 for groups and supergroups will be returned.
 
         Returns:
-            ``bool``: On success, True is returned.
+            :obj:`~pyrogram.types.ChatAdministratorRights` | ``None``: On success, the default privileges of
+            the bot are returned, otherwise, in case the bot has no default privileges set, None is returned.
 
         Example:
             .. code-block:: python
@@ -46,14 +46,10 @@ class GetBotDefaultPrivileges:
                 privileges = await app.get_bot_default_privileges()
         """
 
-        bot_info = await self.invoke(
-            raw.functions.users.GetFullUser(
-                id=raw.types.InputUserSelf()
-            )
-        )
+        bot_info = await self.invoke(raw.functions.users.GetFullUser(id=raw.types.InputUserSelf()))
 
         field = "bot_broadcast_admin_rights" if for_channels else "bot_group_admin_rights"
 
         admin_rights = getattr(bot_info.full_user, field)
 
-        return types.ChatPrivileges._parse(admin_rights) if admin_rights else None
+        return types.ChatAdministratorRights._parse(admin_rights) if admin_rights else None

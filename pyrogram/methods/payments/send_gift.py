@@ -16,8 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-
-from typing import List, Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
@@ -25,15 +24,15 @@ from pyrogram import enums, raw, types, utils
 
 class SendGift:
     async def send_gift(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         gift_id: int,
-        text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        entities: Optional[List["types.MessageEntity"]] = None,
-        is_private: Optional[bool] = None,
-        pay_for_upgrade: Optional[bool] = None,
-    ) -> Optional["types.Message"]:
+        text: str | None = None,
+        parse_mode: enums.ParseMode | None = None,
+        entities: list[types.MessageEntity] | None = None,
+        is_private: bool | None = None,
+        pay_for_upgrade: bool | None = None,
+    ) -> types.Message | None:
         """Send a gift to another user or channel chat. May return an error with a message "STARGIFT_USAGE_LIMITED" if the gift was sold out.
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -65,7 +64,8 @@ class SendGift:
                 Pass True to additionally pay for the gift upgrade and allow the receiver to upgrade it for free.
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise,
+            in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -73,24 +73,26 @@ class SendGift:
                 # Send gift
                 await app.send_gift(chat_id=chat_id, gift_id=123)
         """
-        text, entities = (await utils.parse_text_entities(self, text, parse_mode, entities)).values()
+        text, entities = (
+            await utils.parse_text_entities(self, text, parse_mode, entities)
+        ).values()
 
         invoice = raw.types.InputInvoiceStarGift(
             peer=await self.resolve_peer(chat_id),
             gift_id=gift_id,
             hide_name=is_private,
             include_upgrade=pay_for_upgrade,
-            message=raw.types.TextWithEntities(text=text, entities=entities or []) if text else None
+            message=raw.types.TextWithEntities(text=text, entities=entities or [])
+            if text
+            else None,
         )
 
         r = await self.invoke(
             raw.functions.payments.SendStarsForm(
-                form_id=(await self.invoke(
-                    raw.functions.payments.GetPaymentForm(
-                        invoice=invoice
-                    )
-                )).form_id,
-                invoice=invoice
+                form_id=(
+                    await self.invoke(raw.functions.payments.GetPaymentForm(invoice=invoice))
+                ).form_id,
+                invoice=invoice,
             )
         )
 

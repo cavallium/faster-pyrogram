@@ -16,419 +16,845 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Dict, List, Optional, Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw, types, utils, enums
+from pyrogram import enums, raw, types, utils
 
 from ..object import Object
 
+if TYPE_CHECKING:
+    from datetime import datetime
+
 
 class Gift(Object):
-    """A star gift.
+    """Describes a gift or an upgraded gift that can be transferred to another owner or transferred to the TON blockchain as an NFT.
 
     Parameters:
         id (``int``):
-            Unique star gift identifier.
+            Unique identifier of the gift.
+
+        type (:obj:`~pyrogram.enums.GiftType`):
+            Type of the gift.
+
+        origin (:obj:`~pyrogram.enums.UpgradedGiftOrigin`, *optional*):
+            Origin of the gift.
+
+        received_gift_id (``str``, *optional*):
+            Unique identifier of the received gift for the current user.
+
+        regular_gift_id (``int``, *optional*):
+            Unique identifier of the regular gift from which the gift was upgraded.
+
+        publisher_chat (:obj:`~pyrogram.types.Chat`, *optional*):
+            Information about the chat that published the gift.
 
         sticker (:obj:`~pyrogram.types.Sticker`, *optional*):
-            Information about the star gift sticker.
+            The sticker that represents the gift.
 
-        caption (``str``, *optional*):
-            Text message.
-
-        caption_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
-            For text messages, special entities like usernames, URLs, bot commands, etc. that appear in the text.
-
-        message_id (``int``, *optional*):
-            Unique message identifier.
-
-        upgrade_message_id (``int``, *optional*):
-            Unique message identifier.
-            For unique gifts only.
-
-        name (``str``, *optional*):
-            Unique name of the upgraded gift that can be used with :meth:`~pyrogram.Client.send_resold_gift`.
-
-        title (``str``, *optional*):
-            The title of the upgraded gift
-
-        collectible_id (``int``, *optional*):
-            Collectible number of the star gift.
-            For unique gifts only.
-
-        attributes (List of :obj:`~pyrogram.types.GiftAttribute`, *optional*):
-            Attributes of the star gift.
-            For unique gifts only.
+        text (:obj:`~pyrogram.types.FormattedText`, *optional*):
+            Message added to the gift.
 
         date (:py:obj:`~datetime.datetime`, *optional*):
-            Date when the star gift was received.
+            Date when the gift was sent or received.
 
         first_sale_date (:py:obj:`~datetime.datetime`, *optional*):
-            Date when the star gift was first purchased.
+            Date when the gift was sent for the first time.
+            For sold out gifts only.
 
         last_sale_date (:py:obj:`~datetime.datetime`, *optional*):
-            Date when the star gift was last purchased.
+            Date when the gift was sent for the last time.
+            For sold out gifts only.
 
-        from_user (:obj:`~pyrogram.types.User`, *optional*):
-            User who sent the star gift.
+        locked_until_date (:py:obj:`~datetime.datetime`, *optional*):
+            Date when the gift will be available for purchase.
+
+        craft_date (:py:obj:`~datetime.datetime`, *optional*):
+            Date when the gift can be used to craft another gift can be in the past.
+
+        sender (:obj:`~pyrogram.types.Chat`, *optional*):
+            User or a chat that sent the gift.
+
+        receiver (:obj:`~pyrogram.types.Chat`, *optional*):
+            User or a chat that received the gift.
+
+        host (:obj:`~pyrogram.types.Chat`, *optional*):
+            User or the chat to which the upgraded gift was assigned from blockchain.
 
         owner (:obj:`~pyrogram.types.Chat`, *optional*):
-            Current gift owner.
-
-        owner_name (``str``, *optional*):
-            Name of the user who received the star gift.
+            User or the chat that owns the gift.
 
         owner_address (``str``, *optional*):
             Address of the gift owner in TON blockchain.
 
+        owner_name (``str``, *optional*):
+            Name of the user who received the star gift.
+
         gift_address (``str``, *optional*):
             Address of the gift in TON blockchain.
 
-        price (``int``, *optional*):
-            Price of this gift in stars.
+        title (``str``, *optional*):
+            The title of the upgraded gift.
 
-        convert_price (``int``, *optional*):
-            The number of stars you get if you convert this gift.
+        name (``str``, *optional*):
+            Unique name of the upgraded gift.
 
-        upgrade_price (``int``, *optional*):
-            The number of stars you need to upgrade this gift.
+        model (:obj:`~pyrogram.types.GiftAttribute`, *optional*):
+            Model of the upgraded gift.
 
-        transfer_price (``int``, *optional*):
-            The number of stars you need to transfer this gift.
+        symbol (:obj:`~pyrogram.types.GiftAttribute`, *optional*):
+            Symbol of the upgraded gift.
 
-        resale_price (``int``, *optional*):
-            Number of Telegram Stars that must be paid to buy the gift and send it to someone else.
+        backdrop (:obj:`~pyrogram.types.GiftAttribute`, *optional*):
+            Backdrop of the upgraded gift.
 
-        last_resale_price (``int``, *optional*):
-            Number of Telegram Stars that were paid by the sender for the gift; 0 if the gift was upgraded or transferred.
+        original_details (:obj:`~pyrogram.types.UpgradedGiftOriginalDetails`, *optional*):
+            Information about the originally sent gift.
 
-        number (``int``, *optional*):
-            Unique number of the upgraded gift among gifts upgraded from the same gift.
+        total_upgraded_count (``int``, *optional*):
+            Total number of gifts that were upgraded from the same gift.
 
-        available_resale_amount (``int``, *optional*):
-            The number of gifts available for resale.
-            Returned only if is_limited is True.
+        max_upgraded_count (``int``, *optional*):
+            The maximum number of gifts that can be upgraded from the same gift.
 
-        available_amount (``int``, *optional*):
-            The number of gifts available for purchase.
-            Returned only if is_limited is True.
+        available_resale_count (``int``, *optional*):
+            Total number of gifts that can be bought from other users on the market.
 
-        total_amount (``int``, *optional*):
-            Total amount of gifts.
-            Returned only if is_limited is True.
+        unique_gift_number (``int``, *optional*):
+            Unique number of the gift among gifts upgraded from the same gift after upgrade.
 
-        can_upgrade (``bool``, *optional*):
-            True, if the gift can be upgraded.
+        unique_gift_variant_count (``int``, *optional*):
+            The total number of different unique gifts that can be obtained by upgrading the gift.
 
-        can_export_at (:py:obj:`~datetime.datetime`, *optional*):
-            Date when the gift can be exported via blockchain.
+        star_count (``int``, *optional*):
+            Number of Telegram Stars that must be paid for the gift.
 
-        can_transfer_at (:py:obj:`~datetime.datetime`, *optional*):
-            Date when the gift can be transferred to another user.
+        default_sell_star_count (``int``, *optional*):
+            Number of Telegram Stars that can be claimed by the receiver instead of the regular gift by default.
 
-        can_resell_at (:py:obj:`~datetime.datetime`, *optional*):
-            Date when the gift can be resold.
+        convert_star_count (``int``, *optional*):
+            Number of Telegram Stars that can be claimed by the receiver instead of the gift; omitted if the gift cannot be converted to Telegram Stars.
+
+        upgrade_star_count (``int``, *optional*):
+            Number of Telegram Stars that must be paid to upgrade the gift.
+
+        transfer_star_count (``int``, *optional*):
+            Number of Telegram Stars that must be paid to transfer the upgraded gift.
+
+        drop_original_details_star_count (``int``, *optional*):
+            Number of Telegram Stars that must be paid to drop original details of the upgraded gift.
+
+        minimum_resell_star_count (``int``, *optional*):
+            Number of Telegram Stars for which sales begin on the market for the gift.
+
+        minimum_offer_star_count (``int``, *optional*):
+            Number of Telegram Stars required to make an offer for the gift.
+
+        prepaid_upgrade_star_count (``int``, *optional*):
+            Number of Telegram Stars that were paid by the sender for the ability to upgrade the gift.
+
+        prepaid_upgrade_hash (``str``, *optional*):
+            If non-empty, then the user can pay for an upgrade of the gift using :meth:`~pyrogram.Client.buy_gift_upgrade`.
+
+        auction_info (:obj:`~pyrogram.types.GiftAuction`, *optional*):
+            Information about the auction on which the gift can be purchased.
+
+        resale_parameters (:obj:`~pyrogram.types.GiftResaleParameters`, *optional*):
+            Resale parameters of the gift.
+
+        user_limits (:obj:`~pyrogram.types.GiftPurchaseLimit`, *optional*):
+            Number of times the gift can be purchased by the current user.
+
+        overall_limits (:obj:`~pyrogram.types.GiftPurchaseLimit`, *optional*):
+            Number of times the gift can be purchased all users.
+
+        value_currency (``str``, *optional*):
+            ISO 4217 currency code of the currency in which value of the gift is represented.
+
+        value_amount (``int``, *optional*):
+            Estimated value of the gift; in the smallest units of the currency.
+
+        value_usd_amount (``int``, *optional*):
+            Estimated value of the gift in USD cents.
+
+        last_resale_currency (``str``, *optional*):
+            For gifts bought from other users, the currency in which the payment for the gift was done.
+            Currently, one of “XTR” for Telegram Stars or “TON” for toncoins.
+
+        last_resale_amount (``int``, *optional*):
+            For gifts bought from other users, the price paid for the gift in either Telegram Stars or nanotoncoins.
+
+        next_send_date (:py:obj:`~datetime.datetime`, *optional*):
+            Date when the gift can be sent next time by the current user.
+
+        next_transfer_date (:py:obj:`~datetime.datetime`, *optional*):
+            Date when the gift can be transferred to another owner.
+
+        next_resale_date (:py:obj:`~datetime.datetime`, *optional*):
+            Date when the gift can be resold to another user.
+
+        export_date (:py:obj:`~datetime.datetime`, *optional*):
+            Date when the gift can be transferred to the TON blockchain as an NFT.
+
+        collection_ids (List of ``int``, *optional*):
+            Identifiers of collections to which the gift is added.
+            Only for the receiver of the gift.
+
+        used_theme_chat_id (``int``, *optional*):
+            Identifier of the chat for which the gift is used to set a theme.
+
+        craft_probability_per_mille (``int``, *optional*):
+            Probability that the gift adds to the chance of successful crafting of a new gift.
+
+        has_colors (``bool``, *optional*):
+            True, if the gift can be used to customize user's name and backgrounds.
+
+        is_auction (``bool``, *optional*):
+            True, if the gift can be purchased only on an auction.
+
+        is_private (``bool``, *optional*):
+            True, if the sender and gift text are shown only to the gift receiver.
+
+        is_saved (``bool``, *optional*):
+            True, if the gift is displayed on the chat's profile page.
+
+        is_pinned (``bool``, *optional*):
+            True, if the gift is pinned to the top of the chat's profile page.
 
         is_limited (``bool``, *optional*):
             True, if the number of gifts is limited.
 
-        is_name_hidden (``bool``, *optional*):
-            True, if the sender's name is hidden.
-
-        is_saved (``bool``, *optional*):
-            True, if the star gift is saved in profile.
+        is_limited_per_user (``bool``, *optional*):
+            True, if the number of gifts per user is limited.
 
         is_sold_out (``bool``, *optional*):
-            True, if the star gift is sold out.
+            True, if the gift is sold out.
 
-        is_converted (``bool``, *optional*):
+        is_burned (``bool``, *optional*):
+            True, if the gift was used to craft another gift.
+
+        is_crafted (``bool``, *optional*):
+            True, if the gift was craft from another gifts.
+
+        is_premium (``bool``, *optional*):
+            True, if the gift can be bought only by Telegram Premium subscribers.
+
+        is_for_birthday (``bool``, *optional*):
+            True, if the gift is a birthday gift.
+
+        is_theme_available (``bool``, *optional*):
+            True, if the gift can be used to set a theme in a chat.
+
+        is_upgrade_separate (``bool``, *optional*):
+            True, if the upgrade was bought after the gift was sent.
+
+        is_name_hidden (``bool``, *optional*):
+            True, if the owner name of the gift is hidden.
+
+        can_be_upgraded (``bool``, *optional*):
+            True, if the gift can be upgraded to a unique gift.
+
+        can_be_transferred (``bool``, *optional*):
+            True, if the upgraded gift can be transferred to another owner.
+
+        can_send_purchase_offer (``bool``, *optional*):
+            True, if an offer to purchase the gift can be sent using :meth:`~pyrogram.Client.send_gift_purchase_offer`.
+
+        was_converted (``bool``, *optional*):
             True, if the gift was converted to Telegram Stars.
             Only for the receiver of the gift.
 
-        is_upgraded (``bool``, *optional*):
-            True, if the gift was upgraded.
+        was_upgraded (``bool``, *optional*):
+            True, if the gift was upgraded to a unique gift.
 
-        is_refunded (``bool``, *optional*):
-            True, if the gift was refunded.
+        was_refunded (``bool``, *optional*):
+            True, if the gift was refunded and isn't available anymore.
 
-        is_transferred (``bool``, *optional*):
-            True, if the gift was transferred.
-
-        is_birthday (``bool``, *optional*):
-            True, if the gift is a birthday gift.
-
-        is_pinned (``bool``, *optional*):
-            True, if the gift is pinned.
-
-        raw (:obj:`~pyrogram.raw.base.StarGift`, *optional*):
+        raw (:obj:`~pyrogram.raw.base.StarGift` | :obj:`~pyrogram.raw.base.SavedStarGift`):
             The raw object as received from the server.
 
         link (``str``, *property*):
             A link to the gift.
-            For unique gifts only.
+
+        owned_gift_id (``str``, *property*):
+            Unique identifier of the gift.
     """
+
+    # TODO: background, colors
 
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         id: int,
-        sticker: "types.Sticker" = None,
-        caption: Optional[str] = None,
-        caption_entities: List["types.MessageEntity"] = None,
-        message_id: Optional[int] = None,
-        date: Optional[datetime] = None,
-        first_sale_date: Optional[datetime] = None,
-        last_sale_date: Optional[datetime] = None,
-        from_user: Optional["types.User"] = None,
-        owner: Optional["types.Chat"] = None,
-        owner_name: Optional[str] = None,
-        owner_address: Optional[str] = None,
-        gift_address: Optional[str] = None,
-        price: Optional[int] = None,
-        convert_price: Optional[int] = None,
-        upgrade_price: Optional[int] = None,
-        transfer_price: Optional[int] = None,
-        resale_price: Optional[int] = None,
-        last_resale_price: Optional[int] = None,
-        upgrade_message_id: Optional[int] = None,
-        name: Optional[str] = None,
-        title: Optional[str] = None,
-        collectible_id: Optional[int] = None,
-        attributes: Optional[List["types.GiftAttribute"]] = None,
-        number: Optional[int] = None,
-        available_resale_amount: Optional[int] = None,
-        available_amount: Optional[int] = None,
-        total_amount: Optional[int] = None,
-        can_upgrade: Optional[bool] = None,
-        can_export_at: Optional[datetime] = None,
-        can_transfer_at: Optional[datetime] = None,
-        can_resell_at: Optional[datetime] = None,
-        is_limited: Optional[bool] = None,
-        is_name_hidden: Optional[bool] = None,
-        is_saved: Optional[bool] = None,
-        is_sold_out: Optional[bool] = None,
-        is_converted: Optional[bool] = None,
-        is_upgraded: Optional[bool] = None,
-        is_refunded: Optional[bool] = None,
-        is_transferred: Optional[bool] = None,
-        is_birthday: Optional[bool] = None,
-        is_pinned: Optional[bool] = None,
-        raw: Optional["raw.base.StarGift"] = None
+        type: enums.GiftType,
+        origin: enums.UpgradedGiftOrigin | None = None,
+        received_gift_id: str | None = None,
+        regular_gift_id: int | None = None,
+        publisher_chat: types.Chat | None = None,
+        sticker: types.Sticker | None = None,
+        text: types.FormattedText | None = None,
+        date: datetime | None = None,
+        first_sale_date: datetime | None = None,
+        last_sale_date: datetime | None = None,
+        locked_until_date: datetime | None = None,
+        craft_date: datetime | None = None,
+        sender: types.Chat | None = None,
+        receiver: types.Chat | None = None,
+        host: types.Chat | None = None,
+        owner: types.Chat | None = None,
+        owner_address: str | None = None,
+        owner_name: str | None = None,
+        gift_address: str | None = None,
+        title: str | None = None,
+        name: str | None = None,
+        model: types.GiftAttribute | None = None,
+        symbol: types.GiftAttribute | None = None,
+        backdrop: types.GiftAttribute | None = None,
+        original_details: types.UpgradedGiftOriginalDetails | None = None,
+        total_upgraded_count: int | None = None,
+        max_upgraded_count: int | None = None,
+        available_resale_count: int | None = None,
+        unique_gift_variant_count: int | None = None,
+        unique_gift_number: int | None = None,
+        star_count: int | None = None,
+        default_sell_star_count: int | None = None,
+        convert_star_count: int | None = None,
+        upgrade_star_count: int | None = None,
+        transfer_star_count: int | None = None,
+        drop_original_details_star_count: int | None = None,
+        minimum_resell_star_count: int | None = None,
+        minimum_offer_star_count: int | None = None,
+        prepaid_upgrade_star_count: int | None = None,
+        prepaid_upgrade_hash: str | None = None,
+        auction_info: types.GiftAuction | None = None,
+        resale_parameters: types.GiftResaleParameters | None = None,
+        user_limits: types.GiftPurchaseLimit | None = None,
+        overall_limits: types.GiftPurchaseLimit | None = None,
+        value_currency: str | None = None,
+        value_amount: int | None = None,
+        value_usd_amount: int | None = None,
+        last_resale_currency: str | None = None,
+        last_resale_amount: int | None = None,
+        next_send_date: datetime | None = None,
+        next_transfer_date: datetime | None = None,
+        next_resale_date: datetime | None = None,
+        export_date: datetime | None = None,
+        collection_ids: list[int] | None = None,
+        used_theme_chat_id: int | None = None,
+        craft_probability_per_mille: int | None = None,
+        has_colors: bool | None = None,
+        is_auction: bool | None = None,
+        is_private: bool | None = None,
+        is_saved: bool | None = None,
+        is_pinned: bool | None = None,
+        is_limited: bool | None = None,
+        is_limited_per_user: bool | None = None,
+        is_sold_out: bool | None = None,
+        is_burned: bool | None = None,
+        is_crafted: bool | None = None,
+        is_premium: bool | None = None,
+        is_for_birthday: bool | None = None,
+        is_theme_available: bool | None = None,
+        is_upgrade_separate: bool | None = None,
+        is_name_hidden: bool | None = None,
+        can_be_upgraded: bool | None = None,
+        can_be_transferred: bool | None = None,
+        can_send_purchase_offer: bool | None = None,
+        was_converted: bool | None = None,
+        was_upgraded: bool | None = None,
+        was_refunded: bool | None = None,
+        raw: raw.base.StarGift | raw.base.SavedStarGift | None,
     ):
         super().__init__(client)
 
         self.id = id
+        self.type = type
+        self.origin = origin
+        self.received_gift_id = received_gift_id
+        self.regular_gift_id = regular_gift_id
+        self.publisher_chat = publisher_chat
         self.sticker = sticker
-        self.caption = caption
-        self.caption_entities = caption_entities
-        self.message_id = message_id
+        self.text = text
         self.date = date
         self.first_sale_date = first_sale_date
         self.last_sale_date = last_sale_date
-        self.from_user = from_user
+        self.locked_until_date = locked_until_date
+        self.craft_date = craft_date
+        self.sender = sender
+        self.receiver = receiver
+        self.host = host
         self.owner = owner
-        self.owner_name = owner_name
         self.owner_address = owner_address
+        self.owner_name = owner_name
         self.gift_address = gift_address
-        self.price = price
-        self.convert_price = convert_price
-        self.upgrade_price = upgrade_price
-        self.transfer_price = transfer_price
-        self.resale_price = resale_price
-        self.last_resale_price = last_resale_price
-        self.upgrade_message_id = upgrade_message_id
-        self.name = name
         self.title = title
-        self.collectible_id = collectible_id
-        self.attributes = attributes
-        self.number = number
-        self.available_resale_amount = available_resale_amount
-        self.available_amount = available_amount
-        self.total_amount = total_amount
-        self.can_upgrade = can_upgrade
-        self.can_export_at = can_export_at
-        self.can_transfer_at = can_transfer_at
-        self.can_resell_at = can_resell_at
-        self.is_limited = is_limited
-        self.is_name_hidden = is_name_hidden
+        self.name = name
+        self.model = model
+        self.symbol = symbol
+        self.backdrop = backdrop
+        self.original_details = original_details
+        self.total_upgraded_count = total_upgraded_count
+        self.max_upgraded_count = max_upgraded_count
+        self.available_resale_count = available_resale_count
+        self.unique_gift_variant_count = unique_gift_variant_count
+        self.unique_gift_number = unique_gift_number
+        self.star_count = star_count
+        self.default_sell_star_count = default_sell_star_count
+        self.convert_star_count = convert_star_count
+        self.upgrade_star_count = upgrade_star_count
+        self.transfer_star_count = transfer_star_count
+        self.drop_original_details_star_count = drop_original_details_star_count
+        self.minimum_resell_star_count = minimum_resell_star_count
+        self.minimum_offer_star_count = minimum_offer_star_count
+        self.prepaid_upgrade_star_count = prepaid_upgrade_star_count
+        self.prepaid_upgrade_hash = prepaid_upgrade_hash
+        self.auction_info = auction_info
+        self.resale_parameters = resale_parameters
+        self.user_limits = user_limits
+        self.overall_limits = overall_limits
+        self.value_currency = value_currency
+        self.value_amount = value_amount
+        self.value_usd_amount = value_usd_amount
+        self.last_resale_currency = last_resale_currency
+        self.last_resale_amount = last_resale_amount
+        self.next_send_date = next_send_date
+        self.next_transfer_date = next_transfer_date
+        self.next_resale_date = next_resale_date
+        self.export_date = export_date
+        self.collection_ids = collection_ids
+        self.used_theme_chat_id = used_theme_chat_id
+        self.craft_probability_per_mille = craft_probability_per_mille
+        self.has_colors = has_colors
+        self.is_auction = is_auction
+        self.is_private = is_private
         self.is_saved = is_saved
-        self.is_sold_out = is_sold_out
-        self.is_converted = is_converted
-        self.is_upgraded = is_upgraded
-        self.is_refunded = is_refunded
-        self.is_transferred = is_transferred
-        self.is_birthday = is_birthday
         self.is_pinned = is_pinned
+        self.is_limited = is_limited
+        self.is_limited_per_user = is_limited_per_user
+        self.is_sold_out = is_sold_out
+        self.is_burned = is_burned
+        self.is_crafted = is_crafted
+        self.is_premium = is_premium
+        self.is_for_birthday = is_for_birthday
+        self.is_theme_available = is_theme_available
+        self.is_upgrade_separate = is_upgrade_separate
+        self.is_name_hidden = is_name_hidden
+        self.can_be_upgraded = can_be_upgraded
+        self.can_be_transferred = can_be_transferred
+        self.can_send_purchase_offer = can_send_purchase_offer
+        self.was_converted = was_converted
+        self.was_upgraded = was_upgraded
+        self.was_refunded = was_refunded
         self.raw = raw
 
     @staticmethod
-    async def _parse(client, gift, users: Dict[int, "raw.base.User"] = {}, chats: Dict[int, "raw.base.Chat"] = {}):
+    async def _parse(
+        client: pyrogram.Client,
+        gift: (
+            raw.base.StarGift
+            | raw.base.SavedStarGift
+            | raw.types.MessageActionStarGift
+            | raw.types.MessageActionStarGiftUnique
+        ),
+        receiver: raw.base.User | raw.base.Chat | None = None,
+        users: dict[int, raw.base.User] | None = None,
+        chats: dict[int, raw.base.Chat] | None = None,
+    ):
+        users = users or {}
+        chats = chats or {}
+
         if isinstance(gift, raw.types.StarGift):
-            return await Gift._parse_regular(client, gift)
+            return await Gift._parse_regular(client, gift, receiver, users, chats)
         elif isinstance(gift, raw.types.StarGiftUnique):
-            return await Gift._parse_unique(client, gift, users, chats)
-        elif isinstance(gift, raw.types.StarGiftSaved):
-            return await Gift._parse_saved(client, gift, users, chats)
+            return await Gift._parse_upgraded(client, gift, receiver, users, chats)
+        elif isinstance(gift, raw.types.SavedStarGift):
+            return await Gift._parse_received(client, gift, receiver, users, chats)
+        elif isinstance(
+            gift, (raw.types.MessageActionStarGift, raw.types.MessageActionStarGiftUnique)
+        ):
+            return await Gift._parse_action(client, gift, receiver, users, chats)
 
     @staticmethod
     async def _parse_regular(
-        client,
-        star_gift: "raw.types.StarGift",
-    ) -> "Gift":
+        client: pyrogram.Client,
+        star_gift: raw.types.StarGift,
+        receiver: raw.base.User | raw.base.Chat | None = None,
+        users: dict[int, raw.base.User] | None = None,
+        chats: dict[int, raw.base.Chat] | None = None,
+    ) -> Gift:
+        users = users or {}
+        chats = chats or {}
+
         if not isinstance(star_gift, raw.types.StarGift):
             return
 
         doc = star_gift.sticker
         attributes = {type(i): i for i in doc.attributes}
 
-        # TODO: resell_min_stars
+        # TODO?
+        # auction_slug
+        # background
+
         return Gift(
             id=star_gift.id,
-            title=star_gift.title,
+            type=enums.GiftType.REGULAR,
             sticker=await types.Sticker._parse(client, doc, attributes),
-            price=star_gift.stars,
-            convert_price=star_gift.convert_stars,
-            upgrade_price=star_gift.upgrade_stars,
-            available_amount=star_gift.availability_remains,
-            available_resale_amount=star_gift.availability_resale,
-            total_amount=star_gift.availability_total,
+            star_count=star_gift.stars,
+            convert_star_count=star_gift.convert_stars,
+            upgrade_star_count=star_gift.upgrade_stars,
+            title=star_gift.title,
+            available_resale_count=star_gift.availability_resale,
+            user_limits=types.GiftPurchaseLimit._parse(
+                star_gift.per_user_total, star_gift.per_user_remains
+            ),
+            overall_limits=types.GiftPurchaseLimit._parse(
+                star_gift.availability_total, star_gift.availability_remains
+            ),
+            is_auction=star_gift.auction,
             is_limited=star_gift.limited,
             is_sold_out=star_gift.sold_out,
-            is_birthday=star_gift.birthday,
+            is_for_birthday=star_gift.birthday,
+            is_premium=star_gift.require_premium,
+            is_limited_per_user=star_gift.limited_per_user,
+            has_colors=star_gift.peer_color_available,
             first_sale_date=utils.timestamp_to_datetime(star_gift.first_sale_date),
             last_sale_date=utils.timestamp_to_datetime(star_gift.last_sale_date),
+            locked_until_date=utils.timestamp_to_datetime(star_gift.locked_until_date),
+            publisher_chat=await types.Chat._parse_chat(
+                client, chats.get(utils.get_raw_peer_id(star_gift.released_by))
+            ),
+            auction_info=types.GiftAuction._parse(star_gift),
+            unique_gift_variant_count=star_gift.upgrade_variants,
+            minimum_resell_star_count=star_gift.resell_min_stars,
             raw=star_gift,
-            client=client
+            client=client,
         )
 
     @staticmethod
-    async def _parse_unique(
-        client,
-        star_gift: "raw.types.StarGiftUnique",
-        users: Dict[int, "raw.base.User"] = {},
-        chats: Dict[int, "raw.base.Chat"] = {}
-    ) -> "Gift":
+    async def _parse_upgraded(
+        client: pyrogram.Client,
+        star_gift: raw.types.StarGiftUnique,
+        receiver: raw.base.User | raw.base.Chat | None = None,
+        users: dict[int, raw.base.User] | None = None,
+        chats: dict[int, raw.base.Chat] | None = None,
+    ) -> Gift:
+        users = users or {}
+        chats = chats or {}
+
         if not isinstance(star_gift, raw.types.StarGiftUnique):
             return
 
-        owner_id = utils.get_raw_peer_id(star_gift.owner_id)
+        raw_host_id = utils.get_raw_peer_id(star_gift.host_id)
+        raw_owner_id = utils.get_raw_peer_id(star_gift.owner_id)
+
+        model = None
+        symbol = None
+        backdrop = None
+        original_details = None
+
+        for attr in star_gift.attributes:
+            if isinstance(attr, raw.types.StarGiftAttributeModel):
+                model = await types.GiftAttribute._parse(client, attr, users, chats)
+            elif isinstance(attr, raw.types.StarGiftAttributePattern):
+                symbol = await types.GiftAttribute._parse(client, attr, users, chats)
+            elif isinstance(attr, raw.types.StarGiftAttributeBackdrop):
+                backdrop = await types.GiftAttribute._parse(client, attr, users, chats)
+            elif isinstance(attr, raw.types.StarGiftAttributeOriginalDetails):
+                original_details = await types.UpgradedGiftOriginalDetails._parse(
+                    client, attr, users, chats
+                )
+
+        # TODO?
+        # peer_color
 
         return Gift(
             id=star_gift.id,
-            name=star_gift.slug,
-            title=star_gift.title,
-            collectible_id=star_gift.num,
-            attributes=types.List(
-                [await types.GiftAttribute._parse(client, attr, users, chats) for attr in star_gift.attributes]
-            ) or None,
-            number=star_gift.availability_issued,
-            total_amount=star_gift.availability_total,
-            owner=types.Chat._parse_chat(client, users.get(owner_id) or chats.get(owner_id)),
-            owner_name=star_gift.owner_name,
-            owner_address=star_gift.owner_address,
+            type=enums.GiftType.UPGRADED,
+            can_send_purchase_offer=star_gift.offer_min_stars is not None,
             gift_address=star_gift.gift_address,
-            last_resale_price=star_gift.resell_stars,
-            is_upgraded=True,
+            host=await types.Chat._parse_chat(
+                client, users.get(raw_host_id) or chats.get(raw_host_id)
+            ),
+            is_burned=star_gift.burned,
+            is_crafted=star_gift.crafted,
+            is_premium=star_gift.require_premium,
+            is_theme_available=star_gift.theme_available,
+            max_upgraded_count=star_gift.availability_total,
+            minimum_offer_star_count=star_gift.offer_min_stars,
+            model=model,
+            symbol=symbol,
+            backdrop=backdrop,
+            title=star_gift.title,
+            name=star_gift.slug,
+            unique_gift_number=star_gift.num,
+            original_details=original_details,
+            owner=await types.Chat._parse_chat(
+                client, users.get(raw_owner_id) or chats.get(raw_owner_id)
+            ),
+            owner_address=star_gift.owner_address,
+            owner_name=star_gift.owner_name,
+            publisher_chat=await types.Chat._parse_chat(
+                client, chats.get(utils.get_raw_peer_id(star_gift.released_by))
+            ),
+            regular_gift_id=star_gift.gift_id,
+            resale_parameters=types.GiftResaleParameters._parse(
+                star_gift.resell_amount, star_gift.resale_ton_only
+            ),
+            total_upgraded_count=star_gift.availability_issued,
+            used_theme_chat_id=utils.get_peer_id(star_gift.theme_peer)
+            if star_gift.theme_peer
+            else None,
+            craft_probability_per_mille=star_gift.craft_chance_permille,
+            value_amount=star_gift.value_amount,
+            value_currency=star_gift.value_currency,
+            value_usd_amount=star_gift.value_usd_amount,
             raw=star_gift,
-            client=client
+            client=client,
         )
 
     @staticmethod
-    async def _parse_saved(
+    async def _parse_received(
         client,
-        saved_gift: "raw.types.SavedStarGift",
-        users: Dict[int, "raw.base.User"] = {},
-        chats: Dict[int, "raw.base.Chat"] = {}
-    ) -> "Gift":
+        saved_gift: raw.types.SavedStarGift,
+        receiver: raw.base.User | raw.base.Chat | None = None,
+        users: dict[int, raw.base.User] | None = None,
+        chats: dict[int, raw.base.Chat] | None = None,
+    ) -> Gift:
+        users = users or {}
+        chats = chats or {}
+
         if not isinstance(saved_gift, raw.types.SavedStarGift):
             return
 
-        caption, caption_entities = (
-            utils.parse_text_with_entities(
-                client, saved_gift.message, users
-            )
-        ).values()
-
         if isinstance(saved_gift.gift, raw.types.StarGift):
-            parsed_gift = await Gift._parse_regular(client, saved_gift.gift)
+            parsed_gift = await Gift._parse_regular(
+                client, saved_gift.gift, users=users, chats=chats
+            )
         elif isinstance(saved_gift.gift, raw.types.StarGiftUnique):
-            parsed_gift = await Gift._parse_unique(client, saved_gift.gift, users, chats)
+            parsed_gift = await Gift._parse_upgraded(
+                client, saved_gift.gift, users=users, chats=chats
+            )
 
-        parsed_gift.date = utils.timestamp_to_datetime(saved_gift.date)
-        parsed_gift.is_name_hidden = saved_gift.name_hidden
-        parsed_gift.is_saved = not saved_gift.unsaved
-        parsed_gift.is_refunded = saved_gift.refunded
-        parsed_gift.is_pinned = saved_gift.pinned_to_top
-        parsed_gift.can_upgrade = saved_gift.can_upgrade
-        parsed_gift.from_user = types.User._parse(client, users.get(utils.get_raw_peer_id(saved_gift.from_id)))
-        parsed_gift.caption = caption
-        parsed_gift.caption_entities = caption_entities
-        parsed_gift.message_id = saved_gift.msg_id or saved_gift.saved_id
-        parsed_gift.can_export_at = utils.timestamp_to_datetime(saved_gift.can_export_at)
-        parsed_gift.convert_price = parsed_gift.convert_price or saved_gift.convert_stars
-        parsed_gift.upgrade_price = parsed_gift.upgrade_price or saved_gift.upgrade_stars
-        parsed_gift.transfer_price = parsed_gift.transfer_price or saved_gift.transfer_stars
+        raw_from_id = utils.get_raw_peer_id(saved_gift.from_id)
+
+        if saved_gift.msg_id:
+            parsed_gift.received_gift_id = str(saved_gift.msg_id)
+        elif saved_gift.saved_id:
+            parsed_gift.received_gift_id = str(saved_gift.saved_id)
+
+        parsed_gift.date = utils.timestamp_to_datetime(saved_gift.date) or parsed_gift.date
+        parsed_gift.receiver = (
+            await types.Chat._parse_chat(client, receiver) or parsed_gift.receiver
+        )
+        parsed_gift.is_name_hidden = saved_gift.name_hidden or parsed_gift.is_name_hidden
+        parsed_gift.is_saved = not saved_gift.unsaved or parsed_gift.is_saved
+        parsed_gift.was_refunded = saved_gift.refunded or parsed_gift.was_refunded
+        parsed_gift.can_be_upgraded = saved_gift.can_upgrade or parsed_gift.can_be_upgraded
+        parsed_gift.is_pinned = saved_gift.pinned_to_top or parsed_gift.is_pinned
+        parsed_gift.is_upgrade_separate = (
+            saved_gift.upgrade_separate or parsed_gift.is_upgrade_separate
+        )
+        parsed_gift.sender = (
+            await types.Chat._parse_chat(client, users.get(raw_from_id) or chats.get(raw_from_id))
+            or parsed_gift.sender
+        )
+        parsed_gift.text = (
+            await types.FormattedText._parse(client, saved_gift.message) or parsed_gift.text
+        )
+        parsed_gift.convert_star_count = saved_gift.convert_stars or parsed_gift.convert_star_count
+        parsed_gift.upgrade_star_count = saved_gift.upgrade_stars or parsed_gift.upgrade_star_count
+        parsed_gift.export_date = (
+            utils.timestamp_to_datetime(saved_gift.can_export_at) or parsed_gift.export_date
+        )
+        parsed_gift.transfer_star_count = (
+            saved_gift.transfer_stars or parsed_gift.transfer_star_count
+        )
+        parsed_gift.next_transfer_date = (
+            utils.timestamp_to_datetime(saved_gift.can_transfer_at)
+            or parsed_gift.next_transfer_date
+        )
+        parsed_gift.next_resale_date = (
+            utils.timestamp_to_datetime(saved_gift.can_resell_at) or parsed_gift.next_resale_date
+        )
+        parsed_gift.craft_date = (
+            utils.timestamp_to_datetime(saved_gift.can_craft_at) or parsed_gift.craft_date
+        )
+        parsed_gift.collection_ids = (
+            list(saved_gift.collection_id)
+            if saved_gift.collection_id
+            else parsed_gift.collection_ids
+        )
+        parsed_gift.prepaid_upgrade_hash = (
+            saved_gift.prepaid_upgrade_hash or parsed_gift.prepaid_upgrade_hash
+        )
+        parsed_gift.drop_original_details_star_count = (
+            saved_gift.drop_original_details_stars or parsed_gift.drop_original_details_star_count
+        )
+        parsed_gift.unique_gift_number = saved_gift.gift_num or parsed_gift.unique_gift_number
+        parsed_gift.raw = saved_gift
 
         return parsed_gift
 
     @staticmethod
     async def _parse_action(
         client,
-        message: "raw.base.Message",
-        users: Dict[int, "raw.base.User"] = {},
-        chats: Dict[int, "raw.base.Chat"] = {}
-    ) -> "Gift":
-        action = message.action
+        action_gift: raw.types.MessageActionStarGift | raw.types.MessageActionStarGiftUnique,
+        receiver: raw.base.User | raw.base.Chat | None = None,
+        users: dict[int, raw.base.User] | None = None,
+        chats: dict[int, raw.base.Chat] | None = None,
+    ) -> Gift:
+        users = users or {}
+        chats = chats or {}
 
-        if isinstance(action, raw.types.MessageActionStarGift):
-            parsed_gift = await Gift._parse_regular(client, action.gift)
+        # TODO: fix receiver
+        if isinstance(action_gift, raw.types.MessageActionStarGift):
+            # auction_acquired
+            # upgrade_msg_id
+            # peer
+            # gift_msg_id
 
-            caption, caption_entities = (
-                utils.parse_text_with_entities(
-                    client, action.message, users
+            raw_sender_id = utils.get_raw_peer_id(action_gift.from_id)
+            raw_receiver_id = utils.get_raw_peer_id(action_gift.peer)
+
+            parsed_gift = await Gift._parse_regular(
+                client, action_gift.gift, users=users, chats=chats
+            )
+
+            if action_gift.saved_id:
+                parsed_gift.received_gift_id = str(action_gift.saved_id)
+
+            parsed_gift.is_name_hidden = action_gift.name_hidden or parsed_gift.is_name_hidden
+            parsed_gift.is_saved = action_gift.saved or parsed_gift.is_saved
+            parsed_gift.is_private = action_gift.name_hidden or parsed_gift.is_private
+            parsed_gift.was_converted = action_gift.converted or parsed_gift.was_converted
+            parsed_gift.was_upgraded = action_gift.upgraded or parsed_gift.was_upgraded
+            parsed_gift.was_refunded = action_gift.refunded or parsed_gift.was_refunded
+            parsed_gift.can_be_upgraded = action_gift.can_upgrade or parsed_gift.can_be_upgraded
+            parsed_gift.is_upgrade_separate = (
+                action_gift.upgrade_separate or parsed_gift.is_upgrade_separate
+            )
+            parsed_gift.text = (
+                await types.FormattedText._parse(client, action_gift.message) or parsed_gift.text
+            )
+            parsed_gift.convert_star_count = (
+                action_gift.convert_stars or parsed_gift.convert_star_count
+            )
+            parsed_gift.upgrade_star_count = (
+                action_gift.upgrade_stars or parsed_gift.upgrade_star_count
+            )
+            parsed_gift.sender = (
+                await types.Chat._parse_chat(
+                    client, users.get(raw_sender_id) or chats.get(raw_sender_id)
                 )
-            ).values()
+                or parsed_gift.sender
+            )
+            parsed_gift.receiver = (
+                await types.Chat._parse_chat(
+                    client, users.get(raw_receiver_id) or chats.get(raw_receiver_id)
+                )
+                or parsed_gift.receiver
+            )
+            parsed_gift.prepaid_upgrade_hash = (
+                action_gift.prepaid_upgrade_hash or parsed_gift.prepaid_upgrade_hash
+            )
+            parsed_gift.unique_gift_number = action_gift.gift_num or parsed_gift.unique_gift_number
+            parsed_gift.raw = action_gift
 
-            parsed_gift.is_name_hidden = action.name_hidden
-            parsed_gift.is_saved = action.saved
-            parsed_gift.is_converted = action.converted
-            parsed_gift.is_upgraded = action.upgraded
-            parsed_gift.is_refunded = action.refunded
-            parsed_gift.can_upgrade = action.can_upgrade
-            parsed_gift.caption = caption
-            parsed_gift.caption_entities = caption_entities
-            parsed_gift.convert_price = action.convert_stars
-            parsed_gift.upgrade_price = action.upgrade_stars
-            parsed_gift.upgrade_message_id = action.upgrade_msg_id
-        elif isinstance(action, raw.types.MessageActionStarGiftUnique):
-            parsed_gift = await Gift._parse_unique(client, action.gift, users, chats)
+            return parsed_gift
+        elif isinstance(action_gift, raw.types.MessageActionStarGiftUnique):
+            # peer
 
-            parsed_gift.is_upgraded = action.upgrade
-            parsed_gift.is_transferred = action.transferred
-            parsed_gift.is_saved = action.saved
-            parsed_gift.is_refunded = action.refunded
-            parsed_gift.can_export_at = utils.timestamp_to_datetime(action.can_export_at)
-            parsed_gift.can_transfer_at = utils.timestamp_to_datetime(action.can_transfer_at)
-            parsed_gift.can_resell_at = utils.timestamp_to_datetime(action.can_resell_at)
-            parsed_gift.transfer_price = action.transfer_stars
-            parsed_gift.last_resale_star_count = action.resale_stars
-            parsed_gift.upgrade_message_id = message.id
+            raw_sender_id = utils.get_raw_peer_id(action_gift.from_id)
+            raw_receiver_id = utils.get_raw_peer_id(action_gift.peer)
 
+            parsed_gift = await Gift._parse_upgraded(
+                client, action_gift.gift, users=users, chats=chats
+            )
 
-        parsed_gift.date = utils.timestamp_to_datetime(message.date)
-        parsed_gift.message_id = message.id
+            if action_gift.from_offer:
+                parsed_gift.origin = enums.UpgradedGiftOrigin.OFFER
+            elif action_gift.assigned:
+                parsed_gift.origin = enums.UpgradedGiftOrigin.BLOCKCHAIN
+            elif action_gift.prepaid_upgrade:
+                parsed_gift.origin = enums.UpgradedGiftOrigin.GIFTED_UPGRADE
+            elif action_gift.resale_amount:
+                parsed_gift.origin = enums.UpgradedGiftOrigin.RESALE
+            elif action_gift.upgrade:
+                parsed_gift.origin = enums.UpgradedGiftOrigin.UPGRADE
+            elif action_gift.transferred:
+                parsed_gift.origin = enums.UpgradedGiftOrigin.TRANSFER
+            elif action_gift.craft:
+                parsed_gift.origin = enums.UpgradedGiftOrigin.CRAFT
 
-        return parsed_gift
+            if action_gift.saved_id:
+                parsed_gift.received_gift_id = str(action_gift.saved_id)
+
+            if isinstance(action_gift.resale_amount, raw.types.StarsAmount):
+                parsed_gift.last_resale_currency = "XTR"
+                parsed_gift.last_resale_amount = action_gift.resale_amount.amount
+            elif isinstance(action_gift.resale_amount, raw.types.StarsTonAmount):
+                parsed_gift.last_resale_currency = "TON"
+                parsed_gift.last_resale_amount = action_gift.resale_amount.amount
+
+            parsed_gift.was_upgraded = action_gift.upgrade or parsed_gift.was_upgraded
+            parsed_gift.is_saved = action_gift.saved or parsed_gift.is_saved
+            parsed_gift.was_refunded = action_gift.refunded or parsed_gift.was_refunded
+            parsed_gift.export_date = (
+                utils.timestamp_to_datetime(action_gift.can_export_at) or parsed_gift.export_date
+            )
+            parsed_gift.transfer_star_count = (
+                action_gift.transfer_stars or parsed_gift.transfer_star_count
+            )
+            parsed_gift.sender = (
+                await types.Chat._parse_chat(
+                    client, users.get(raw_sender_id) or chats.get(raw_sender_id)
+                )
+                or parsed_gift.sender
+            )
+            parsed_gift.receiver = (
+                await types.Chat._parse_chat(
+                    client, users.get(raw_receiver_id) or chats.get(raw_receiver_id)
+                )
+                or parsed_gift.receiver
+            )
+            parsed_gift.next_transfer_date = (
+                utils.timestamp_to_datetime(action_gift.can_transfer_at)
+                or parsed_gift.next_transfer_date
+            )
+            parsed_gift.next_resale_date = (
+                utils.timestamp_to_datetime(action_gift.can_resell_at)
+                or parsed_gift.next_resale_date
+            )
+            parsed_gift.craft_date = (
+                utils.timestamp_to_datetime(action_gift.can_craft_at) or parsed_gift.craft_date
+            )
+            parsed_gift.drop_original_details_star_count = (
+                action_gift.drop_original_details_stars
+                or parsed_gift.drop_original_details_star_count
+            )
+            parsed_gift.raw = action_gift
+
+            return parsed_gift
 
     @property
-    def link(self) -> Optional[str]:
+    def link(self) -> str | None:
         if not self.name:
             return None
 
         return f"https://t.me/nft/{self.name}"
+
+    @property
+    def owned_gift_id(self) -> str | None:
+        if not self.received_gift_id:
+            return None
+
+        if self.receiver and self.receiver.type != enums.ChatType.PRIVATE:
+            return f"{self.receiver.id}_{self.received_gift_id}"
+
+        return self.received_gift_id
 
     async def show(self) -> bool:
         """Bound method *show* of :obj:`~pyrogram.types.Gift`.
@@ -449,9 +875,7 @@ class Gift(Object):
         Returns:
             ``bool``: On success, True is returned.
         """
-        return await self._client.show_gift(
-            owned_gift_id=str(self.message_id)
-        )
+        return await self._client.show_gift(owned_gift_id=self.owned_gift_id)
 
     async def hide(self) -> bool:
         """Bound method *hide* of :obj:`~pyrogram.types.Gift`.
@@ -472,12 +896,14 @@ class Gift(Object):
         Returns:
             ``bool``: On success, True is returned.
         """
-        return await self._client.hide_gift(
-            owned_gift_id=str(self.message_id)
-        )
+        return await self._client.hide_gift(owned_gift_id=self.owned_gift_id)
 
     async def convert(self) -> bool:
         """Bound method *convert* of :obj:`~pyrogram.types.Gift`.
+
+        .. note::
+
+            For regular gifts only.
 
         Use as a shortcut for:
 
@@ -495,12 +921,16 @@ class Gift(Object):
         Returns:
             ``bool``: On success, True is returned.
         """
-        return await self._client.convert_gift_to_stars(
-            owned_gift_id=str(self.message_id)
-        )
+        return await self._client.convert_gift_to_stars(owned_gift_id=self.owned_gift_id)
 
-    async def upgrade(self, keep_original_details: Optional[bool] = None, star_count: Optional[int] = None) -> Optional["types.Message"]:
+    async def upgrade(
+        self, keep_original_details: (bool | None) = None, star_count: (int | None) = None
+    ) -> types.Message | None:
         """Bound method *upgrade* of :obj:`~pyrogram.types.Gift`.
+
+        .. note::
+
+            For regular gifts only.
 
         Use as a shortcut for:
 
@@ -516,16 +946,21 @@ class Gift(Object):
                 await gift.upgrade()
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise, in case the
+            server answered with no message, None is returned.
         """
         return await self._client.upgrade_gift(
-            owned_gift_id=str(self.message_id),
+            owned_gift_id=self.owned_gift_id,
             keep_original_details=keep_original_details,
-            star_count=star_count
+            star_count=star_count,
         )
 
-    async def transfer(self, to_chat_id: Union[int, str]) -> Optional["types.Message"]:
+    async def transfer(self, to_chat_id: int | str) -> types.Message | None:
         """Bound method *transfer* of :obj:`~pyrogram.types.Gift`.
+
+        .. note::
+
+            For upgraded gifts only.
 
         Use as a shortcut for:
 
@@ -542,11 +977,14 @@ class Gift(Object):
                 await gift.transfer(to_chat_id=123)
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise, in case the
+            server answered with no message, None is returned.
         """
+        if not self.type == enums.GiftType.UPGRADED:
+            raise ValueError("Only upgraded gifts can be transferred.")
+
         return await self._client.transfer_gift(
-            owned_gift_id=self.link,
-            new_owner_chat_id=to_chat_id
+            owned_gift_id=self.owned_gift_id or self.link, new_owner_chat_id=to_chat_id
         )
 
     async def wear(self) -> bool:
@@ -554,7 +992,7 @@ class Gift(Object):
 
         .. note::
 
-            This works for upgraded gifts only.
+            For upgraded gifts only.
 
         Use as a shortcut for:
 
@@ -570,18 +1008,18 @@ class Gift(Object):
         Returns:
             ``bool``: On success, True is returned.
         """
-        return await self._client.set_emoji_status(
-            emoji_status=types.EmojiStatus(
-                gift_id=self.id
-            )
-        )
+        return await self._client.set_emoji_status(emoji_status=types.EmojiStatus(gift_id=self.id))
 
-    async def buy(self, star_count: Optional[int] = None) -> Optional["types.Message"]:
+    async def buy(
+        self,
+        new_owner_chat_id: (int | str | None) = None,
+        price: (types.GiftResalePrice | None) = None,
+    ) -> types.Message | None:
         """Bound method *buy* of :obj:`~pyrogram.types.Gift`.
 
         .. note::
 
-            This works for gifts from market only.
+            For upgraded gifts from market only.
 
         Use as a shortcut for:
 
@@ -595,24 +1033,39 @@ class Gift(Object):
                 await gift.buy()
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise, in case the
+            server answered with no message, None is returned.
         """
+        if new_owner_chat_id is None:
+            new_owner_chat_id = "me"
+
+        if price is None:
+            if self.resale_parameters.toncoin_only:
+                price = types.GiftResalePriceTon(
+                    toncoin_cent_count=self.resale_parameters.toncoin_cent_count
+                )
+            else:
+                price = types.GiftResalePriceStar(star_count=self.resale_parameters.star_count)
+
         return await self._client.send_resold_gift(
-            gift_link=self.link,
-            new_owner_chat_id="me",
-            star_count=star_count
+            gift_link=self.link, new_owner_chat_id=new_owner_chat_id, price=price
         )
 
     async def send(
         self,
-        chat_id: Union[int, str],
-        text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        entities: Optional[List["types.MessageEntity"]] = None,
-        is_private: Optional[bool] = None,
-        pay_for_upgrade: Optional[bool] = None,
-    ) -> Optional["types.Message"]:
+        chat_id: int | str,
+        text: str | None = None,
+        parse_mode: enums.ParseMode | None = None,
+        entities: list[types.MessageEntity] | None = None,
+        is_private: bool | None = None,
+        pay_for_upgrade: bool | None = None,
+    ) -> types.Message | None:
         """Bound method *send* of :obj:`~pyrogram.types.Gift`.
+
+        .. note::
+
+            For regular gifts only.
+            May return an error with a message "STARGIFT_USAGE_LIMITED" if the gift was sold out.
 
         Use as a shortcut for:
 
@@ -629,7 +1082,8 @@ class Gift(Object):
                 await gift.send("me")
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise, in case the
+            server answered with no message, None is returned.
         """
         return await self._client.send_gift(
             chat_id=chat_id,
@@ -638,5 +1092,67 @@ class Gift(Object):
             parse_mode=parse_mode,
             entities=entities,
             is_private=is_private,
-            pay_for_upgrade=pay_for_upgrade
+            pay_for_upgrade=pay_for_upgrade,
+        )
+
+    async def get_auction_state(self) -> types.GiftAuctionState:
+        """Bound method *get_auction_state* of :obj:`~pyrogram.types.Gift`.
+
+        .. note::
+
+            For regular gifts only.
+
+        Use as a shortcut for:
+
+        .. code-block:: python
+
+            await client.get_gift_auction_state(
+                auction_id=gift.id
+            )
+
+        Returns:
+            :obj:`~pyrogram.types.GiftAuctionState`: The auction state of the gift.
+        """
+
+        return await self._client.get_gift_auction_state(auction_id=self.id)
+
+    async def send_purchase_offer(
+        self,
+        price: types.GiftResalePrice,
+        duration: int,
+        paid_message_star_count: int | None = None,
+    ) -> types.Message | None:
+        """Shortcut for method :obj:`~pyrogram.Client.send_gift_purchase_offer` will automatically fill method attributes:
+
+        * owner_id
+        * gift_id
+
+        Parameters:
+            price (:obj:`~pyrogram.types.GiftResalePrice`):
+                The price that the user agreed to pay for the gift.
+
+            duration (``int``):
+                Duration of the offer, in seconds.
+                Must be one of 21600, 43200, 86400, 129600, 172800, or 259200.
+
+            paid_message_star_count (``int``, *optional*):
+                The number of Telegram Stars the user agreed to pay additionally for sending of the offer message to the current gift owner.
+                Pass User.paid_message_star_count for users and None otherwise.
+
+        Returns:
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise, in case the
+            server answered with no message, None is returned.
+        """
+        if not self.can_send_purchase_offer:
+            raise ValueError("This gift cannot be purchased via offer.")
+
+        if not self.owner:
+            raise ValueError("Gift owner not found.")
+
+        return await self._client.send_gift_purchase_offer(
+            owner_id=self.owner.id,
+            gift_name=self.name,
+            price=price,
+            duration=duration,
+            paid_message_star_count=paid_message_star_count,
         )

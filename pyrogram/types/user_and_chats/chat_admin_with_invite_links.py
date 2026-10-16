@@ -16,11 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
+
 from ..object import Object
 
 
@@ -39,10 +39,11 @@ class ChatAdminWithInviteLinks(Object):
     """
 
     def __init__(
-        self, *,
-        admin: "types.User",
+        self,
+        *,
+        admin: types.User,
         chat_invite_links_count: int,
-        revoked_chat_invite_links_count: int = None
+        revoked_chat_invite_links_count: int | None = None,
     ):
         super().__init__()
 
@@ -51,13 +52,13 @@ class ChatAdminWithInviteLinks(Object):
         self.revoked_chat_invite_links_count = revoked_chat_invite_links_count
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        admin: "raw.types.ChatAdminWithInvites",
-        users: Dict[int, "raw.types.User"] = None
-    ) -> "ChatAdminWithInviteLinks":
+    async def _parse(
+        client: pyrogram.Client,
+        admin: raw.types.ChatAdminWithInvites,
+        users: dict[int, raw.types.User],
+    ) -> ChatAdminWithInviteLinks:
         return ChatAdminWithInviteLinks(
-            admin=types.User._parse(client, users[admin.admin_id]),
+            admin=await types.User._parse(client, users[admin.admin_id]),
             chat_invite_links_count=admin.invites_count,
-            revoked_chat_invite_links_count=admin.revoked_invites_count
+            revoked_chat_invite_links_count=admin.revoked_invites_count,
         )

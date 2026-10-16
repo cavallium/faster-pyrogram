@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict, List, Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -34,10 +34,12 @@ class UsersShared(Object):
         users (List of :obj:`~pyrogram.types.User`):
             List of requested users.
     """
+
     def __init__(
-        self, *,
+        self,
+        *,
         button_id: int,
-        users: List["types.User"],
+        users: list[types.User],
     ):
         super().__init__()
 
@@ -45,14 +47,13 @@ class UsersShared(Object):
         self.users = users
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        action: Union[
-            "raw.types.MessageActionRequestedPeer",
-            "raw.types.MessageActionRequestedPeerSentMe"
-        ],
-        users: Dict[int, "raw.base.User"] = {}
-    ) -> Optional["UsersShared"]:
+    async def _parse(
+        client: pyrogram.Client,
+        action: raw.types.MessageActionRequestedPeer | raw.types.MessageActionRequestedPeerSentMe,
+        users: dict[int, raw.base.User] | None = None,
+    ) -> UsersShared:
+        users = users or {}
+
         requested_users = types.List()
 
         for peer in action.peers:
@@ -62,7 +63,7 @@ class UsersShared(Object):
                 raw_user = users.get(utils.get_raw_peer_id(peer))
 
                 if raw_user:
-                    requested_users.append(types.User._parse(client, raw_user))
+                    requested_users.append(await types.User._parse(client, raw_user))
                 else:
                     requested_users.append(types.User(id=peer_id, client=client))
             elif isinstance(action, raw.types.MessageActionRequestedPeerSentMe):
@@ -73,11 +74,8 @@ class UsersShared(Object):
                         last_name=getattr(peer, "last_name", None),
                         username=getattr(peer, "username", None),
                         photo=types.Photo._parse(client, getattr(peer, "photo", None)),
-                        client=client
+                        client=client,
                     )
                 )
 
-        return UsersShared(
-            button_id=action.button_id,
-            users=requested_users
-        )
+        return UsersShared(button_id=action.button_id, users=requested_users)

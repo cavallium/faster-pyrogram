@@ -16,8 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
+
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import raw
 
 
 class BusinessWeeklyOpen(Object):
@@ -36,13 +42,12 @@ class BusinessWeeklyOpen(Object):
         *,
         start_minute: int,
         end_minute: int,
-
     ):
         self.start_minute = start_minute
         self.end_minute = end_minute
 
     @staticmethod
-    def _parse(weekly_open: "raw.types.BusinessWeeklyOpen" = None) -> "BusinessWeeklyOpen":
+    def _parse(weekly_open: raw.types.BusinessWeeklyOpen) -> BusinessWeeklyOpen:
         return BusinessWeeklyOpen(
             start_minute=weekly_open.start_minute,
             end_minute=weekly_open.end_minute,

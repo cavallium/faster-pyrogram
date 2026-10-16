@@ -16,11 +16,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, types, utils
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class MyBoost(Object):
@@ -48,10 +53,10 @@ class MyBoost(Object):
         self,
         *,
         slot: int,
-        chat: "types.Chat",
+        chat: types.Chat,
         date: datetime,
         expire_date: datetime,
-        cooldown_until_date: datetime
+        cooldown_until_date: datetime,
     ):
         super().__init__()
 
@@ -62,13 +67,13 @@ class MyBoost(Object):
         self.cooldown_until_date = cooldown_until_date
 
     @staticmethod
-    def _parse(client: "pyrogram.Client", my_boost: "raw.types.MyBoost", users, chats) -> "MyBoost":
+    async def _parse(client: pyrogram.Client, my_boost: raw.types.MyBoost, users, chats) -> MyBoost:
         peer_id = utils.get_raw_peer_id(my_boost.peer)
 
         if isinstance(my_boost.peer, raw.types.PeerChannel):
-            chat = types.Chat._parse_channel_chat(client, chats.get(peer_id, None))
+            chat = await types.Chat._parse_channel_chat(client, chats.get(peer_id, None))
         else:
-            chat = types.Chat._parse_user_chat(client, users.get(peer_id, None))
+            chat = await types.Chat._parse_user_chat(client, users.get(peer_id, None))
 
         return MyBoost(
             slot=my_boost.slot,

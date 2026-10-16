@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -24,19 +24,12 @@ from pyrogram import raw, types, utils
 
 class SetChatTitle:
     async def set_chat_title(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        title: str
-    ) -> "types.Message":
+        self: pyrogram.Client, chat_id: int | str, title: str
+    ) -> types.Message | None:
         """Change the title of a chat.
-        
+
         Titles can't be changed for private chats.
         You must be an administrator in the chat for this to work and must have the appropriate admin rights.
-
-        .. note::
-
-            In regular groups (non-supergroups), this method will only work if the "All Members Are Admins"
-            setting is off.
 
         .. include:: /_includes/usable-by/users-bots.rst
 
@@ -48,7 +41,8 @@ class SetChatTitle:
                 New chat title, 1-255 characters.
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent service message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent service message is returned,
+            otherwise, in case the server answered with no message, None is returned.
 
         Raises:
             ValueError: In case a chat id belongs to user.
@@ -62,18 +56,10 @@ class SetChatTitle:
 
         if isinstance(peer, raw.types.InputPeerChat):
             r = await self.invoke(
-                raw.functions.messages.EditChatTitle(
-                    chat_id=peer.chat_id,
-                    title=title
-                )
+                raw.functions.messages.EditChatTitle(chat_id=peer.chat_id, title=title)
             )
         elif isinstance(peer, raw.types.InputPeerChannel):
-            r = await self.invoke(
-                raw.functions.channels.EditTitle(
-                    channel=peer,
-                    title=title
-                )
-            )
+            r = await self.invoke(raw.functions.channels.EditTitle(channel=peer, title=title))
         else:
             raise ValueError(f'The chat_id "{chat_id}" belongs to a user')
 

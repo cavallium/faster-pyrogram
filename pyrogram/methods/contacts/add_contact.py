@@ -16,22 +16,22 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types, utils
 
 
 class AddContact:
     async def add_contact(
-        self: "pyrogram.Client",
-        user_id: Union[int, str],
+        self: pyrogram.Client,
+        user_id: int | str,
         first_name: str,
         last_name: str = "",
         phone_number: str = "",
-        share_phone_number: bool = False
-    ):
+        share_phone_number: bool = False,
+        note: str | types.FormattedText | None = None,
+    ) -> types.User:
         """Add an existing Telegram user as contact, even without a phone number.
 
         .. include:: /_includes/usable-by/users.rst
@@ -53,6 +53,9 @@ class AddContact:
                 Whether or not to share the phone number with the user.
                 Defaults to False.
 
+            note (``str`` | :obj:`~pyrogram.types.FormattedText`, *optional*):
+                Note to set for the user.
+
         Returns:
             :obj:`~pyrogram.types.User`: On success the user is returned.
 
@@ -65,14 +68,18 @@ class AddContact:
                 # Add contact by username
                 await app.add_contact("username", "Bar")
         """
+        if isinstance(note, str):
+            note = types.FormattedText(text=note)
+
         r = await self.invoke(
             raw.functions.contacts.AddContact(
                 id=await self.resolve_peer(user_id),
                 first_name=first_name,
                 last_name=last_name,
                 phone=phone_number,
-                add_phone_privacy_exception=share_phone_number
+                add_phone_privacy_exception=share_phone_number,
+                note=await note.write(self) if note else None,
             )
         )
 
-        return types.User._parse(self, r.users[0])
+        return utils.require_parsed(await types.User._parse(self, r.users[0]))

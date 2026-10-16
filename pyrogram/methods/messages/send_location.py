@@ -16,45 +16,56 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from datetime import datetime
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
 
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
 log = logging.getLogger(__name__)
+
 
 class SendLocation:
     async def send_location(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         latitude: float,
         longitude: float,
-        disable_notification: bool = None,
-        message_thread_id: int = None,
-        direct_messages_chat_topic_id: int = None,
-        effect_id: int = None,
-        reply_parameters: "types.ReplyParameters" = None,
-        schedule_date: datetime = None,
-        protect_content: bool = None,
-        business_connection_id: str = None,
-        allow_paid_broadcast: bool = None,
-        paid_message_star_count: int = None,
-        reply_markup: Union[
-            "types.InlineKeyboardMarkup",
-            "types.ReplyKeyboardMarkup",
-            "types.ReplyKeyboardRemove",
-            "types.ForceReply"
-        ] = None,
-
-        reply_to_message_id: int = None,
-        reply_to_chat_id: Union[int, str] = None,
-        quote_text: str = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: List["types.MessageEntity"] = None,
-        quote_offset: int = None,
-    ) -> "types.Message":
+        horizontal_accuracy: float | None = None,
+        live_period: int | None = None,
+        heading: int | None = None,
+        proximity_alert_radius: int | None = None,
+        disable_notification: bool | None = None,
+        message_thread_id: int | None = None,
+        direct_messages_topic_id: int | None = None,
+        ephemeral_message_parameters: types.EphemeralMessageParameters | None = None,
+        effect_id: int | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        suggested_post_parameters: types.SuggestedPostParameters | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        protect_content: bool | None = None,
+        business_connection_id: str | None = None,
+        allow_paid_broadcast: bool | None = None,
+        paid_message_star_count: int | None = None,
+        reply_markup: (
+            types.InlineKeyboardMarkup
+            | types.ReplyKeyboardMarkup
+            | types.ReplyKeyboardRemove
+            | types.ForceReply
+            | None
+        ) = None,
+        reply_to_message_id: int | None = None,
+        reply_to_chat_id: int | str | None = None,
+        quote_text: str | None = None,
+        parse_mode: enums.ParseMode | None = None,
+        quote_entities: list[types.MessageEntity] | None = None,
+        quote_offset: int | None = None,
+    ) -> types.Message | None:
         """Send points on the map.
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -71,6 +82,22 @@ class SendLocation:
             longitude (``float``):
                 Longitude of the location.
 
+            horizontal_accuracy (``float``, *optional*):
+                The radius of uncertainty for the location, measured in meters, 0-1500.
+
+            live_period (``int``, *optional*):
+                For live locations, a period for which the location can be updated, in seconds.
+                Must be between 60 and 86400 for a temporary live location, 0x7FFFFFFF for permanent live location.
+
+            heading (``int``, *optional*):
+                For live locations, a direction in which the user is moving, in degrees.
+                Must be between 1 and 360 if specified.
+
+            proximity_alert_radius (``int``, *optional*):
+                For live locations, a maximum distance for proximity alerts about approaching another chat member, in meters.
+                Must be between 1 and 100000 if specified.
+                Can't be enabled in channels and Saved Messages.
+
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
@@ -79,9 +106,12 @@ class SendLocation:
                 Unique identifier for the target message thread (topic) of the forum.
                 For forums only.
 
-            direct_messages_chat_topic_id (``int``, *optional*):
+            direct_messages_topic_id (``int``, *optional*):
                 Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For directs only only.
+                For direct chats only.only.
+
+            ephemeral_message_parameters (:obj:`~pyrogram.types.EphemeralMessageParameters`, *optional*):
+                Parameters of the ephemeral message to send.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -90,8 +120,12 @@ class SendLocation:
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
-            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+            suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
+                Information about the suggested post.
+
+            schedule_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the message will be automatically sent.
+                A :py:obj:`~datetime.timedelta` is counted from now.
 
             protect_content (``bool``, *optional*):
                 Protects the contents of the sent message from forwarding and saving.
@@ -112,8 +146,39 @@ class SendLocation:
                 Additional interface options. An object for an inline keyboard, custom reply keyboard,
                 instructions to remove reply keyboard or to force a reply from the user.
 
+            reply_to_message_id (``int``, *optional*):
+                If the message is a reply, ID of the original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_chat_id (``int`` | ``str``, *optional*):
+                Unique identifier (int) or username (str) of the chat holding the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_text (``str``, *optional*):
+                Text of the quoted part of the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
+                Parse mode of the quoted part of the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
+                List of special entities that appear in the quote, which can be specified instead of *parse_mode*.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_offset (``int``, *optional*):
+                Offset for quote in original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent location message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent location message is returned,
+            otherwise, in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -166,25 +231,49 @@ class SendLocation:
                 quote=quote_text,
                 quote_parse_mode=parse_mode,
                 quote_entities=quote_entities,
-                quote_position=quote_offset
+                quote_position=quote_offset,
             )
 
-        r = await self.invoke(
-            raw.functions.messages.SendMedia(
-                peer=await self.resolve_peer(chat_id),
-                media=raw.types.InputMediaGeoPoint(
-                    geo_point=raw.types.InputGeoPoint(
-                        lat=latitude,
-                        long=longitude
-                    )
+        if live_period is not None:
+            media = raw.types.InputMediaGeoLive(
+                geo_point=raw.types.InputGeoPoint(
+                    lat=latitude, long=longitude, accuracy_radius=horizontal_accuracy
                 ),
-                message="",
-                silent=disable_notification or None,
+                heading=heading,
+                period=live_period,
+                proximity_notification_radius=proximity_alert_radius,
+            )
+        else:
+            media = raw.types.InputMediaGeoPoint(
+                geo_point=raw.types.InputGeoPoint(
+                    lat=latitude, long=longitude, accuracy_radius=horizontal_accuracy
+                )
+            )
+
+        if ephemeral_message_parameters:
+            rpc = raw.functions.ephemeral.SendMessage(
+                peer=await self.resolve_peer(chat_id),
+                receiver_id=await self.resolve_peer(ephemeral_message_parameters.receiver_user_id),
+                query_id=int(ephemeral_message_parameters.callback_query_id)
+                if ephemeral_message_parameters.callback_query_id is not None
+                else None,
+                media=media,
                 reply_to=await utils.get_reply_to(
-                    self,
-                    reply_parameters,
-                    message_thread_id,
-                    direct_messages_chat_topic_id
+                    self, reply_parameters, message_thread_id, direct_messages_topic_id
+                ),
+                random_id=self.rnd_id(),
+                anchor=ephemeral_message_parameters.replace_callback_query_message,
+                reply_markup=await reply_markup.write(self) if reply_markup else None,
+                message="",
+            )
+        else:
+            rpc = raw.functions.messages.SendMedia(
+                peer=await self.resolve_peer(chat_id),
+                media=media,
+                message="",
+                silent=disable_notification,
+                reply_to=await utils.get_reply_to(
+                    self, reply_parameters, message_thread_id, direct_messages_topic_id
                 ),
                 random_id=self.rnd_id(),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
@@ -192,10 +281,13 @@ class SendLocation:
                 allow_paid_floodskip=allow_paid_broadcast,
                 allow_paid_stars=paid_message_star_count,
                 reply_markup=await reply_markup.write(self) if reply_markup else None,
-                effect=effect_id
-            ),
-            business_connection_id=business_connection_id
-        )
+                effect=effect_id,
+                suggested_post=suggested_post_parameters.write()
+                if suggested_post_parameters
+                else None,
+            )
+
+        r = await self.invoke(rpc, business_connection_id=business_connection_id)
 
         messages = await utils.parse_messages(client=self, messages=r)
 

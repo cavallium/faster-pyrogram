@@ -16,19 +16,34 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import asyncio
-from typing import Union, List, Iterable
+from typing import TYPE_CHECKING, overload
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class GetUsers:
+    # `str` is itself an iterable of `str`, so a username matches both overloads.
+    #  The single-user one comes first, resolving it the way the body does.
+    @overload
+    async def get_users(  # type: ignore[overload-overlap]
+        self: pyrogram.Client, user_ids: int | str
+    ) -> types.User | None: ...
+
+    @overload
     async def get_users(
-        self: "pyrogram.Client",
-        user_ids: Union[int, str, Iterable[Union[int, str]]]
-    ) -> Union["types.User", List["types.User"]]:
+        self: pyrogram.Client, user_ids: Iterable[int | str]
+    ) -> list[types.User]: ...
+
+    async def get_users(
+        self: pyrogram.Client, user_ids: int | str | Iterable[int | str]
+    ) -> types.User | list[types.User] | None:
         """Get information about a user.
         You can retrieve up to 200 users at once.
 
@@ -40,8 +55,10 @@ class GetUsers:
                 For a contact that exists in your Telegram address book you can use his phone number (str).
 
         Returns:
-            :obj:`~pyrogram.types.User` | List of :obj:`~pyrogram.types.User`: In case *user_ids* was not a list,
-            a single user is returned, otherwise a list of users is returned.
+            :obj:`~pyrogram.types.User` | List of :obj:`~pyrogram.types.User` | ``None``: In case *user_ids* was not a
+            list, a single user is returned, otherwise a list of users is returned. Telegram answers with an empty
+            list for an identifier that belongs to no user (a channel, a chat, or a peer this account cannot see),
+            in which case None is returned for a single identifier and the missing users are absent from the list.
 
         Example:
             .. code-block:: python
@@ -57,15 +74,11 @@ class GetUsers:
         user_ids = list(user_ids) if is_iterable else [user_ids]
         user_ids = await asyncio.gather(*[self.resolve_peer(i) for i in user_ids])
 
-        r = await self.invoke(
-            raw.functions.users.GetUsers(
-                id=user_ids
-            )
-        )
+        r = await self.invoke(raw.functions.users.GetUsers(id=user_ids))
 
         users = types.List()
 
         for i in r:
-            users.append(types.User._parse(self, i))
+            users.append(await types.User._parse(self, i))
 
-        return users if is_iterable else users[0]
+        return users if is_iterable else users[0] if users else None

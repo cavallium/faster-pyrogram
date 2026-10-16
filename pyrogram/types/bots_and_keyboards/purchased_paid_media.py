@@ -16,12 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 from pyrogram import raw, types
 
 from ..object import Object
+from ..update import Update
 
 
-class PurchasedPaidMedia(Object):
+class PurchasedPaidMedia(Object, Update):
     """This object represents information about purchased paid media.
 
     Parameters:
@@ -32,19 +35,17 @@ class PurchasedPaidMedia(Object):
             Bot-defined invoice payload, 1-128 bytes. This will not be displayed to the user, use for your internal processes.
     """
 
-    def __init__(
-        self,
-        from_user: "types.User",
-        payload: str
-    ):
+    def __init__(self, from_user: types.User, payload: str):
         super().__init__()
 
         self.from_user = from_user
         self.payload = payload
 
     @staticmethod
-    def _parse(client, purchased_media: "raw.types.UpdateBotPurchasedPaidMedia", users) -> "PurchasedPaidMedia":
+    async def _parse(
+        client, purchased_media: raw.types.UpdateBotPurchasedPaidMedia, users
+    ) -> PurchasedPaidMedia:
         return PurchasedPaidMedia(
-            from_user=types.User._parse(client, users.get(purchased_media.user_id)),
-            payload=purchased_media.payload
+            from_user=await types.User._parse(client, users.get(purchased_media.user_id)),
+            payload=purchased_media.payload,
         )

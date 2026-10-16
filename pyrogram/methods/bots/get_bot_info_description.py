@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,9 +24,9 @@ from pyrogram import raw
 
 class GetBotInfoDescription:
     async def get_bot_info_description(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         language_code: str = "",
-        for_my_bot: Union[int, str] = None,
+        for_my_bot: int | str | None = None,
     ) -> str:
         """Use this method to get the current / owned bot description for the given user language.
 
@@ -56,8 +56,8 @@ class GetBotInfoDescription:
         bot_info = await self.invoke(
             raw.functions.bots.GetBotInfo(
                 bot=await self.resolve_peer(for_my_bot) if for_my_bot else None,
-                lang_code=language_code
+                lang_code=language_code,
             )
         )
-        
+
         return bot_info.description

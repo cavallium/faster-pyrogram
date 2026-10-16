@@ -16,11 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
+
 from ..object import Object
 
 
@@ -30,30 +30,32 @@ class InlineKeyboardMarkup(Object):
     Parameters:
         inline_keyboard (List of List of :obj:`~pyrogram.types.InlineKeyboardButton`):
             List of button rows, each represented by a List of InlineKeyboardButton objects.
+
+        force_reply (``bool``, *optional*):
+            Pass *True* if the reply interface must be shown to the user, as if they had manually selected the bot's message and tapped 'Reply'.
+            The value of the field can't be changed when the inline keyboard is edited.
     """
 
-    def __init__(self, inline_keyboard: List[List["types.InlineKeyboardButton"]]):
+    def __init__(
+        self,
+        inline_keyboard: list[list[types.InlineKeyboardButton]],
+        force_reply: bool | None = None,
+    ):
         super().__init__()
 
         self.inline_keyboard = inline_keyboard
+        self.force_reply = force_reply
 
     @staticmethod
-    def read(o):
-        inline_keyboard = []
-
-        for i in o.rows:
-            row = []
-
-            for j in i.buttons:
-                row.append(types.InlineKeyboardButton.read(j))
-
-            inline_keyboard.append(row)
-
+    def read(reply_markup: raw.types.ReplyInlineMarkup):
         return InlineKeyboardMarkup(
-            inline_keyboard=inline_keyboard
+            inline_keyboard=[
+                [types.InlineKeyboardButton.read(j) for j in i.buttons] for i in reply_markup.rows
+            ],
+            force_reply=reply_markup.force_reply,
         )
 
-    async def write(self, client: "pyrogram.Client"):
+    async def write(self, client: pyrogram.Client):
         rows = []
 
         for r in self.inline_keyboard:
@@ -62,9 +64,9 @@ class InlineKeyboardMarkup(Object):
             for b in r:
                 buttons.append(await b.write(client))
 
-            rows.append(raw.types.KeyboardButtonRow(buttons=buttons))
+            rows.append(raw.types.KeyboardInlineButtonRow(buttons=buttons))
 
-        return raw.types.ReplyInlineMarkup(rows=rows)
+        return raw.types.ReplyInlineMarkup(rows=rows, force_reply=self.force_reply)
 
         # There seems to be a Python issues with nested async comprehensions.
         # See: https://bugs.python.org/issue33346

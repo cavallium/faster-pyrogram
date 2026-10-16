@@ -16,22 +16,34 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from typing import Union, List, Iterable
+from typing import TYPE_CHECKING, overload
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 log = logging.getLogger(__name__)
 
 
 class GetForumTopicsByID:
+    @overload
     async def get_forum_topics_by_id(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        topic_ids: Union[int, Iterable[int]]
-    ) -> Union["types.ForumTopic", List["types.ForumTopic"]]:
+        self: pyrogram.Client, chat_id: int | str, topic_ids: int
+    ) -> types.ForumTopic: ...
+
+    @overload
+    async def get_forum_topics_by_id(
+        self: pyrogram.Client, chat_id: int | str, topic_ids: Iterable[int]
+    ) -> list[types.ForumTopic]: ...
+
+    async def get_forum_topics_by_id(
+        self: pyrogram.Client, chat_id: int | str, topic_ids: int | Iterable[int]
+    ) -> types.ForumTopic | list[types.ForumTopic]:
         """Get one or more topic from a chat by using topic identifiers.
 
         .. include:: /_includes/usable-by/users.rst
@@ -40,7 +52,7 @@ class GetForumTopicsByID:
             chat_id (``int`` | ``str``):
                 Unique identifier (int) or username (str) of the target chat.
 
-            topic_ids (``int`` | Iterable of ``int``, *optional*):
+            topic_ids (``int`` | Iterable of ``int``):
                 Pass a single topic identifier or an iterable of topic ids (as integers) to get the information of the
                 topic themselves.
 
@@ -64,9 +76,8 @@ class GetForumTopicsByID:
         ids = list(topic_ids) if is_iterable else [topic_ids]
 
         r = await self.invoke(
-            raw.functions.channels.GetForumTopicsByID(
-                channel=await self.resolve_peer(chat_id),
-                topics=ids
+            raw.functions.messages.GetForumTopicsByID(
+                peer=await self.resolve_peer(chat_id), topics=ids
             )
         )
 
@@ -76,6 +87,7 @@ class GetForumTopicsByID:
         topics = types.List()
 
         for i in r.topics:
-            topics.append(types.ForumTopic._parse(self, i, users=users, chats=chats))
+            topics.append(await types.ForumTopic._parse(self, i, users=users, chats=chats))
 
-        return topics if is_iterable else topics[0] if topics else None
+        # A topic that does not exist comes back as `forumTopicDeleted`, never as a missing entry.
+        return topics if is_iterable else topics[0]

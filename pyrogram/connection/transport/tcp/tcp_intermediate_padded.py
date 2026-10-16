@@ -1,0 +1,86 @@
+#  Pyrogram - Telegram MTProto API Client Library for Python
+#  Copyright (C) 2017-present Dan <https://github.com/delivrance>
+#
+#  This file is part of Pyrogram.
+#
+#  Pyrogram is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Lesser General Public License as published
+#  by the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  Pyrogram is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Lesser General Public License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import annotations as _annotations
+
+import logging
+import os
+from struct import pack, unpack
+from typing import TYPE_CHECKING
+
+from pyrogram.connection.transport.tcp.tcp import INTERMEDIATE_PADDED_OBFUSCATE_TAG, TCP
+
+if TYPE_CHECKING:
+    from pyrogram.connection.proxy import Proxy
+
+log = logging.getLogger(__name__)
+
+
+class TCPIntermediatePadded(TCP):
+    # The tag Telegram's protocol requires for a dd-prefixed (random-padding)
+    #  secret. `TCP._obfuscated2_secret` refuses to build a header for such a
+    #  secret with any other tag, so this is what makes the class usable over
+    #  both obfuscated2 schemes - classic MTProxy and WEB.
+    OBFUSCATE_TAG = INTERMEDIATE_PADDED_OBFUSCATE_TAG
+
+    def __init__(
+        self,
+        ipv6: bool = False,
+        proxy: Proxy | None = None,
+        crypto_executor_workers: int = 1,
+        dc_id: int | None = None,
+    ) -> None:
+        super().__init__(ipv6, proxy, crypto_executor_workers, dc_id=dc_id)
+
+    async def connect(self, address: tuple[str, int]) -> None:
+        self.marker_event.clear()
+        await super().connect(address)
+        if not self.opens_with_obfuscated2_header:
+            # The header already carries this tag where one was sent; see
+            #  `TCP.opens_with_obfuscated2_header`.
+            await super().send(INTERMEDIATE_PADDED_OBFUSCATE_TAG, wait_for_marker=False)
+        self.marker_event.set()
+
+    async def send(self, data: bytes, wait_for_marker: bool = True) -> None:
+        padding = os.urandom(os.urandom(1)[0] & 0x0F)
+        await super().send(pack("<i", len(data) + len(padding)) + data + padding, wait_for_marker)
+
+    async def recv(self, length: int = 0) -> bytes | None:
+        length = await super().recv(4)
+
+        if length is None:
+            return None
+
+        length = unpack("<i", length)[0]
+        data = await super().recv(length)
+
+        if data is None:
+            return None
+
+        if length < 24:
+            if length >= 8 and data[:4] == b"\xff\xff\xff\xff":
+                return data[:8]
+            return data[:4]
+
+        if data[:8] != b"\x00" * 8:
+            strip = (length - 24) % 16
+
+            if strip:
+                data = data[:-strip]
+
+        return data

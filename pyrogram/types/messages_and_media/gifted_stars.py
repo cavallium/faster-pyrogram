@@ -16,15 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import random
 
-from pyrogram import raw, types, utils
+from pyrogram import raw, types
 
 from ..object import Object
 
 
 class GiftedStars(Object):
-    """Telegram Premium was gifted to the user.
+    """Telegram Stars were gifted to a user.
 
     Parameters:
         gifter (:obj:`~pyrogram.types.User`, *optional*):
@@ -56,18 +58,19 @@ class GiftedStars(Object):
         sticker (:obj:`~pyrogram.types.Sticker`):
             A sticker to be shown in the message.
     """
+
     def __init__(
         self,
         *,
-        gifter: "types.User" = None,
-        receiver: "types.User",
-        currency: str = None,
-        amount: int = None,
-        cryptocurrency: str = None,
-        cryptocurrency_amount: int = None,
-        star_count: int = None,
-        transaction_id: str = None,
-        sticker: "types.Sticker" = None,
+        gifter: types.User | None = None,
+        receiver: types.User,
+        currency: str | None = None,
+        amount: int | None = None,
+        cryptocurrency: str | None = None,
+        cryptocurrency_amount: int | None = None,
+        star_count: int | None = None,
+        transaction_id: str | None = None,
+        sticker: types.Sticker | None = None,
     ):
         super().__init__()
 
@@ -84,20 +87,19 @@ class GiftedStars(Object):
     @staticmethod
     async def _parse(
         client,
-        action: "raw.types.MessageActionGiftStars",
-        gifter: "raw.base.User" = None,
-        receiver: "raw.base.User" = None,
-    ) -> "GiftedStars":
+        action: raw.types.MessageActionGiftStars,
+        gifter: raw.base.User | None = None,
+        receiver: raw.base.User | None = None,
+    ) -> GiftedStars:
         raw_stickers = await client.invoke(
             raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(),
-                hash=0
+                stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
             )
         )
 
         return GiftedStars(
-            gifter=types.User._parse(client, gifter),
-            receiver=types.User._parse(client, receiver),
+            gifter=await types.User._parse(client, gifter),
+            receiver=await types.User._parse(client, receiver),
             currency=action.currency,
             amount=action.amount,
             cryptocurrency=getattr(action, "crypto_currency", None),
@@ -108,13 +110,10 @@ class GiftedStars(Object):
                 types.List(
                     [
                         await types.Sticker._parse(
-                            client,
-                            doc,
-                            {
-                                type(i): i for i in doc.attributes
-                            }
-                        ) for doc in raw_stickers.documents
+                            client, doc, {type(i): i for i in doc.attributes}
+                        )
+                        for doc in raw_stickers.documents
                     ]
                 )
-            )
+            ),
         )

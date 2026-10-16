@@ -16,6 +16,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 from ..object import Object
 
 
@@ -27,10 +29,7 @@ class KeyboardButtonPollType(Object):
             If True, the requested poll will be sent as quiz.
     """
 
-    def __init__(
-        self, *,
-        is_quiz: bool = None
-    ):
+    def __init__(self, *, is_quiz: bool | None = None):
         super().__init__()
 
         self.is_quiz = is_quiz

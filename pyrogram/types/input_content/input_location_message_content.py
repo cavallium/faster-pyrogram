@@ -16,8 +16,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from typing import Optional
 
 import pyrogram
 from pyrogram import raw
@@ -57,10 +58,10 @@ class InputLocationMessageContent(InputMessageContent):
         self,
         latitude: float,
         longitude: float,
-        horizontal_accuracy: Optional[float] = None,
-        live_period: Optional[int] = None,
-        heading: Optional[int] = None,
-        proximity_alert_radius: Optional[int] = None
+        horizontal_accuracy: float | None = None,
+        live_period: int | None = None,
+        heading: int | None = None,
+        proximity_alert_radius: int | None = None,
     ):
         super().__init__()
 
@@ -71,15 +72,13 @@ class InputLocationMessageContent(InputMessageContent):
         self.heading = heading
         self.proximity_alert_radius = proximity_alert_radius
 
-    async def write(self, client: "pyrogram.Client", reply_markup):
+    async def write(self, client: pyrogram.Client, reply_markup):
         return raw.types.InputBotInlineMessageMediaGeo(
             geo_point=raw.types.InputGeoPoint(
-                lat=self.latitude,
-                long=self.longitude,
-                accuracy_radius=self.horizontal_accuracy
+                lat=self.latitude, long=self.longitude, accuracy_radius=self.horizontal_accuracy
             ),
             heading=self.heading,
             period=self.live_period,
             proximity_notification_radius=self.proximity_alert_radius,
-            reply_markup=await reply_markup.write(client) if reply_markup else None
+            reply_markup=await reply_markup.write(client) if reply_markup else None,
         )

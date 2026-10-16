@@ -19,6 +19,8 @@
 from .block_user import BlockUser
 from .check_username import CheckUsername
 from .delete_profile_photos import DeleteProfilePhotos
+from .get_chat_audios_count import GetChatAudiosCount
+from .get_chat_audios import GetChatAudios
 from .get_chat_photos import GetChatPhotos
 from .get_chat_photos_count import GetChatPhotosCount
 from .get_common_chats import GetCommonChats
@@ -27,7 +29,7 @@ from .get_me import GetMe
 from .get_users import GetUsers
 from .set_emoji_status import SetEmojiStatus
 from .set_personal_channel import SetPersonalChannel
-from .set_profile_photo import SetProfilePhoto
+from .set_profile_photo import SetBotProfilePhoto, SetProfilePhoto
 from .set_username import SetUsername
 from .unblock_user import UnblockUser
 from .update_birthday import UpdateBirthday
@@ -41,8 +43,11 @@ class Users(
     GetCommonChats,
     GetChatPhotos,
     SetPersonalChannel,
+    SetBotProfilePhoto,
     SetProfilePhoto,
     DeleteProfilePhotos,
+    GetChatAudiosCount,
+    GetChatAudios,
     GetUsers,
     GetMe,
     SetUsername,
@@ -52,6 +57,6 @@ class Users(
     UpdateProfile,
     UpdateStatus,
     GetDefaultEmojiStatuses,
-    SetEmojiStatus
+    SetEmojiStatus,
 ):
     pass

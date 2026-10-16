@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,9 +24,7 @@ from pyrogram import raw
 
 class ReadMentions:
     async def read_mentions(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        topic_id: int = None
+        self: pyrogram.Client, chat_id: int | str, topic_id: int | None = None
     ) -> bool:
         """Mark a mention in the chat as read.
 
@@ -56,8 +54,7 @@ class ReadMentions:
         """
         r = await self.invoke(
             raw.functions.messages.ReadMentions(
-                peer=await self.resolve_peer(chat_id),
-                top_msg_id=topic_id
+                peer=await self.resolve_peer(chat_id), top_msg_id=topic_id
             )
         )
 

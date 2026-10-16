@@ -16,30 +16,74 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Iterable, List, Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING, overload
 
 import pyrogram
 from pyrogram import raw, types, utils
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from datetime import datetime, timedelta
+
 
 class ForwardMessages:
+    @overload
     async def forward_messages(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        from_chat_id: Union[int, str],
-        message_ids: Union[int, Iterable[int]],
-        message_thread_id: int = None,
-        disable_notification: bool = None,
-        schedule_date: datetime = None,
-        hide_sender_name: bool = None,
-        hide_captions: bool = None,
-        protect_content: bool = None,
-        allow_paid_broadcast: bool = None,
-        video_start_timestamp: int = None,
-        reply_parameters: "types.ReplyParameters" = None,
-        paid_message_star_count: int = None
-    ) -> Union["types.Message", List["types.Message"]]:
+        self: pyrogram.Client,
+        chat_id: int | str,
+        from_chat_id: int | str,
+        message_ids: int,
+        message_thread_id: int | None = None,
+        disable_notification: bool | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        repeat_period: int | None = None,
+        hide_sender_name: bool | None = None,
+        hide_captions: bool | None = None,
+        protect_content: bool | None = None,
+        allow_paid_broadcast: bool | None = None,
+        video_start_timestamp: int | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        paid_message_star_count: int | None = None,
+    ) -> types.Message | None: ...
+
+    @overload
+    async def forward_messages(
+        self: pyrogram.Client,
+        chat_id: int | str,
+        from_chat_id: int | str,
+        message_ids: Iterable[int],
+        message_thread_id: int | None = None,
+        disable_notification: bool | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        repeat_period: int | None = None,
+        hide_sender_name: bool | None = None,
+        hide_captions: bool | None = None,
+        protect_content: bool | None = None,
+        allow_paid_broadcast: bool | None = None,
+        video_start_timestamp: int | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        paid_message_star_count: int | None = None,
+    ) -> list[types.Message]: ...
+
+    async def forward_messages(
+        self: pyrogram.Client,
+        chat_id: int | str,
+        from_chat_id: int | str,
+        message_ids: int | Iterable[int],
+        message_thread_id: int | None = None,
+        disable_notification: bool | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        repeat_period: int | None = None,
+        hide_sender_name: bool | None = None,
+        hide_captions: bool | None = None,
+        protect_content: bool | None = None,
+        allow_paid_broadcast: bool | None = None,
+        video_start_timestamp: int | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        paid_message_star_count: int | None = None,
+    ) -> types.Message | list[types.Message] | None:
         """Forward messages of any kind.
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -66,8 +110,12 @@ class ForwardMessages:
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+            schedule_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the message will be automatically sent.
+                A :py:obj:`~datetime.timedelta` is counted from now.
+
+            repeat_period (``int``, *optional*):
+                Period after which the message will be sent again in seconds.
 
             hide_sender_name (``bool``, *optional*):
                 If True, the original author of the message will not be shown.
@@ -94,8 +142,9 @@ class ForwardMessages:
                 The number of Telegram Stars the user agreed to pay to send the messages.
 
         Returns:
-            :obj:`~pyrogram.types.Message` | List of :obj:`~pyrogram.types.Message`: In case *message_ids* was not
-            a list, a single message is returned, otherwise a list of messages is returned.
+            :obj:`~pyrogram.types.Message` | List of :obj:`~pyrogram.types.Message` | ``None``: In case *message_ids*
+            was not a list, a single message is returned, otherwise a list of messages is returned. In case
+            *message_ids* was not a list and the answer carried no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -114,21 +163,18 @@ class ForwardMessages:
                 to_peer=await self.resolve_peer(chat_id),
                 from_peer=await self.resolve_peer(from_chat_id),
                 id=message_ids,
-                silent=disable_notification or None,
+                silent=disable_notification,
                 random_id=[self.rnd_id() for _ in message_ids],
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
+                schedule_repeat_period=repeat_period,
                 drop_author=hide_sender_name,
                 drop_media_captions=hide_captions,
                 noforwards=protect_content,
                 allow_paid_floodskip=allow_paid_broadcast,
                 top_msg_id=message_thread_id,
-                reply_to=await utils.get_reply_to(
-                    self,
-                    reply_parameters,
-                    message_thread_id
-                ),
+                reply_to=await utils.get_reply_to(self, reply_parameters, message_thread_id),
                 video_timestamp=video_start_timestamp,
-                allow_paid_stars=paid_message_star_count
+                allow_paid_stars=paid_message_star_count,
             )
         )
 

@@ -16,25 +16,71 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Union, AsyncGenerator, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import types, raw, utils
+from pyrogram import raw, types, utils
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+
+async def get_chunk(
+    client: pyrogram.Client,
+    peer: raw.types.InputPeerChannel,
+    peer_id: int,
+    peer_access_hash: int,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[types.ChatPhoto]:
+    r = await client.invoke(
+        raw.functions.messages.Search(
+            peer=peer,
+            q="",
+            filter=raw.types.InputMessagesFilterChatPhotos(),
+            min_date=0,
+            max_date=0,
+            offset_id=0,
+            add_offset=offset,
+            limit=limit,
+            max_id=0,
+            min_id=0,
+            hash=0,
+        ),
+        sleep_threshold=60,
+    )
+
+    photos = []
+
+    for message in r.messages:
+        if not isinstance(message, raw.types.MessageService):
+            continue
+
+        if not isinstance(message.action, raw.types.MessageActionChatEditPhoto):
+            continue
+
+        photos.append(
+            await types.ChatPhoto._parse(
+                client=client,
+                chat_photo=message.action.photo,
+                peer_id=peer_id,
+                peer_access_hash=peer_access_hash,
+            )
+        )
+
+    return photos
 
 
 class GetChatPhotos:
     async def get_chat_photos(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         limit: int = 0,
-    ) -> Optional[
-        Union[
-            AsyncGenerator["types.Photo", None],
-            AsyncGenerator["types.Animation", None]
-        ]
-    ]:
+    ) -> AsyncGenerator[types.ChatPhoto, None]:
         """Get a chat or a user profile photos sequentially.
+        Personal and public photo aren't returned.
 
         .. include:: /_includes/usable-by/users-bots.rst
 
@@ -42,14 +88,13 @@ class GetChatPhotos:
             chat_id (``int`` | ``str``):
                 Unique identifier (int) or username (str) of the target chat.
                 For your personal cloud (Saved Messages) you can simply use "me" or "self".
-                For a contact that exists in your Telegram address book you can use his phone number (str).
 
             limit (``int``, *optional*):
                 Limits the number of profile photos to be retrieved.
                 By default, no limit is applied and all profile photos are returned.
 
         Returns:
-            ``Generator``: A generator yielding :obj:`~pyrogram.types.Photo` | :obj:`~pyrogram.types.Animation` objects.
+            ``Generator``: A generator yielding :obj:`~pyrogram.types.ChatPhoto` objects.
 
         Example:
             .. code-block:: python
@@ -57,91 +102,85 @@ class GetChatPhotos:
                 async for photo in app.get_chat_photos("me"):
                     print(photo)
         """
-        peer_id = await self.resolve_peer(chat_id)
+        peer = await self.resolve_peer(chat_id)
 
-        if isinstance(peer_id, raw.types.InputPeerChannel):
-            r = await self.invoke(
-                raw.functions.channels.GetFullChannel(
-                    channel=peer_id
-                )
-            )
+        if isinstance(peer, raw.types.InputPeerSelf):
+            peer_id = self.me.id if self.me else None
+            peer_access_hash = 0
+        else:
+            peer_id = utils.get_raw_peer_id(peer)
+            peer_access_hash = peer.access_hash
 
-            current = types.Animation._parse_chat_animation(
-                self,
-                r.full_chat.chat_photo,
-                f"photo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4"
-            ) or types.Photo._parse(self, r.full_chat.chat_photo) or []
+        current = 0
+        total = limit or (1 << 31)
+        limit = min(100, total)
+        offset = 0
 
-            if current:
-                current = [current]
+        if isinstance(peer, raw.types.InputPeerChannel):
+            current_photo = None
 
-            if not self.me.is_bot:
-                r = await utils.parse_messages(
-                    self,
-                    await self.invoke(
-                        raw.functions.messages.Search(
-                            peer=peer_id,
-                            q="",
-                            filter=raw.types.InputMessagesFilterChatPhotos(),
-                            min_date=0,
-                            max_date=0,
-                            offset_id=0,
-                            add_offset=0,
-                            limit=limit,
-                            max_id=0,
-                            min_id=0,
-                            hash=0
-                        )
-                    )
+            r = await self.invoke(raw.functions.channels.GetFullChannel(channel=peer))
+
+            if not isinstance(r.full_chat.chat_photo, raw.types.PhotoEmpty):
+                current_photo = await types.ChatPhoto._parse(
+                    client=self,
+                    chat_photo=r.full_chat.chat_photo,
+                    peer_id=peer_id,
+                    peer_access_hash=peer_access_hash,
                 )
 
-                extra = [message.new_chat_photo for message in r]
-
-                if extra:
-                    if current:
-                        photos = (current + extra) if current[0].file_id != extra[0].file_id else extra
-                    else:
-                        photos = extra
-                else:
-                    if current:
-                        photos = current
-                    else:
-                        photos = []
-
-            if not photos:
-                return
-
-            current = 0
-
-            for photo in photos:
-                yield photo
+                yield current_photo
 
                 current += 1
 
-                if current >= limit:
+                if current >= total:
                     return
-        else:
-            current = 0
-            total = limit or (1 << 31)
-            limit = min(100, total)
-            offset = 0
 
+            if self.me and not self.me.is_bot:
+                while True:
+                    photos = await get_chunk(
+                        client=self,
+                        peer=peer,
+                        peer_id=peer_id,
+                        peer_access_hash=peer_access_hash,
+                        offset=offset,
+                        limit=limit,
+                    )
+
+                    if not photos:
+                        return
+
+                    offset += len(photos)
+
+                    for photo in photos:
+                        if current_photo and current_photo.big_file_id == photo.big_file_id:
+                            continue
+
+                        yield photo
+
+                        current += 1
+
+                        if current >= total:
+                            return
+
+                    if len(photos) < limit:
+                        return
+
+        else:
             while True:
                 r = await self.invoke(
                     raw.functions.photos.GetUserPhotos(
-                        user_id=peer_id,
-                        offset=offset,
-                        max_id=0,
-                        limit=limit
+                        user_id=peer, offset=offset, max_id=0, limit=limit
                     )
                 )
 
                 photos = [
-                    types.Animation._parse_chat_animation(
-                        self,
-                        photo,
-                        f"photo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4"
-                    ) or types.Photo._parse(self, photo)
+                    await types.ChatPhoto._parse(
+                        client=self,
+                        chat_photo=photo,
+                        peer_id=peer_id,
+                        peer_access_hash=peer_access_hash,
+                    )
                     for photo in r.photos
                 ]
 

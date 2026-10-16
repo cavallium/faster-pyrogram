@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,8 +24,8 @@ from pyrogram import raw
 
 class ApproveChatJoinRequest:
     async def approve_chat_join_request(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         user_id: int,
     ) -> bool:
         """Approve a chat join request.
@@ -50,7 +50,7 @@ class ApproveChatJoinRequest:
             raw.functions.messages.HideChatJoinRequest(
                 peer=await self.resolve_peer(chat_id),
                 user_id=await self.resolve_peer(user_id),
-                approved=True
+                approved=True,
             )
         )
 

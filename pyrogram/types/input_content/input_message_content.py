@@ -16,17 +16,23 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import pyrogram
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    import pyrogram
 
 
 class InputMessageContent(Object):
     """Content of a message to be sent as a result of an inline query.
 
-    Pyrogram currently supports the following types:
+    Kurigram currently supports the following types:
 
     - :obj:`~pyrogram.types.InputTextMessageContent`
+    - :obj:`~pyrogram.types.InputRichMessageContent`
     - :obj:`~pyrogram.types.InputLocationMessageContent`
     - :obj:`~pyrogram.types.InputVenueMessageContent`
     - :obj:`~pyrogram.types.InputContactMessageContent`
@@ -36,5 +42,5 @@ class InputMessageContent(Object):
     def __init__(self):
         super().__init__()
 
-    async def write(self, client: "pyrogram.Client", reply_markup):
+    async def write(self, client: pyrogram.Client, reply_markup):
         raise NotImplementedError

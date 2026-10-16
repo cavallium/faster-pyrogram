@@ -16,12 +16,13 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, List
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw, types, utils, enums
-from .inline_query_result import InlineQueryResult
+from pyrogram import enums, raw, types, utils
+
 from ...file_id import FileId
+from .inline_query_result import InlineQueryResult
 
 
 class InlineQueryResultCachedVoice(InlineQueryResult):
@@ -62,13 +63,13 @@ class InlineQueryResultCachedVoice(InlineQueryResult):
     def __init__(
         self,
         voice_file_id: str,
-        id: str = None,
-        title: str = None,
+        id: str | None = None,
+        title: str | None = None,
         caption: str = "",
-        parse_mode: Optional["enums.ParseMode"] = None,
-        caption_entities: List["types.MessageEntity"] = None,
-        reply_markup: "types.InlineKeyboardMarkup" = None,
-        input_message_content: "types.InputMessageContent" = None
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
+        reply_markup: types.InlineKeyboardMarkup | None = None,
+        input_message_content: types.InputMessageContent | None = None,
     ):
         super().__init__("voice", id, input_message_content, reply_markup)
 
@@ -80,10 +81,12 @@ class InlineQueryResultCachedVoice(InlineQueryResult):
         self.reply_markup = reply_markup
         self.input_message_content = input_message_content
 
-    async def write(self, client: "pyrogram.Client"):
-        message, entities = (await utils.parse_text_entities(
-            client, self.caption, self.parse_mode, self.caption_entities
-        )).values()
+    async def write(self, client: pyrogram.Client):
+        message, entities = (
+            await utils.parse_text_entities(
+                client, self.caption, self.parse_mode, self.caption_entities
+            )
+        ).values()
 
         file_id = FileId.decode(self.voice_file_id)
 
@@ -100,9 +103,11 @@ class InlineQueryResultCachedVoice(InlineQueryResult):
                 await self.input_message_content.write(client, self.reply_markup)
                 if self.input_message_content
                 else raw.types.InputBotInlineMessageMediaAuto(
-                    reply_markup=await self.reply_markup.write(client) if self.reply_markup else None,
+                    reply_markup=await self.reply_markup.write(client)
+                    if self.reply_markup
+                    else None,
                     message=message,
-                    entities=entities
+                    entities=entities,
                 )
-            )
+            ),
         )

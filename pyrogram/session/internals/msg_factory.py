@@ -16,23 +16,54 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
+import asyncio
+from typing import TYPE_CHECKING
+
 from pyrogram.raw.core import Message, MsgContainer, TLObject
 from pyrogram.raw.functions import Ping
-from pyrogram.raw.types import MsgsAck, HttpWait
-from .msg_id import MsgId
-from .seq_no import SeqNo
+from pyrogram.raw.types import HttpWait, MsgsAck
 
-not_content_related = (Ping, HttpWait, MsgsAck, MsgContainer)
+if TYPE_CHECKING:
+    import pyrogram
 
 
 class MsgFactory:
-    def __init__(self):
-        self.seq_no = SeqNo()
+    def __init__(self, client: pyrogram.Client):
+        self.client = client
 
-    def __call__(self, body: TLObject) -> Message:
-        return Message(
-            body,
-            MsgId(),
-            self.seq_no(not isinstance(body, not_content_related)),
-            len(body)
-        )
+        self._last_msg_id = 0
+
+        self._msg_id_lock = asyncio.Lock()
+        self._seq_no_lock = asyncio.Lock()
+
+        self._content_related_messages_sent = 0
+
+    async def allocate_message_identity(self) -> int:
+        async with self._msg_id_lock:
+            base_msg_id = int(self.client.server_time * (2**32)) & ~0b11
+
+            if base_msg_id <= self._last_msg_id:
+                base_msg_id = self._last_msg_id + 4
+
+            self._last_msg_id = base_msg_id
+
+            return base_msg_id
+
+    async def allocate_message_sequence(self, is_content_related: bool) -> int:
+        async with self._seq_no_lock:
+            seq_no = (self._content_related_messages_sent * 2) + (1 if is_content_related else 0)
+
+            if is_content_related:
+                self._content_related_messages_sent += 1
+
+            return seq_no
+
+    async def create(self, body: TLObject) -> Message:
+        msg_id = await self.allocate_message_identity()
+
+        is_content_related = not isinstance(body, (Ping, HttpWait, MsgsAck, MsgContainer))
+        seq_no = await self.allocate_message_sequence(is_content_related)
+
+        return Message(body, msg_id, seq_no, len(body))

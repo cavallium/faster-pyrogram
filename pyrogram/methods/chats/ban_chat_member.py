@@ -16,31 +16,30 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw, utils
-from pyrogram import types
+from pyrogram import raw, types, utils
+
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
 
 
 class BanChatMember:
     async def ban_chat_member(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        user_id: Union[int, str],
-        until_date: datetime = utils.zero_datetime()
-    ) -> Union["types.Message", bool]:
+        self: pyrogram.Client,
+        chat_id: int | str,
+        user_id: int | str,
+        until_date: datetime | timedelta | None = None,
+        revoke_messages: bool | None = None,
+        revoke_reactions: bool | None = None,
+    ) -> types.Message | bool:
         """Ban a user from a group, a supergroup or a channel.
         In the case of supergroups and channels, the user will not be able to return to the group on their own using
         invite links, etc., unless unbanned first. You must be an administrator in the chat for this to work and must
         have the appropriate admin rights.
-
-        .. note::
-
-            In regular groups (non-supergroups), this method will only work if the "All Members Are Admins" setting is
-            off in the target group. Otherwise members may only be removed by the group's creator or by the member
-            that added them.
 
         .. include:: /_includes/usable-by/users-bots.rst
 
@@ -52,10 +51,17 @@ class BanChatMember:
                 Unique identifier (int) or username (str) of the target user.
                 For a contact that exists in your Telegram address book you can use his phone number (str).
 
-            until_date (:py:obj:`~datetime.datetime`, *optional*):
+            until_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the user will be unbanned.
                 If user is banned for more than 366 days or less than 30 seconds from the current time they are
                 considered to be banned forever. Defaults to epoch (ban forever).
+                A :py:obj:`~datetime.timedelta` is counted from now.
+
+            revoke_messages (``bool``, *optional*):
+                Pass True to delete all messages in the chat for the user who is being removed.
+
+            revoke_reactions (``bool``, *optional*):
+                Pass True to delete all reactions in the chat for the user who is being removed.
 
         Returns:
             :obj:`~pyrogram.types.Message` | ``bool``: On success, a service message will be returned (when applicable),
@@ -72,8 +78,13 @@ class BanChatMember:
                 # Ban chat member and automatically unban after 24h
                 await app.ban_chat_member(chat_id, user_id, datetime.now() + timedelta(days=1))
         """
+        until_date = until_date or utils.zero_datetime()
+
         chat_peer = await self.resolve_peer(chat_id)
         user_peer = await self.resolve_peer(user_id)
+
+        if isinstance(chat_peer, (raw.types.InputPeerSelf, raw.types.InputPeerUser)):
+            raise ValueError("Can't ban members in private chats")
 
         if isinstance(chat_peer, raw.types.InputPeerChannel):
             r = await self.invoke(
@@ -89,18 +100,32 @@ class BanChatMember:
                         send_gifs=True,
                         send_games=True,
                         send_inline=True,
-                        embed_links=True
+                        embed_links=True,
+                    ),
+                )
+            )
+
+            if revoke_messages:
+                await self.invoke(
+                    raw.functions.channels.DeleteParticipantHistory(
+                        channel=chat_peer, participant=user_peer
                     )
                 )
-            )
         else:
+            if not isinstance(user_peer, raw.types.InputPeerUser):
+                raise ValueError("Can't ban chats in basic groups")
+
             r = await self.invoke(
                 raw.functions.messages.DeleteChatUser(
-                    chat_id=abs(chat_id),
-                    user_id=user_peer
+                    chat_id=abs(chat_id), user_id=user_peer, revoke_history=revoke_messages
                 )
             )
 
-        messages = await utils.parse_messages(client=self, messages=r)
+        if revoke_reactions:
+            await self.invoke(
+                raw.functions.messages.DeleteParticipantReactions(
+                    peer=chat_peer, participant=user_peer
+                )
+            )
 
-        return messages[0] if messages else True
+        return next(iter(await utils.parse_messages(client=self, messages=r)), True)

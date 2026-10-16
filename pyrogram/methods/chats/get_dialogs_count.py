@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,9 +24,7 @@ from pyrogram import raw
 
 class GetDialogsCount:
     async def get_dialogs_count(
-        self: "pyrogram.Client",
-        pinned_only: bool = False,
-        from_archive: Optional[bool] = None
+        self: pyrogram.Client, pinned_only: bool = False, from_archive: bool | None = None
     ) -> int:
         """Get the total count of your dialogs.
 
@@ -52,11 +50,9 @@ class GetDialogsCount:
 
         if pinned_only:
             r = await self.invoke(
-                raw.functions.messages.GetPinnedDialogs(
-                    folder_id=1 if from_archive else 0
-                )
+                raw.functions.messages.GetPinnedDialogs(folder_id=1 if from_archive else 0)
             )
-            
+
             return len(r.dialogs)
         else:
             r = await self.invoke(
@@ -66,7 +62,7 @@ class GetDialogsCount:
                     offset_peer=raw.types.InputPeerEmpty(),
                     limit=1,
                     hash=0,
-                    folder_id=None if from_archive is None else 1 if from_archive else 0
+                    folder_id=None if from_archive is None else 1 if from_archive else 0,
                 )
             )
 

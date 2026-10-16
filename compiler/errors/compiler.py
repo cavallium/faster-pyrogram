@@ -16,127 +16,399 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import csv
-import os
 import re
 import shutil
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Final
 
-HOME = "compiler/errors"
-DEST = "pyrogram/errors/exceptions"
-NOTICE_PATH = "NOTICE"
+# Resolved from this file rather than from the working directory, which is the repository root
+# under `hatch_build.py` and `compiler/errors` under `make errors`.
+_HOME: Final[Path] = Path(__file__).resolve().parent
+_DEST: Final[Path] = _HOME.parents[1] / "pyrogram" / "errors" / "exceptions"
+_NOTICE: Final[Path] = _HOME.parents[1] / "NOTICE"
+
+# The name an error carries its value under when its own message names none. `value` is the
+#  property `RPCError` itself defines, so a property of that name would shadow it and none
+#  is written.
+_PLAIN_VALUE_NAME: Final[str] = "value"
+
+# `pyrogram/errors/__init__.py` imports the hand-written errors after the generated ones, so a
+# generated class of either name never reaches the caller: a 400 `UNKNOWN_ERROR` used to arrive as
+# the hand-written `UnknownError`, which reports code 520 and is no `BadRequest`.
+_RESERVED_CLASS_NAMES: Final[tuple[str, ...]] = ("RPCError", "UnknownError")
+
+# A class name may not start with a digit. `2FA_CONFIRM_WAIT_X` is the only id that does, and any
+# other would need a word of its own here rather than a module Python cannot import.
+_LEADING_DIGIT_WORDS: Final[dict[str, str]] = {"2": "Two"}
 
 
-def snek(s):
+@dataclass(frozen=True)
+class _Table:
+    """A source table, and the module it compiles to."""
+
+    path: Path
+    code: int
+    module_name: str
+    super_class: str
+    title: str
+
+
+@dataclass(frozen=True)
+class _Row:
+    """A line of a source table."""
+
+    table: _Table
+    error_id: str
+    message: str
+    value_name: str
+    base_name: str
+
+
+@dataclass(frozen=True)
+class _Error:
+    """A row, once every claimant of the name it asks for is known and it has one of its own."""
+
+    row: _Row
+    class_name: str
+    bases: list[str]
+    primary: _Error | None
+
+    @property
+    def table(self) -> _Table:
+        return self.row.table
+
+
+@dataclass(frozen=True)
+class _Templates:
+    """
+    The files under `template/`. `class.txt` is a whole module: a category and the errors under it,
+    each of them written from `sub_class.txt`, and each of the three blocks below written into the
+    body of a sub class that asks for it.
+
+    The newlines that join a block to that body are spelled out where the block is written, rather
+    than left to whichever ones a template file happens to begin and end with.
+    """
+
+    module: str
+    sub_class: str
+    code_and_name: str
+    value_property: str
+    value_name_reset: str
+
+
+def _to_snake_case(name: str) -> str:
     # https://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-snake-case
-    s = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", s)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s).lower()
+    name = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
 
-def caml(s):
-    s = snek(s).split("_")
-    return "".join([str(i.title()) for i in s])
+def _to_pascal_case(name: str) -> str:
+    return "".join([word.title() for word in _to_snake_case(name).split("_")])
 
 
-def start():
-    shutil.rmtree(DEST, ignore_errors=True)
-    os.makedirs(DEST)
+def _read_notice() -> str:
+    lines = _NOTICE.read_text(encoding="utf-8").splitlines()
 
-    files = [i for i in os.listdir("{}/source".format(HOME))]
+    return "\n".join([f"# {line}".strip() for line in lines])
 
-    with open(NOTICE_PATH, encoding="utf-8") as f:
-        notice = []
 
-        for line in f.readlines():
-            notice.append("# {}".format(line).strip())
+def _read_templates() -> _Templates:
+    return _Templates(
+        module=_read_template("class"),
+        sub_class=_read_template("sub_class"),
+        code_and_name=_read_template("code_and_name"),
+        value_property=_read_template("value_property"),
+        value_name_reset=_read_template("value_name_reset"),
+    )
 
-        notice = "\n".join(notice)
 
-    with open("{}/all.py".format(DEST), "w", encoding="utf-8") as f_all:
-        f_all.write(notice + "\n\n")
-        f_all.write("count = {count}\n\n")
-        f_all.write("exceptions = {\n")
+def _read_template(template_name: str) -> str:
+    return (_HOME / "template" / f"{template_name}.txt").read_text(encoding="utf-8")
 
-        count = 0
 
-        for i in files:
-            code, name = re.search(r"(\d+)_([A-Z_]+)", i).groups()
+def _read_table(path: Path) -> _Table:
+    code, name = re.search(r"(\d+)_([A-Z_]+)", path.name).groups()
+    words = re.sub(r"_", " ", name).lower().split(" ")
 
-            f_all.write("    {}: {{\n".format(code))
+    return _Table(
+        path=path,
+        code=int(code),
+        module_name=f"{name.lower()}_{code}",
+        super_class=_to_pascal_case(name),
+        title=" ".join([word.capitalize() for word in words]),
+    )
 
-            init = "{}/__init__.py".format(DEST)
 
-            if not os.path.exists(init):
-                with open(init, "w", encoding="utf-8") as f_init:
-                    f_init.write(notice + "\n\n")
+def _read_rows(table: _Table) -> list[_Row]:
+    with table.path.open(encoding="utf-8", newline="") as table_file:
+        reader = csv.reader(table_file, delimiter="\t")
+        next(reader)  # The header.
 
-            with open(init, "a", encoding="utf-8") as f_init:
-                f_init.write("from .{}_{} import *\n".format(name.lower(), code))
+        # A blank line is no error of the table.
+        return [_read_row(table, line=line) for line in reader if line]
 
-            with open("{}/source/{}".format(HOME, i), encoding="utf-8") as f_csv, \
-                open("{}/{}_{}.py".format(DEST, name.lower(), code), "w", encoding="utf-8") as f_class:
-                reader = csv.reader(f_csv, delimiter="\t")
 
-                super_class = caml(name)
-                name = " ".join([str(i.capitalize()) for i in re.sub(r"_", " ", name).lower().split(" ")])
+def _read_row(table: _Table, *, line: list[str]) -> _Row:
+    error_id, message = line
 
-                sub_classes = []
+    return _Row(
+        table=table,
+        error_id=error_id,
+        message=message,
+        value_name=_value_name_of(error_id=error_id, message=message),
+        base_name=_base_name_of(error_id),
+    )
 
-                f_all.write("        \"_\": \"{}\",\n".format(super_class))
 
-                for j, row in enumerate(reader):
-                    if j == 0:
-                        continue
+def _base_name_of(error_id: str) -> str:
+    # The `_X` suffix marks the ids whose message carries a value. It is not part of the name: an
+    # id spelled both ways is one error, and the two are told apart by a suffix further down.
+    name = _to_pascal_case(re.sub(r"_X", "_", error_id))
 
-                    count += 1
+    # `No workers running`, at 500, is a sentence rather than an id.
+    return _spell_out_leading_digit(name.replace(" ", ""), error_id=error_id)
 
-                    if not row:  # Row is empty (blank line)
-                        continue
 
-                    error_id, error_message = row
+def _spell_out_leading_digit(name: str, *, error_id: str) -> str:
+    if not name[:1].isdigit():
+        return name
 
-                    sub_class = caml(re.sub(r"_X", "_", error_id))
-                    sub_class = re.sub(r"^2", "Two", sub_class)
-                    sub_class = re.sub(r" ", "", sub_class)
+    word = _LEADING_DIGIT_WORDS.get(name[0])
 
-                    f_all.write("        \"{}\": \"{}\",\n".format(error_id, sub_class))
+    if word is None:
+        msg = f"{error_id} starts with a digit that no word is spelled out for: {name[0]}"
+        raise ValueError(msg)
 
-                    sub_classes.append((sub_class, error_id, error_message))
+    return word + name[1:]
 
-                with open("{}/template/class.txt".format(HOME), "r", encoding="utf-8") as f_class_template:
-                    class_template = f_class_template.read()
 
-                    with open("{}/template/sub_class.txt".format(HOME), "r", encoding="utf-8") as f_sub_class_template:
-                        sub_class_template = f_sub_class_template.read()
+def _value_name_of(*, error_id: str, message: str) -> str:
+    # The placeholder in a message is Telegram's own word for what the error carries, taken from
+    # the descriptions in the error list Telegram publishes, https://core.telegram.org/api/errors,
+    # in machine-readable form at https://core.telegram.org/api/errors.json, or from the schema's
+    # word for the same thing (`dc_id` is `auth.exportAuthorization.dc_id`), or from Telethon,
+    # which named a number of them first:
+    # https://github.com/LonamiWebs/Telethon/blob/v1.36.0/telethon_generator/data/errors.csv
+    #
+    # One placeholder per message, at most. `RPCError.raise_it()` reads a single number out of an
+    # error message and renders the message with it, so a second placeholder could never be filled
+    # in - `str.format()` would raise `KeyError` on the error nobody can catch.
+    placeholders = re.findall(r"\{(\w*)\}", message)
 
-                    class_template = class_template.format(
-                        notice=notice,
-                        super_class=super_class,
-                        code=code,
-                        docstring='"""{}"""'.format(name),
-                        sub_classes="".join([sub_class_template.format(
-                            sub_class=k[0],
-                            super_class=super_class,
-                            id="\"{}\"".format(k[1]),
-                            docstring='"""{}"""'.format(k[2])
-                        ) for k in sub_classes])
-                    )
+    if len(placeholders) > 1:
+        msg = f"{error_id} carries more than one placeholder: {message}"
+        raise ValueError(msg)
 
-                f_class.write(class_template)
+    if not placeholders:
+        return _PLAIN_VALUE_NAME
 
-            f_all.write("    },\n")
+    return placeholders[0]
 
-        f_all.write("}\n")
 
-    with open("{}/all.py".format(DEST), encoding="utf-8") as f:
-        content = f.read()
+def _name_errors(rows: list[_Row]) -> list[_Error]:
+    claimants: dict[str, list[_Row]] = {}
 
-    with open("{}/all.py".format(DEST), "w", encoding="utf-8") as f:
-        f.write(re.sub("{count}", str(count), content))
+    for row in rows:
+        claimants.setdefault(row.base_name, []).append(row)
+
+    for reserved_name in _RESERVED_CLASS_NAMES:
+        for row in claimants.pop(reserved_name, []):
+            claimants.setdefault(f"{reserved_name}{row.table.code}", []).append(row)
+
+    named: dict[_Row, _Error] = {}
+
+    for base_name, group in claimants.items():
+        group.sort(key=lambda claimant: (claimant.table.code, claimant.error_id))
+
+        primary = _Error(
+            row=group[0], class_name=base_name, bases=[group[0].table.super_class], primary=None
+        )
+
+        named[primary.row] = primary
+
+        for row in group[1:]:
+            named[row] = _subclass_of(primary, row=row)
+
+    class_names = [error.class_name for error in named.values()]
+
+    if len(class_names) != len(set(class_names)):
+        msg = "two errors compile to the same class name"
+        raise RuntimeError(msg)
+
+    return [named[row] for row in rows]
+
+
+def _subclass_of(primary: _Error, *, row: _Row) -> _Error:
+    if row.table.code != primary.table.code:
+        # The very same error under a second code. It keeps the name it shares, so that
+        # `except PeerIdInvalid` still catches every one of them, and takes the category of its own
+        # code as a second base, so that `except Forbidden` catches the 403 too.
+        return _Error(
+            row=row,
+            class_name=f"{primary.class_name}{row.table.code}",
+            bases=[primary.class_name, row.table.super_class],
+            primary=primary,
+        )
+
+    # Two ids under one code that only differ by the value they carry, such as `EMAIL_UNCONFIRMED`
+    # and `EMAIL_UNCONFIRMED_X`. The parameterised one is the one that gets marked, and subclasses
+    # the other so both are caught by the plain name.
+    return _Error(
+        row=row,
+        class_name=f"{primary.class_name}X",
+        bases=[primary.class_name],
+        primary=primary,
+    )
+
+
+def _by_table(errors: list[_Error]) -> dict[_Table, list[_Error]]:
+    grouped: dict[_Table, list[_Error]] = {}
+
+    for error in errors:
+        grouped.setdefault(error.table, []).append(error)
+
+    return grouped
+
+
+def _code_and_name_block(templates: _Templates, *, error: _Error) -> str:
+    # A sub class answers with the code and the category of the class it subclasses, and an error
+    # that arrived under a code of its own has to say so, or `except Forbidden` would miss the 403
+    # that shares its name with a 400.
+    if error.primary is None or error.primary.table.code == error.table.code:
+        return ""
+
+    return "\n" + templates.code_and_name.format(
+        code=error.table.code, name=error.table.title
+    ).rstrip("\n")
+
+
+def _value_block(templates: _Templates, *, error: _Error) -> str:
+    if error.row.value_name != _PLAIN_VALUE_NAME:
+        return "\n\n" + templates.value_property.format(value_name=error.row.value_name).rstrip(
+            "\n"
+        )
+
+    # An error that carries nothing inherits the name of a value it never has when the error it
+    # subclasses names one. `ALLOW_PAYMENT_REQUIRED` at 406 is the only one: the 403 it shares a
+    # name with is the parameterised `ALLOW_PAYMENT_REQUIRED_X`, which carries `{star_count}`.
+    if error.primary is not None and error.primary.row.value_name != _PLAIN_VALUE_NAME:
+        return "\n\n" + templates.value_name_reset.format(primary=error.primary.class_name).rstrip(
+            "\n"
+        )
+
+    return ""
+
+
+def _import_block(table: _Table, *, errors: list[_Error]) -> str:
+    imports: dict[str, set[str]] = {}
+
+    for error in errors:
+        if error.primary is not None and error.primary.table != table:
+            imports.setdefault(error.primary.table.module_name, set()).add(error.primary.class_name)
+
+    # An error only ever subclasses one of a lower code, and the modules are written in that order,
+    # so these imports run downwards and can never form a cycle.
+    return "".join(
+        [
+            "\nfrom .{} import (\n{}\n)".format(
+                module_name,
+                "".join([f"    {class_name},\n" for class_name in sorted(class_names)]).rstrip(
+                    "\n"
+                ),
+            )
+            for module_name, class_names in sorted(imports.items())
+        ]
+    )
+
+
+def _write_init(tables: list[_Table], *, notice: str) -> None:
+    imports = [f"from .{table.module_name} import *" for table in tables]
+
+    _write(_DEST / "__init__.py", lines=[notice, ""] + imports)
+
+
+def _write_all(tables: dict[_Table, list[_Error]], *, notice: str, count: int) -> None:
+    lines: list[str] = [notice, "", f"count = {count}", "", "exceptions = {"]
+
+    for table, errors in tables.items():
+        lines.append(f"    {table.code}: {{")
+        lines.append(f'        "_": "{table.super_class}",')
+        lines.extend([f'        "{error.row.error_id}": "{error.class_name}",' for error in errors])
+        lines.append("    },")
+
+    lines.append("}")
+
+    _write(_DEST / "all.py", lines=lines)
+
+
+def _write(path: Path, *, lines: list[str]) -> None:
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_module(
+    table: _Table, *, errors: list[_Error], notice: str, templates: _Templates
+) -> None:
+    sub_classes: list[str] = []
+    written: set[str] = set()
+
+    for error in errors:
+        primary = error.primary
+
+        if primary is not None and primary.table == table and primary.class_name not in written:
+            msg = f"{error.class_name} is written before the {primary.class_name} it subclasses"
+            raise RuntimeError(msg)
+
+        sub_class = templates.sub_class.format(
+            sub_class=error.class_name,
+            bases=", ".join(error.bases),
+            id=f'"{error.row.error_id}"',
+            docstring=f'"""{error.row.message}"""',
+            code_and_name=_code_and_name_block(templates, error=error),
+            value_property=_value_block(templates, error=error),
+        )
+
+        sub_classes.append(sub_class)
+        written.add(error.class_name)
+
+    module = templates.module.format(
+        notice=notice,
+        imports=_import_block(table, errors=errors),
+        super_class=table.super_class,
+        code=table.code,
+        docstring=f'"""{table.title}"""',
+        sub_classes="".join(sub_classes),
+    )
+
+    (_DEST / f"{table.module_name}.py").write_text(module, encoding="utf-8")
+
+
+def start() -> None:
+    shutil.rmtree(_DEST, ignore_errors=True)
+    _DEST.mkdir(parents=True)
+
+    notice = _read_notice()
+    templates = _read_templates()
+
+    # Every table is read before a single class is written. The name an error compiles to is not
+    # its own to take - 52 of them are claimed by more than one error - and which claimant keeps
+    # the plain name is only known once they all are.
+    rows: list[_Row] = []
+
+    for path in sorted((_HOME / "source").iterdir()):
+        rows.extend(_read_rows(_read_table(path)))
+
+    tables = _by_table(_name_errors(rows))
+
+    _write_init(list(tables), notice=notice)
+    _write_all(tables, notice=notice, count=len(rows))
+
+    for table, errors in tables.items():
+        _write_module(table, errors=errors, notice=notice, templates=templates)
 
 
 if "__main__" == __name__:
-    HOME = "."
-    DEST = "../../pyrogram/errors/exceptions"
-    NOTICE_PATH = "../../NOTICE"
-
     start()

@@ -16,9 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import raw
 
 
 class LoginUrl(Object):
@@ -26,6 +31,12 @@ class LoginUrl(Object):
 
     Serves as a great replacement for the Telegram Login Widget when the user is coming from Telegram.
     All the user needs to do is tap/click a button and confirm that they want to log in.
+
+    .. note::
+
+        A button received from Telegram carries neither *bot_username* nor
+        *request_write_access*: the incoming ``inlineButtonTypeUrlAuth`` constructor has no
+        field for either, so both are always ``None`` on a parsed button.
 
     Parameters:
         url (``str``):
@@ -49,7 +60,7 @@ class LoginUrl(Object):
             See `Linking your domain to the bot <https://core.telegram.org/widgets/login#linking-your-domain-to-the-bot>`_
             for more details.
 
-        request_write_access (``str``, *optional*):
+        request_write_access (``bool``, *optional*):
             Pass True to request the permission for your bot to send messages to the user.
 
         button_id (``int``):
@@ -57,12 +68,13 @@ class LoginUrl(Object):
     """
 
     def __init__(
-        self, *,
+        self,
+        *,
         url: str,
-        forward_text: str = None,
-        bot_username: str = None,
-        request_write_access: str = None,
-        button_id: int = None
+        forward_text: str | None = None,
+        bot_username: str | None = None,
+        request_write_access: bool | None = None,
+        button_id: int | None = None,
     ):
         super().__init__()
 
@@ -73,18 +85,5 @@ class LoginUrl(Object):
         self.button_id = button_id
 
     @staticmethod
-    def read(b: "raw.types.KeyboardButtonUrlAuth") -> "LoginUrl":
-        return LoginUrl(
-            url=b.url,
-            forward_text=b.fwd_text,
-            button_id=b.button_id
-        )
-
-    def write(self, text: str, bot: "raw.types.InputUser"):
-        return raw.types.InputKeyboardButtonUrlAuth(
-            text=text,
-            url=self.url,
-            bot=bot,
-            fwd_text=self.forward_text,
-            request_write_access=self.request_write_access
-        )
+    def read(b: raw.types.InlineButtonTypeUrlAuth) -> LoginUrl:
+        return LoginUrl(url=b.url, forward_text=b.fwd_text, button_id=b.button_id)

@@ -16,8 +16,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import random
-from typing import Dict, Optional
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -52,16 +53,17 @@ class GiveawayPrizeStars(Object):
         sticker (:obj:`~pyrogram.types.Sticker`):
             A sticker to be shown in the message.
     """
+
     def __init__(
         self,
         *,
         star_count: int,
         transaction_id: str,
-        boosted_chat: "types.Chat",
+        boosted_chat: types.Chat,
         giveaway_message_id: int,
-        giveaway_message: Optional["types.Message"] = None,
-        is_unclaimed: Optional[bool] = None,
-        sticker: Optional["types.Sticker"] = None
+        giveaway_message: types.Message | None = None,
+        is_unclaimed: bool | None = None,
+        sticker: types.Sticker | None = None,
     ):
         super().__init__()
 
@@ -75,14 +77,13 @@ class GiveawayPrizeStars(Object):
 
     @staticmethod
     async def _parse(
-        client: "pyrogram.Client",
-        action: "raw.types.MessageActionPrizeStars",
-        chats: Dict[int, "raw.base.Chat"],
-    ) -> "GiveawayPrizeStars":
+        client: pyrogram.Client,
+        action: raw.types.MessageActionPrizeStars,
+        chats: dict[int, raw.base.Chat],
+    ) -> GiveawayPrizeStars:
         raw_stickers = await client.invoke(
             raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetPremiumGifts(),
-                hash=0
+                stickerset=raw.types.InputStickerSetPremiumGifts(), hash=0
             )
         )
 
@@ -92,7 +93,7 @@ class GiveawayPrizeStars(Object):
             parsed_message = await client.get_messages(
                 chat_id=utils.get_peer_id(action.boost_peer),
                 message_ids=action.giveaway_msg_id,
-                replies=0
+                replies=0,
             )
         except (MessageIdsEmpty, ChannelPrivate):
             pass
@@ -100,20 +101,19 @@ class GiveawayPrizeStars(Object):
         return GiveawayPrizeStars(
             star_count=action.stars,
             transaction_id=action.transaction_id,
-            boosted_chat=types.Chat._parse_chat(client, chats.get(utils.get_raw_peer_id(action.boost_peer))),
-            giveaway_message_id=action.message_id,
+            boosted_chat=await types.Chat._parse_chat(
+                client, chats.get(utils.get_raw_peer_id(action.boost_peer))
+            ),
+            giveaway_message_id=action.giveaway_msg_id,
             giveaway_message=parsed_message,
             sticker=random.choice(
                 types.List(
                     [
                         await types.Sticker._parse(
-                            client,
-                            doc,
-                            {
-                                type(i): i for i in doc.attributes
-                            }
-                        ) for doc in raw_stickers.documents
+                            client, doc, {type(i): i for i in doc.attributes}
+                        )
+                        for doc in raw_stickers.documents
                     ]
                 )
-            )
+            ),
         )

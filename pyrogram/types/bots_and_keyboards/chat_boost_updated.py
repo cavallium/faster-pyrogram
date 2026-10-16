@@ -16,11 +16,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw, utils
-from pyrogram import types
+from pyrogram import raw, types, utils
+
 from ..object import Object
 from ..update import Update
 
@@ -37,11 +37,7 @@ class ChatBoostUpdated(Object, Update):
     """
 
     def __init__(
-        self,
-        *,
-        client: "pyrogram.Client" = None,
-        chat: "types.Chat",
-        boost: "types.ChatBoost"
+        self, *, client: pyrogram.Client | None = None, chat: types.Chat, boost: types.ChatBoost
     ):
         super().__init__(client)
 
@@ -49,14 +45,16 @@ class ChatBoostUpdated(Object, Update):
         self.boost = boost
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        update: "raw.types.UpdateBotChatBoost",
-        users: Dict[int, "raw.types.User"],
-        chats: Dict[int, "raw.types.Channel"],
-    ) -> "ChatBoostUpdated":
+    async def _parse(
+        client: pyrogram.Client,
+        update: raw.types.UpdateBotChatBoost,
+        users: dict[int, raw.types.User],
+        chats: dict[int, raw.types.Channel],
+    ) -> ChatBoostUpdated:
         return ChatBoostUpdated(
-            chat=types.Chat._parse_channel_chat(client, chats.get(utils.get_raw_peer_id(update.peer))),
-            boost=types.ChatBoost._parse(client, update.boost, users),
-            client=client
+            chat=await types.Chat._parse_channel_chat(
+                client, chats.get(utils.get_raw_peer_id(update.peer))
+            ),
+            boost=await types.ChatBoost._parse(client, update.boost, users),
+            client=client,
         )

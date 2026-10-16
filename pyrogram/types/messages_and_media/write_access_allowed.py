@@ -16,8 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrogram import raw
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
+
 from ..object import Object
+
+if TYPE_CHECKING:
+    from pyrogram import raw
 
 
 class WriteAccessAllowed(Object):
@@ -38,9 +44,9 @@ class WriteAccessAllowed(Object):
     def __init__(
         self,
         *,
-        from_request: bool = None,
-        web_app_name: str = None,
-        from_attachment_menu: bool = None,
+        from_request: bool | None = None,
+        web_app_name: str | None = None,
+        from_attachment_menu: bool | None = None,
     ):
         super().__init__()
 
@@ -49,7 +55,7 @@ class WriteAccessAllowed(Object):
         self.from_attachment_menu = from_attachment_menu
 
     @staticmethod
-    def _parse(action: "raw.types.MessageActionBotAllowed"):
+    def _parse(action: raw.types.MessageActionBotAllowed):
         return WriteAccessAllowed(
             from_request=getattr(action, "from_request", None),
             web_app_name=getattr(getattr(action, "app", None), "short_name", None),

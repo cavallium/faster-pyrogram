@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -25,8 +25,8 @@ from pyrogram import types
 
 class GetBoosts:
     async def get_boosts(
-        self: "pyrogram.Client",
-    ) -> bool:
+        self: pyrogram.Client,
+    ) -> list[types.MyBoost]:
         """Get your boosts list
 
         .. include:: /_includes/usable-by/users.rst
@@ -40,18 +40,19 @@ class GetBoosts:
                 # get boosts list
                 await app.get_boosts()
         """
-        r = await self.invoke(
-            raw.functions.premium.GetMyBoosts()
-        )
+        r = await self.invoke(raw.functions.premium.GetMyBoosts())
 
         users = {i.id: i for i in r.users}
         chats = {i.id: i for i in r.chats}
 
         return types.List(
-            types.MyBoost._parse(
-                self,
-                boost,
-                users,
-                chats,
-            ) for boost in r.my_boosts
+            [
+                await types.MyBoost._parse(
+                    self,
+                    boost,
+                    users,
+                    chats,
+                )
+                for boost in r.my_boosts
+            ]
         )

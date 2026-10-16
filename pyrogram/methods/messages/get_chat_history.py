@@ -16,59 +16,79 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Union, AsyncGenerator
+from __future__ import annotations as _annotations
+
+import logging
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import types, raw, utils
+from pyrogram import raw, types, utils
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+    from datetime import datetime, timedelta
+
+log = logging.getLogger(__name__)
 
 
 async def get_chunk(
+    client: pyrogram.Client,
+    chat_id: int | str,
     *,
-    client: "pyrogram.Client",
-    chat_id: Union[int, str],
     limit: int = 0,
     offset: int = 0,
-    from_message_id: int = 0,
-    from_date: datetime = utils.zero_datetime(),
-    min_id: int = 0,
-    max_id: int = 0,
-    reverse: bool = False
-):
-    from_message_id = from_message_id or (1 if reverse else 0)
+    offset_id: int = 0,
+    from_date: datetime | timedelta | None = None,
+    min_id: int = 0,  # Inclusive
+    max_id: int = 0,  # Inclusive
+    reverse: bool = False,
+) -> list[types.Message]:
+    from_date = from_date or utils.zero_datetime()
 
-    messages = await client.invoke(
+    # Telegram API requires `offset_id` as starting point, boundaries alone don't work
+    if (min_id or max_id) and not offset_id:
+        if max_id:
+            offset_id = max_id + 1
+        elif min_id:
+            offset_id = 0
+
+    if min_id and max_id and not offset_id:
+        offset_id = max_id + 1
+
+    history: raw.base.messages.Messages = await client.invoke(
         raw.functions.messages.GetHistory(
             peer=await client.resolve_peer(chat_id),
-            offset_id=from_message_id,
+            offset_id=offset_id,
             offset_date=utils.datetime_to_timestamp(from_date),
-            add_offset=offset * (-1 if reverse else 1) - (limit if reverse else 0),
+            add_offset=offset,
             limit=limit,
             max_id=max_id,
             min_id=min_id,
-            hash=0
+            hash=0,
         ),
-        sleep_threshold=60
+        sleep_threshold=60,
     )
 
-    messages = await utils.parse_messages(client, messages, replies=0)
+    messages = await utils.parse_messages(client, history, replies=0)
+
     if reverse:
         messages.reverse()
 
     return messages
 
+
 class GetChatHistory:
     async def get_chat_history(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         limit: int = 0,
         offset: int = 0,
-        offset_id: int = 0,
-        offset_date: datetime = utils.zero_datetime(),
+        offset_id: int | None = None,
+        offset_date: datetime | timedelta | None = None,
         min_id: int = 0,
         max_id: int = 0,
-        reverse: bool = False
-    ) -> AsyncGenerator["types.Message", None]:
+        reverse: bool = False,
+    ) -> AsyncGenerator[types.Message, None]:
         """Get messages from a chat history.
 
         The messages are returned in reverse chronological order.
@@ -86,20 +106,25 @@ class GetChatHistory:
                 By default, no limit is applied and all messages are returned.
 
             offset (``int``, *optional*):
-                Sequential number of the first message to be returned..
+                Sequential number of the first message to be returned.
                 Negative values are also accepted and become useful in case you set offset_id or offset_date.
 
             offset_id (``int``, *optional*):
                 Identifier of the first message to be returned.
+                This parameter is deprecated and should not be used.
+                Use `min_id` / `max_id` instead for proper filtering.
 
-            offset_date (:py:obj:`~datetime.datetime`, *optional*):
+            offset_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Pass a date as offset to retrieve only older messages starting from that date.
+                A :py:obj:`~datetime.timedelta` is counted from now.
 
             min_id (``int``, *optional*):
-                If a positive value was provided, the method will return only messages with IDs more than min_id.
+                If a positive value was provided, the method will return only messages
+                with IDs more than or equal to min_id (inclusive).
 
             max_id (``int``, *optional*):
-                If a positive value was provided, the method will return only messages with IDs less than max_id.
+                If a positive value was provided, the method will return only messages
+                with IDs less than or equal to max_id (inclusive).
 
             reverse (``bool``, *optional*):
                 Pass True to retrieve the messages from oldest to newest.
@@ -113,9 +138,24 @@ class GetChatHistory:
                 async for message in app.get_chat_history(chat_id):
                     print(message.text)
         """
-        current = 0
-        total = limit or (1 << 31) - 1
-        limit = min(100, total)
+        if offset_id is not None:
+            log.warning(
+                "`offset_id` is deprecated and will be removed in future updates. "
+                "Use `min_id` or `max_id` instead."
+            )
+
+        current: int = 0
+        total: int = limit or (1 << 31) - 1
+        limit: int = min(100, total)  # We can only retrieve up to 100 messages at a time
+
+        min_id = (min_id - 1) if min_id else 0  # Make `min_id` inclusive
+        max_id = (max_id + 1) if max_id else 0  # Make `max_id` inclusive
+
+        if reverse:
+            offset_id = min_id if min_id else 1
+            offset = offset - limit
+        else:
+            offset_id = max_id if max_id else 0
 
         while True:
             messages = await get_chunk(
@@ -123,20 +163,17 @@ class GetChatHistory:
                 chat_id=chat_id,
                 limit=limit,
                 offset=offset,
-                from_message_id=offset_id,
+                offset_id=offset_id,
                 from_date=offset_date,
                 max_id=max_id,
                 min_id=min_id,
-                reverse=reverse
+                reverse=reverse,
             )
 
             if not messages:
                 return
 
-            offset_id = messages[-1].id
-            if reverse:
-                offset_id += 1
-
+            offset_id = messages[-1].id + (1 if reverse else 0)
             for message in messages:
                 yield message
 

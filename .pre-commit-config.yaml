@@ -1,0 +1,22 @@
+# The rule set and the excludes live in `pyproject.toml`, and this hook runs `make lint`,
+#  the same recipe the `lint` job runs, so the two cannot drift apart.
+repos:
+  - repo: local
+    hooks:
+      - id: lint
+        name: ruff
+        entry: make lint
+        language: system
+        # `ruff` reads its own file list from the config, and the whole tree takes 0.03s,
+        #  so the hook checks everything rather than only what is staged.
+        pass_filenames: false
+        always_run: true
+
+      - id: typecheck
+        name: ty
+        # Needs the generated `pyrogram.raw.*` tree on disk, so run `make api` at least
+        #  once (and after any change under compiler/api/source) before committing.
+        entry: make typecheck
+        language: system
+        pass_filenames: false
+        always_run: true

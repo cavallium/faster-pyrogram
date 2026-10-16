@@ -16,13 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Optional, Dict, List
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, types, utils
+
 from ..object import Object
 from ..update import Update
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class MessageReactionUpdated(Object, Update):
@@ -58,14 +63,14 @@ class MessageReactionUpdated(Object, Update):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
-        chat: "types.Chat",
+        client: pyrogram.Client | None = None,
+        chat: types.Chat,
         message_id: int,
-        user: "types.User",
-        actor_chat: "types.Chat",
+        user: types.User,
+        actor_chat: types.Chat,
         date: datetime,
-        old_reaction: List["types.Reaction"],
-        new_reaction: List["types.Reaction"]
+        old_reaction: list[types.Reaction],
+        new_reaction: list[types.Reaction],
     ):
         super().__init__(client)
 
@@ -78,19 +83,19 @@ class MessageReactionUpdated(Object, Update):
         self.new_reaction = new_reaction
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        update: "raw.types.UpdateBotMessageReaction",
-        users: Dict[int, "raw.types.User"],
-        chats: Dict[int, "raw.types.Chat"]
-    ) -> "MessageReactionUpdated":
+    async def _parse(
+        client: pyrogram.Client,
+        update: raw.types.UpdateBotMessageReaction,
+        users: dict[int, raw.types.User],
+        chats: dict[int, raw.types.Chat],
+    ) -> MessageReactionUpdated:
         peer_id = utils.get_peer_id(update.peer)
         raw_peer_id = utils.get_raw_peer_id(update.peer)
 
         if peer_id > 0:
-            chat = types.Chat._parse_user_chat(client, users[raw_peer_id])
+            chat = await types.Chat._parse_user_chat(client, users[raw_peer_id])
         else:
-            chat = types.Chat._parse_chat(client, chats[raw_peer_id])
+            chat = await types.Chat._parse_chat(client, chats[raw_peer_id])
 
         user = None
         actor_chat = None
@@ -99,9 +104,9 @@ class MessageReactionUpdated(Object, Update):
         actor_peer_id = utils.get_peer_id(update.actor)
 
         if actor_peer_id > 0:
-            user = types.User._parse(client, users[raw_actor_peer_id])
+            user = await types.User._parse(client, users[raw_actor_peer_id])
         else:
-            actor_chat = types.Chat._parse_channel_chat(client, chats[raw_actor_peer_id])
+            actor_chat = await types.Chat._parse_channel_chat(client, chats[raw_actor_peer_id])
 
         return MessageReactionUpdated(
             client=client,
@@ -111,15 +116,9 @@ class MessageReactionUpdated(Object, Update):
             actor_chat=actor_chat,
             date=utils.timestamp_to_datetime(update.date),
             old_reaction=[
-                types.Reaction._parse(
-                    client,
-                    reaction
-                ) for reaction in update.old_reactions
+                types.Reaction._parse(client, reaction) for reaction in update.old_reactions
             ],
             new_reaction=[
-                types.Reaction._parse(
-                    client,
-                    reaction
-                ) for reaction in update.new_reactions
-            ]
+                types.Reaction._parse(client, reaction) for reaction in update.new_reactions
+            ],
         )

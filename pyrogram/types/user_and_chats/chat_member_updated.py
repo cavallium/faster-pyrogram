@@ -16,14 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Dict, Union
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw, utils
-from pyrogram import types
+from pyrogram import raw, types, utils
+
 from ..object import Object
 from ..update import Update
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class ChatMemberUpdated(Object, Update):
@@ -55,14 +59,14 @@ class ChatMemberUpdated(Object, Update):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
-        chat: "types.Chat",
-        from_user: "types.User",
+        client: pyrogram.Client | None = None,
+        chat: types.Chat,
+        from_user: types.User,
         date: datetime,
-        old_chat_member: "types.ChatMember",
-        new_chat_member: "types.ChatMember",
-        invite_link: "types.ChatInviteLink" = None,
-        via_join_request: bool = None
+        old_chat_member: types.ChatMember | None = None,
+        new_chat_member: types.ChatMember | None = None,
+        invite_link: types.ChatInviteLink | None = None,
+        via_join_request: bool | None = None,
     ):
         super().__init__(client)
 
@@ -75,13 +79,17 @@ class ChatMemberUpdated(Object, Update):
         self.via_join_request = via_join_request
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        update: Union["raw.types.UpdateChatParticipant", "raw.types.UpdateChannelParticipant"],
-        users: Dict[int, "raw.types.User"],
-        chats: Dict[int, "raw.types.Chat"]
-    ) -> "ChatMemberUpdated":
-        chat_id = getattr(update, "chat_id", None) or getattr(update, "channel_id")
+    async def _parse(
+        client: pyrogram.Client,
+        update: raw.types.UpdateChatParticipant | raw.types.UpdateChannelParticipant,
+        users: dict[int, raw.types.User],
+        chats: dict[int, raw.types.Chat],
+    ) -> ChatMemberUpdated:
+        chat_id = (
+            update.chat_id
+            if isinstance(update, raw.types.UpdateChatParticipant)
+            else update.channel_id
+        )
 
         old_chat_member = None
         new_chat_member = None
@@ -89,24 +97,28 @@ class ChatMemberUpdated(Object, Update):
         via_join_request = None
 
         if update.prev_participant:
-            old_chat_member = types.ChatMember._parse(client, update.prev_participant, users, chats)
+            old_chat_member = await types.ChatMember._parse(
+                client, update.prev_participant, users, chats
+            )
 
         if update.new_participant:
-            new_chat_member = types.ChatMember._parse(client, update.new_participant, users, chats)
+            new_chat_member = await types.ChatMember._parse(
+                client, update.new_participant, users, chats
+            )
 
         if update.invite:
-            invite_link = types.ChatInviteLink._parse(client, update.invite, users)
+            invite_link = await types.ChatInviteLink._parse(client, update.invite, users)
 
             if isinstance(update.invite, raw.types.ChatInvitePublicJoinRequests):
                 via_join_request = True
 
         return ChatMemberUpdated(
-            chat=types.Chat._parse_chat(client, chats[chat_id]),
-            from_user=types.User._parse(client, users[update.actor_id]),
+            chat=await types.Chat._parse_chat(client, chats[chat_id]),
+            from_user=await types.User._parse(client, users[update.actor_id]),
             date=utils.timestamp_to_datetime(update.date),
             old_chat_member=old_chat_member,
             new_chat_member=new_chat_member,
             invite_link=invite_link,
             via_join_request=via_join_request,
-            client=client
+            client=client,
         )

@@ -15,15 +15,17 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw, types
 
 
 class GetGiftUpgradePreview:
     async def get_gift_upgrade_preview(
-        self: "pyrogram.Client",
-        gift_id: int
-    ) -> "types.GiftUpgradePreview":
+        self: pyrogram.Client, gift_id: int
+    ) -> types.GiftUpgradePreview:
         """Return examples of possible upgraded gifts for a regular gift.
 
         .. include:: /_includes/usable-by/users.rst
@@ -39,12 +41,8 @@ class GetGiftUpgradePreview:
             .. code-block:: python
 
                 # Get information about upgraded gift preview
-                await client.get_gift_upgrade_preview("https://t.me/nft/SignetRing-903")
+                await client.get_gift_upgrade_preview(5936085638515261992)
         """
-        r = await self.invoke(
-            raw.functions.payments.GetStarGiftUpgradePreview(
-                gift_id=gift_id
-            )
-        )
+        r = await self.invoke(raw.functions.payments.GetStarGiftUpgradePreview(gift_id=gift_id))
 
         return await types.GiftUpgradePreview._parse(self, r)

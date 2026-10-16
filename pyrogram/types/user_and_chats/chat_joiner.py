@@ -16,12 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Dict
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, types, utils
+
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class ChatJoiner(Object):
@@ -47,12 +52,12 @@ class ChatJoiner(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client",
-        user: "types.User",
-        date: datetime = None,
-        bio: str = None,
-        pending: bool = None,
-        approved_by: "types.User" = None,
+        client: pyrogram.Client,
+        user: types.User,
+        date: datetime | None = None,
+        bio: str | None = None,
+        pending: bool | None = None,
+        approved_by: types.User | None = None,
     ):
         super().__init__(client)
 
@@ -63,20 +68,20 @@ class ChatJoiner(Object):
         self.approved_by = approved_by
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        joiner: "raw.base.ChatInviteImporter",
-        users: Dict[int, "raw.base.User"],
-    ) -> "ChatJoiner":
+    async def _parse(
+        client: pyrogram.Client,
+        joiner: raw.base.ChatInviteImporter,
+        users: dict[int, raw.base.User],
+    ) -> ChatJoiner:
         return ChatJoiner(
-            user=types.User._parse(client, users[joiner.user_id]),
+            user=await types.User._parse(client, users[joiner.user_id]),
             date=utils.timestamp_to_datetime(joiner.date),
             pending=joiner.requested,
             bio=joiner.about,
             approved_by=(
-                types.User._parse(client, users[joiner.approved_by])
+                await types.User._parse(client, users[joiner.approved_by])
                 if joiner.approved_by
                 else None
             ),
-            client=client
+            client=client,
         )

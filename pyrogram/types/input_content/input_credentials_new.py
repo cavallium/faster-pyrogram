@@ -16,6 +16,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 
@@ -33,6 +35,7 @@ class InputCredentialsNew(InputCredentials):
             True, if the credential identifier can be saved on the server side.
             Defaults to False.
     """
+
     def __init__(
         self,
         data: str,
@@ -43,8 +46,7 @@ class InputCredentialsNew(InputCredentials):
         self.data = data
         self.allow_save = allow_save
 
-    async def write(self, client: "pyrogram.Client"):
+    async def write(self, client: pyrogram.Client):
         return raw.types.InputPaymentCredentials(
-            data=raw.types.DataJSON(data=self.data),
-            save=self.allow_save
+            data=raw.types.DataJSON(data=self.data), save=self.allow_save
         )

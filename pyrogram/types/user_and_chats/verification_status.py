@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
 from pyrogram import raw
 
@@ -36,17 +36,17 @@ class VerificationStatus(Object):
         is_fake (``bool``, *optional*):
             True, if this user has been flagged for impersonation.
 
-        bot_verification_icon_custom_emoji_id (``int``, *optional*):
+        bot_verification_icon_custom_emoji_id (``str``, *optional*):
             Contains information about verification status of a user.
     """
 
     def __init__(
         self,
         *,
-        is_verified: Optional[bool] = None,
-        is_scam: Optional[bool] = None,
-        is_fake: Optional[bool] = None,
-        bot_verification_icon_custom_emoji_id: Optional[int] = None,
+        is_verified: bool | None = None,
+        is_scam: bool | None = None,
+        is_fake: bool | None = None,
+        bot_verification_icon_custom_emoji_id: str | None = None,
     ):
         super().__init__()
 
@@ -56,14 +56,16 @@ class VerificationStatus(Object):
         self.bot_verification_icon_custom_emoji_id = bot_verification_icon_custom_emoji_id
 
     @staticmethod
-    def _parse(chat: Union["raw.base.User", "raw.base.Chat", "raw.base.ChatInvite"]) -> Optional["VerificationStatus"]:
+    def _parse(
+        chat: raw.base.User | raw.base.Chat | raw.base.ChatInvite,
+    ) -> VerificationStatus | None:
         if not isinstance(chat, (raw.types.User, raw.types.Channel, raw.types.ChatInvite)):
             return None
 
         bot_verification_icon = None
 
         if isinstance(chat, raw.types.ChatInvite):
-            bot_verification_icon = chat.bot_verification.icon
+            bot_verification_icon = getattr(chat.bot_verification, "icon", None)
         else:
             bot_verification_icon = chat.bot_verification_icon
 
@@ -71,5 +73,7 @@ class VerificationStatus(Object):
             is_verified=chat.verified,
             is_scam=chat.scam,
             is_fake=chat.fake,
-            bot_verification_icon_custom_emoji_id=bot_verification_icon
+            bot_verification_icon_custom_emoji_id=str(bot_verification_icon)
+            if bot_verification_icon
+            else None,
         )

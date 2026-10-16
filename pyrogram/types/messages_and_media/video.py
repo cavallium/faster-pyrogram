@@ -16,8 +16,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 from datetime import datetime
-from typing import List, Optional
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -79,26 +80,27 @@ class Video(Object):
         alternative_videos (List of :obj:`~pyrogram.types.Video`, *optional*):
             Alternative qualities of the video in MPEG4 format, encoded with H.264 codec.
     """
+
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         file_id: str,
         file_unique_id: str,
         width: int,
         height: int,
         codec: str,
         duration: int,
-        file_name: Optional[str] = None,
-        mime_type: Optional[str] = None,
-        file_size: Optional[int] = None,
-        supports_streaming: Optional[bool] = None,
-        ttl_seconds: Optional[int] = None,
-        date: Optional[datetime] = None,
-        thumbs: Optional[List["types.Thumbnail"]] = None,
-        video_cover: Optional["types.Photo"] = None,
-        video_start_timestamp: Optional[int] = None,
-        alternative_videos: Optional[List["types.Video"]] = []
+        file_name: str | None = None,
+        mime_type: str | None = None,
+        file_size: int | None = None,
+        supports_streaming: bool | None = None,
+        ttl_seconds: int | None = None,
+        date: datetime | None = None,
+        thumbs: list[types.Thumbnail] | None = None,
+        video_cover: types.Photo | None = None,
+        video_start_timestamp: int | None = None,
+        alternative_videos: list[types.Video] | None = None,
     ):
         super().__init__(client)
 
@@ -122,14 +124,16 @@ class Video(Object):
     @staticmethod
     def _parse(
         client,
-        video: "raw.types.Document",
-        video_attributes: "raw.types.DocumentAttributeVideo",
-        file_name: str = None,
-        ttl_seconds: int = None,
-        video_cover = None,
-        video_start_timestamp: int = None,
-        alternative_videos: List["raw.types.Document"] = []
-    ) -> "Video":
+        video: raw.types.Document,
+        video_attributes: raw.types.DocumentAttributeVideo,
+        file_name: str | None = None,
+        ttl_seconds: int | None = None,
+        video_cover=None,
+        video_start_timestamp: int | None = None,
+        alternative_videos: list[raw.types.Document] | None = None,
+    ) -> Video:
+        alternative_videos = alternative_videos or []
+
         _alt_videos = types.List()
 
         for alt_doc in alternative_videos:
@@ -150,11 +154,10 @@ class Video(Object):
                 dc_id=video.dc_id,
                 media_id=video.id,
                 access_hash=video.access_hash,
-                file_reference=video.file_reference
+                file_reference=video.file_reference,
             ).encode(),
             file_unique_id=FileUniqueId(
-                file_unique_type=FileUniqueType.DOCUMENT,
-                media_id=video.id
+                file_unique_type=FileUniqueType.DOCUMENT, media_id=video.id
             ).encode(),
             width=getattr(video_attributes, "w", None),
             height=getattr(video_attributes, "h", None),
@@ -170,5 +173,5 @@ class Video(Object):
             video_cover=types.Photo._parse(client, video_cover),
             video_start_timestamp=video_start_timestamp,
             alternative_videos=_alt_videos or None,
-            client=client
+            client=client,
         )

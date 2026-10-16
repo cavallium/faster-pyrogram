@@ -16,13 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Dict, List, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, types, utils
 
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class ChecklistTask(Object):
@@ -39,8 +43,8 @@ class ChecklistTask(Object):
             Entities in the text of the task.
             May contain only Bold, Italic, Underline, Strikethrough, Spoiler, CustomEmoji, Url, EmailAddress, Mention, Hashtag, Cashtag and PhoneNumber entities.
 
-        completed_by_user (:obj:`~pyrogram.types.User`, *optional*):
-            The user that completed the task.
+        completed_by (:obj:`~pyrogram.types.Chat`, *optional*):
+            The user or chat that completed the task.
             None if the task isn't completed.
 
         completion_date (:py:obj:`~datetime.datetime`, *optional*):
@@ -53,36 +57,36 @@ class ChecklistTask(Object):
         *,
         id: int,
         text: str,
-        entities: Optional[List["types.MessageEntity"]] = None,
-        completed_by_user: Optional["types.User"] = None,
-        completion_date: Optional[datetime] = None,
+        entities: list[types.MessageEntity] | None = None,
+        completed_by: types.Chat | None = None,
+        completion_date: datetime | None = None,
     ):
         super().__init__()
 
         self.id = id
         self.text = text
         self.entities = entities
-        self.completed_by_user = completed_by_user
+        self.completed_by = completed_by
         self.completion_date = completion_date
 
     @staticmethod
-    def _parse(
-        client: "pyrogram.Client",
-        item: "raw.types.TodoItem",
-        completion: "raw.types.TodoCompletion",
-        users: Dict[int, "raw.base.User"],
-    ) -> "ChecklistTask":
-        raw.types.TodoItem
-        raw.types.TodoCompletion
+    async def _parse(
+        client: pyrogram.Client,
+        item: raw.types.TodoItem,
+        completion: raw.types.TodoCompletion | None,
+        users: dict[int, raw.base.User],
+        chats: dict[int, raw.base.Chat],
+    ) -> ChecklistTask:
+        text, entities = (await utils.parse_text_with_entities(client, item.title, users)).values()
 
-        text, entities = (
-            utils.parse_text_with_entities(client, item.title, users)
-        ).values()
+        completed_by_peer_id = utils.get_raw_peer_id(getattr(completion, "completed_by", None))
 
         return ChecklistTask(
             id=item.id,
             text=text,
             entities=entities,
-            completed_by_user=types.User._parse(client, users.get(getattr(completion, "completed_by", None))),
-            completion_date=utils.timestamp_to_datetime(getattr(completion, "date", None))
+            completed_by=await types.Chat._parse_chat(
+                client, users.get(completed_by_peer_id) or chats.get(completed_by_peer_id)
+            ),
+            completion_date=utils.timestamp_to_datetime(getattr(completion, "date", None)),
         )

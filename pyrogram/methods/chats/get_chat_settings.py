@@ -16,17 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw, types
+from pyrogram import raw, types, utils
 
 
 class GetChatSettings:
-    async def get_chat_settings(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str]
-    ) -> "types.ChatSettings":
+    async def get_chat_settings(self: pyrogram.Client, chat_id: int | str) -> types.ChatSettings:
         """Get information about a chat settings.
 
         .. include:: /_includes/usable-by/users.rst
@@ -50,12 +47,9 @@ class GetChatSettings:
                 print(settings)
         """
         r = await self.invoke(
-            raw.functions.messages.GetPeerSettings(
-                peer=await self.resolve_peer(chat_id)
-            )
+            raw.functions.messages.GetPeerSettings(peer=await self.resolve_peer(chat_id))
         )
 
         users = {i.id: i for i in r.users}
-        chats = {i.id: i for i in r.chats}
 
-        return types.ChatSettings._parse(self, r.settings, users)
+        return utils.require_parsed(await types.ChatSettings._parse(self, r.settings, users))

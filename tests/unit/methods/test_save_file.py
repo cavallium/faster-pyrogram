@@ -1,0 +1,192 @@
+#  Pyrogram - Telegram MTProto API Client Library for Python
+#  Copyright (C) 2017-present Dan <https://github.com/delivrance>
+#
+#  This file is part of Pyrogram.
+#
+#  Pyrogram is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Lesser General Public License as published
+#  by the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  Pyrogram is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Lesser General Public License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import annotations as _annotations
+
+import asyncio
+from typing import TYPE_CHECKING, Final, cast
+
+import pytest
+
+import pyrogram
+from pyrogram import StopTransmission, raw, types
+from pyrogram.methods.advanced.save_file import SaveFile
+
+if TYPE_CHECKING:
+    from concurrent.futures import Executor
+    from pathlib import Path
+
+_PART_SIZE: Final[int] = 512 * 1024
+
+# `rnd_id()` below answers with this too, so a re-upload addresses the same file as the
+#  upload that produced it.
+_FILE_ID: Final[int] = 1234567890
+
+
+class Storage:
+    async def dc_id(self) -> int:
+        return 2
+
+
+class Media:
+    """A media session that records the parts it was asked to save."""
+
+    def __init__(self, rejects_part: int | None = None) -> None:
+        self.rejects_part = rejects_part
+        self.saved_parts: list[int] = []
+
+    async def invoke(
+        self,
+        query: raw.functions.upload.SaveFilePart | raw.functions.upload.SaveBigFilePart,
+    ) -> None:
+        if query.file_part == self.rejects_part:
+            raise ConnectionError("the server closed the connection")
+
+        self.saved_parts.append(query.file_part)
+
+
+class Uploader(SaveFile):
+    def __init__(self, media: Media) -> None:
+        self.media = media
+        self.me: types.User | None = None
+        self.storage = Storage()
+        self.executor: Executor | None = None
+        self.save_file_semaphore = asyncio.Semaphore(1)
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        return asyncio.get_event_loop()
+
+    def rnd_id(self) -> int:
+        return _FILE_ID
+
+    async def get_session(self, dc_id: int, *, is_media: bool = False) -> Media:
+        return self.media
+
+
+def uploader(media: Media) -> pyrogram.Client:
+    # `Uploader` subclasses only the mixin, and the `save_file` overloads pin
+    #  `self: pyrogram.Client`.
+    return cast("pyrogram.Client", Uploader(media))
+
+
+@pytest.fixture
+def three_parts(tmp_path: Path) -> str:
+    path = tmp_path / "upload.bin"
+    path.write_bytes(b"x" * (2 * _PART_SIZE + 1))
+
+    return str(path)
+
+
+@pytest.mark.asyncio
+async def test_a_finished_upload_describes_every_part(three_parts: str) -> None:
+    media = Media()
+
+    file = await uploader(media).save_file(three_parts)
+
+    assert isinstance(file, raw.types.InputFile)
+    assert file.parts == 3
+    assert media.saved_parts == [0, 1, 2]
+
+
+@pytest.mark.asyncio
+async def test_a_part_the_server_refused_reaches_the_caller(three_parts: str) -> None:
+    # The failure used to be logged inside the worker and nowhere else: `save_file()` handed back
+    #  an `InputFile` for a file the server never received in full, and the send that followed
+    #  failed with an unrelated error (much later still, for a caller that stored the id).
+    media = Media(rejects_part=1)
+
+    with pytest.raises(ConnectionError):
+        await uploader(media).save_file(three_parts)
+
+
+@pytest.mark.asyncio
+async def test_the_parts_around_the_refused_one_are_still_sent(three_parts: str) -> None:
+    media = Media(rejects_part=1)
+
+    with pytest.raises(ConnectionError):
+        await uploader(media).save_file(three_parts)
+
+    # The upload is not aborted mid-way: a worker that stops consuming leaves the producer
+    #  blocked on a queue of size one, so every part is offered and only the answer is remembered.
+    assert media.saved_parts == [0, 2]
+
+
+@pytest.mark.asyncio
+async def test_re_uploading_one_missing_part_answers_with_nothing(three_parts: str) -> None:
+    media = Media()
+
+    file = await uploader(media).save_file(
+        three_parts,
+        file_id=_FILE_ID,
+        file_part=1,
+    )
+
+    assert file is None
+    assert media.saved_parts == [1]
+
+
+@pytest.mark.asyncio
+async def test_a_missing_part_the_server_refused_reaches_the_caller_too(three_parts: str) -> None:
+    media = Media(rejects_part=1)
+
+    with pytest.raises(ConnectionError):
+        await uploader(media).save_file(
+            three_parts,
+            file_id=_FILE_ID,
+            file_part=1,
+        )
+
+
+@pytest.mark.asyncio
+async def test_no_path_is_not_an_upload_at_all() -> None:
+    assert await uploader(Media()).save_file(None) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "asynchronous",
+    [
+        pytest.param(True, id="async-callback"),
+        pytest.param(False, id="sync-callback-via-executor"),
+    ],
+)
+async def test_stop_transmission_from_a_progress_callback_ends_the_upload(
+    three_parts: str,
+    *,
+    asynchronous: bool,
+) -> None:
+    media = Media()
+    calls: list[int] = []
+
+    def cancel_on_second_part(current: int, total: int) -> None:
+        calls.append(current)
+
+        if len(calls) == 2:
+            raise StopTransmission
+
+    async def asynchronous_cancel(current: int, total: int) -> None:
+        cancel_on_second_part(current, total)
+
+    progress = asynchronous_cancel if asynchronous else cancel_on_second_part
+
+    with pytest.raises(StopTransmission):
+        await uploader(media).save_file(three_parts, progress=progress)
+
+    # The abort lands between parts: the two already produced were sent, the third never was.
+    assert media.saved_parts == [0, 1]

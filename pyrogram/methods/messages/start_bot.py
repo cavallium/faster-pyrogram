@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -25,10 +25,8 @@ from pyrogram import types
 
 class StartBot:
     async def start_bot(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        param: str = ""
-    ) -> "types.Message":
+        self: pyrogram.Client, chat_id: int | str, param: str = ""
+    ) -> types.Message | None:
         """Start bot
 
         .. include:: /_includes/usable-by/users.rst
@@ -38,12 +36,13 @@ class StartBot:
                 Unique identifier of the bot you want to be started. You can specify
                 a @username (str) or a bot ID (int).
 
-            param (``str``):
+            param (``str``, *optional*):
                 Text of the deep linking parameter (up to 64 characters).
                 Defaults to "" (empty string).
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise, in case the
+            server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -61,17 +60,12 @@ class StartBot:
 
         r = await self.invoke(
             raw.functions.messages.StartBot(
-                bot=peer,
-                peer=peer,
-                random_id=self.rnd_id(),
-                start_param=param
+                bot=peer, peer=peer, random_id=self.rnd_id(), start_param=param
             )
         )
 
         for i in r.updates:
             if isinstance(i, raw.types.UpdateNewMessage):
                 return await types.Message._parse(
-                    self, i.message,
-                    {i.id: i for i in r.users},
-                    {i.id: i for i in r.chats}
+                    self, i.message, {i.id: i for i in r.users}, {i.id: i for i in r.chats}
                 )

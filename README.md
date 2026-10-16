@@ -14,10 +14,14 @@ faster-pyrogram is not polished or documented for anyone else's use. We don't ha
 
 ### CHANGES STILL TO BE MERGED IN THE UPSTREAM
 - Lock-free and asynchronous implementation of the sqlite session.
-- The possibility of turning off journaling and vacuum when starting a session.
+- SQLite sessions use WAL by default; a custom `SQLiteStorage(use_wal=False, ...)` can select rollback journaling.
 - The possibility of turning off the fetch of pinned message on arrival of the service message.
 - Improved implementation of rle_encode.
 - Implementation of _parse_channel_chat without getattr.
-- Cache of FileId and UniqueFileId instances and of their string-coded versions.
+- Per-instance caching of encoded FileId and FileUniqueId values.
 - Use of tcp abridged instead of tcp obfuscated as the default protocol.
-- The possibility of turning off the fetch of set_name on arrival of a new sticker.
+- Sticker-set name fetching is disabled by default; enable it with `fetch_stickers=True`.
+
+## Upstream
+
+Synchronized with [Kurigram](https://github.com/KurimuzonAkuma/pyrogram) main at `d4d069817a51bf8543b5083e525dd83acfca20da` (2026-10-14). Python 3.10 or newer is required.

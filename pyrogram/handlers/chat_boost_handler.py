@@ -16,12 +16,23 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable
+from __future__ import annotations as _annotations
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+from pyrogram import types
 
 from .handler import Handler
 
+if TYPE_CHECKING:
+    import pyrogram
+    from pyrogram.filters import Filter
 
-class ChatBoostHandler(Handler):
+ChatBoostCallbackType = Callable[["pyrogram.Client", types.ChatBoostUpdated], Any]
+
+
+class ChatBoostHandler(Handler[ChatBoostCallbackType]):
     """The ChatBoost handler class. Used to handle applied chat boosts.
     It is intended to be used with :meth:`~pyrogram.Client.add_handler`
 
@@ -33,7 +44,7 @@ class ChatBoostHandler(Handler):
             Pass a function that will be called when a new boost applied. It takes *(client, boost)*
             as positional arguments (look at the section below for a detailed description).
 
-        filters (:obj:`Filters`):
+        filters (:obj:`~pyrogram.filters.Filter`):
             Pass one or more filters to allow only a subset of updates to be passed
             in your callback function.
 
@@ -41,9 +52,9 @@ class ChatBoostHandler(Handler):
         client (:obj:`~pyrogram.Client`):
             The Client itself, useful when you want to call other API methods inside the handler.
 
-        boost (:obj:`~pyrogram.types.ChatBoost`):
+        boost (:obj:`~pyrogram.types.ChatBoostUpdated`):
             The applied chat boost.
     """
 
-    def __init__(self, callback: Callable, filters=None):
+    def __init__(self, callback: ChatBoostCallbackType, filters: Filter | None = None) -> None:
         super().__init__(callback, filters)

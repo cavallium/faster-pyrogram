@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union, Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, enums
@@ -24,12 +24,12 @@ from pyrogram import raw, enums
 
 class SearchMessagesCount:
     async def search_messages_count(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        query: Optional[str] = "",
-        filter: Optional["enums.MessagesFilter"] = enums.MessagesFilter.EMPTY,
-        from_user: Optional[Union[int, str]] = None,
-        message_thread_id: Optional[int] = None
+        self: pyrogram.Client,
+        chat_id: int | str,
+        query: str = "",
+        filter: enums.MessagesFilter = enums.MessagesFilter.EMPTY,
+        from_user: int | str | None = None,
+        message_thread_id: int | None = None,
     ) -> int:
         """Get the count of messages resulting from a search inside a chat.
 
@@ -62,29 +62,38 @@ class SearchMessagesCount:
         Returns:
             ``int``: On success, the messages count is returned.
         """
-        r = await self.invoke(
-            raw.functions.messages.Search(
-                peer=await self.resolve_peer(chat_id),
-                q=query,
-                filter=filter.value(),
-                min_date=0,
-                max_date=0,
-                offset_id=0,
-                add_offset=0,
-                limit=1,
-                min_id=0,
-                max_id=0,
-                from_id=(
-                    await self.resolve_peer(from_user)
-                    if from_user
-                    else None
-                ),
-                top_msg_id=message_thread_id,
-                hash=0
-            )
-        )
+        peer = await self.resolve_peer(chat_id)
+        from_id = await self.resolve_peer(from_user) if from_user else None
 
-        if hasattr(r, "count"):
-            return r.count
-        else:
-            return len(r.messages)
+        # https://t.me/tdlibchat/189410
+        ranges = await self.get_message_split_ranges()
+        total = 0
+
+        for split_range in ranges:
+            result = await self.invoke(
+                raw.functions.InvokeWithMessagesRange(
+                    range=split_range,
+                    query=raw.functions.messages.Search(
+                        peer=peer,
+                        q=query,
+                        filter=filter.value(),
+                        min_date=0,
+                        max_date=0,
+                        offset_id=0,
+                        add_offset=0,
+                        limit=1,
+                        min_id=0,
+                        max_id=0,
+                        from_id=from_id,
+                        top_msg_id=message_thread_id,
+                        hash=0,
+                    ),
+                )
+            )
+            # `messages.Messages` is the one constructor of the base type without a `count`.
+            if isinstance(result, raw.types.messages.Messages):
+                total += len(result.messages)
+            else:
+                total += result.count
+
+        return total

@@ -16,16 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 
 
 class UpdateBirthday:
     async def update_birthday(
-        self: "pyrogram.Client",
-        day: int = None,
-        month: int = None,
-        year: int = None
+        self: pyrogram.Client,
+        day: int | None = None,
+        month: int | None = None,
+        year: int | None = None,
     ) -> bool:
         """Update birthday in your profile.
 
@@ -58,10 +60,4 @@ class UpdateBirthday:
         if all((day, month)):
             birthday = raw.types.Birthday(day=day, month=month, year=year)
 
-        return bool(
-            await self.invoke(
-                raw.functions.account.UpdateBirthday(
-                    birthday=birthday
-                )
-            )
-        )
+        return bool(await self.invoke(raw.functions.account.UpdateBirthday(birthday=birthday)))

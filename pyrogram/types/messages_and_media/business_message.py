@@ -16,11 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Optional, Union, List
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from pyrogram import types, enums, raw, utils
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class BusinessMessage(Object):
@@ -59,15 +63,14 @@ class BusinessMessage(Object):
         self,
         *,
         shortcut_id: int,
-        is_greeting: bool = None,
-        is_away: bool = None,
-        no_activity_days: int = None,
-        offline_only: bool = None,
-        recipients: List["types.User"] = None,
-        schedule: "enums.BusinessSchedule" = None,
-        start_date: datetime = None,
-        end_date: datetime = None,
-
+        is_greeting: bool | None = None,
+        is_away: bool | None = None,
+        no_activity_days: int | None = None,
+        offline_only: bool | None = None,
+        recipients: list[types.User] | None = None,
+        schedule: enums.BusinessSchedule | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ):
         self.shortcut_id = shortcut_id
         self.is_greeting = is_greeting
@@ -80,11 +83,11 @@ class BusinessMessage(Object):
         self.end_date = end_date
 
     @staticmethod
-    def _parse(
+    async def _parse(
         client,
-        message: Union["raw.types.BusinessGreetingMessage", "raw.types.BusinessAwayMessage"] = None,
-        users: dict = None
-    ) -> Optional["BusinessMessage"]:
+        message: raw.types.BusinessGreetingMessage | raw.types.BusinessAwayMessage | None = None,
+        users: dict | None = None,
+    ) -> BusinessMessage | None:
         if not message:
             return None
 
@@ -99,8 +102,12 @@ class BusinessMessage(Object):
             is_away=isinstance(message, raw.types.BusinessAwayMessage),
             no_activity_days=getattr(message, "no_activity_days", None),
             offline_only=getattr(message, "offline_only", None),
-            recipients=types.BusinessRecipients._parse(client, message.recipients, users),
+            recipients=await types.BusinessRecipients._parse(client, message.recipients, users),
             schedule=schedule,
-            start_date=utils.timestamp_to_datetime(message.schedule.start_date) if schedule == enums.BusinessSchedule.CUSTOM else None,
-            end_date=utils.timestamp_to_datetime(message.schedule.end_date) if schedule == enums.BusinessSchedule.CUSTOM else None
+            start_date=utils.timestamp_to_datetime(message.schedule.start_date)
+            if schedule == enums.BusinessSchedule.CUSTOM
+            else None,
+            end_date=utils.timestamp_to_datetime(message.schedule.end_date)
+            if schedule == enums.BusinessSchedule.CUSTOM
+            else None,
         )

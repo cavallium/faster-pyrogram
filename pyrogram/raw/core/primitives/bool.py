@@ -16,10 +16,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from io import BytesIO
-from typing import Any
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING, Any
 
 from ..tl_object import TLObject
+
+if TYPE_CHECKING:
+    from io import BytesIO
 
 
 class BoolFalse(bytes, TLObject):
@@ -30,7 +34,7 @@ class BoolFalse(bytes, TLObject):
     def read(cls, *args: Any) -> bool:
         return cls.value
 
-    def __new__(cls) -> bytes:  # type: ignore
+    def __new__(cls) -> bytes:
         return cls.ID.to_bytes(4, "little")
 
 
@@ -44,5 +48,5 @@ class Bool(bytes, TLObject):
     def read(cls, data: BytesIO, *args: Any) -> bool:
         return int.from_bytes(data.read(4), "little") == BoolTrue.ID
 
-    def __new__(cls, value: bool) -> bytes:  # type: ignore
+    def __new__(cls, value: bool) -> bytes:
         return BoolTrue() if value else BoolFalse()

@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict, Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
@@ -115,33 +115,33 @@ class ExternalReplyInfo(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
-        origin: "types.MessageOrigin" = None,
-        chat: "types.Chat" = None,
+        client: pyrogram.Client | None = None,
+        origin: types.MessageOrigin | None = None,
+        chat: types.Chat | None = None,
         message_id: int,
-        link_preview_options: Optional["types.LinkPreviewOptions"] = None,
-        media: Optional["enums.MessageMediaType"] = None,
-        animation: Optional["types.Animation"] = None,
-        audio: Optional["types.Audio"] = None,
-        document: Optional["types.Document"] = None,
-        paid_media: Optional["types.PaidMediaInfo"] = None,
-        photo: Optional["types.Photo"] = None,
-        sticker: Optional["types.Sticker"] = None,
-        story: Optional["types.Story"] = None,
-        video: Optional["types.Video"] = None,
-        video_note: Optional["types.VideoNote"] = None,
-        voice: Optional["types.Voice"] = None,
-        has_media_spoiler: Optional[bool] = None,
-        checklist: Optional["types.Checklist"] = None,
-        contact: Optional["types.Contact"] = None,
-        dice: Optional["types.Dice"] = None,
-        game: Optional["types.Game"] = None,
-        giveaway: Optional["types.Giveaway"] = None,
-        giveaway_winners: Optional["types.GiveawayWinners"] = None,
-        invoice: Optional["types.Invoice"] = None,
-        location: Optional["types.Location"] = None,
-        poll: Optional["types.Poll"] = None,
-        venue: Optional["types.Venue"] = None,
+        link_preview_options: types.LinkPreviewOptions | None = None,
+        media: enums.MessageMediaType | None = None,
+        animation: types.Animation | None = None,
+        audio: types.Audio | None = None,
+        document: types.Document | None = None,
+        paid_media: types.PaidMediaInfo | None = None,
+        photo: types.Photo | None = None,
+        sticker: types.Sticker | None = None,
+        story: types.Story | None = None,
+        video: types.Video | None = None,
+        video_note: types.VideoNote | None = None,
+        voice: types.Voice | None = None,
+        has_media_spoiler: bool | None = None,
+        checklist: types.Checklist | None = None,
+        contact: types.Contact | None = None,
+        dice: types.Dice | None = None,
+        game: types.Game | None = None,
+        giveaway: types.Giveaway | None = None,
+        giveaway_winners: types.GiveawayWinners | None = None,
+        invoice: types.Invoice | None = None,
+        location: types.Location | None = None,
+        poll: types.Poll | None = None,
+        venue: types.Venue | None = None,
     ):
         super().__init__(client)
 
@@ -175,10 +175,10 @@ class ExternalReplyInfo(Object):
     @staticmethod
     async def _parse(
         client,
-        reply: "raw.types.MessageReplyHeader",
-        users: Dict[int, "raw.types.User"],
-        chats: Dict[int, "raw.types.Chat"],
-    ) -> Optional["ExternalReplyInfo"]:
+        reply: raw.types.MessageReplyHeader,
+        users: dict[int, raw.types.User],
+        chats: dict[int, raw.types.Chat],
+    ) -> ExternalReplyInfo | None:
         if not isinstance(reply, raw.types.MessageReplyHeader):
             return None
 
@@ -216,7 +216,7 @@ class ExternalReplyInfo(Object):
                 media_type = enums.MessageMediaType.PHOTO
                 has_media_spoiler = media.spoiler
             elif isinstance(media, raw.types.MessageMediaGeo):
-                location = types.Location._parse(client, media.geo)
+                location = types.Location._parse(media.geo)
                 media_type = enums.MessageMediaType.LOCATION
             elif isinstance(media, raw.types.MessageMediaContact):
                 contact = types.Contact._parse(client, media)
@@ -228,7 +228,7 @@ class ExternalReplyInfo(Object):
                 game = types.Game._parse(client, media)
                 media_type = enums.MessageMediaType.GAME
             elif isinstance(media, raw.types.MessageMediaGiveaway):
-                giveaway = types.Giveaway._parse(client, media, chats)
+                giveaway = await types.Giveaway._parse(client, media, chats)
                 media_type = enums.MessageMediaType.GIVEAWAY
             elif isinstance(media, raw.types.MessageMediaGiveawayResults):
                 giveaway_winners = await types.GiveawayWinners._parse(client, media, users, chats)
@@ -246,9 +246,7 @@ class ExternalReplyInfo(Object):
                     attributes = {type(i): i for i in doc.attributes}
 
                     file_name = getattr(
-                        attributes.get(
-                            raw.types.DocumentAttributeFilename, None
-                        ), "file_name", None
+                        attributes.get(raw.types.DocumentAttributeFilename, None), "file_name", None
                     )
 
                     if raw.types.DocumentAttributeAnimated in attributes:
@@ -263,17 +261,30 @@ class ExternalReplyInfo(Object):
                         video_attributes = attributes[raw.types.DocumentAttributeVideo]
 
                         if video_attributes.round_message:
-                            video_note = types.VideoNote._parse(client, doc, video_attributes, media.ttl_seconds)
+                            video_note = types.VideoNote._parse(
+                                client, doc, video_attributes, media.ttl_seconds
+                            )
                             media_type = enums.MessageMediaType.VIDEO_NOTE
                         else:
-                            video = types.Video._parse(client, doc, video_attributes, file_name, media.ttl_seconds, media.video_cover, media.video_timestamp, media.alt_documents)
+                            video = types.Video._parse(
+                                client,
+                                doc,
+                                video_attributes,
+                                file_name,
+                                media.ttl_seconds,
+                                media.video_cover,
+                                media.video_timestamp,
+                                media.alt_documents,
+                            )
                             media_type = enums.MessageMediaType.VIDEO
                             has_media_spoiler = media.spoiler
                     elif raw.types.DocumentAttributeAudio in attributes:
                         audio_attributes = attributes[raw.types.DocumentAttributeAudio]
 
                         if audio_attributes.voice:
-                            voice = types.Voice._parse(client, doc, audio_attributes, media.ttl_seconds)
+                            voice = types.Voice._parse(
+                                client, doc, audio_attributes, media.ttl_seconds
+                            )
                             media_type = enums.MessageMediaType.VOICE
                         else:
                             audio = types.Audio._parse(client, doc, audio_attributes, file_name)
@@ -282,7 +293,7 @@ class ExternalReplyInfo(Object):
                         document = types.Document._parse(client, doc, file_name)
                         media_type = enums.MessageMediaType.DOCUMENT
             elif isinstance(media, raw.types.MessageMediaPoll):
-                poll = types.Poll._parse(client, media)
+                poll = await types.Poll._parse(client, media, None, users=users, chats=chats)
                 media_type = enums.MessageMediaType.POLL
             elif isinstance(media, raw.types.MessageMediaDice):
                 dice = types.Dice._parse(client, media)
@@ -291,19 +302,19 @@ class ExternalReplyInfo(Object):
                 paid_media = types.PaidMediaInfo._parse(client, media)
                 media_type = enums.MessageMediaType.PAID_MEDIA
             elif isinstance(media, raw.types.MessageMediaToDo):
-                checklist = types.Checklist._parse(client, media, users)
+                checklist = await types.Checklist._parse(client, media, users, chats)
                 media_type = enums.MessageMediaType.CHECKLIST
             else:
                 media = None
 
         return ExternalReplyInfo(
-            origin=types.MessageOrigin._parse(
+            origin=await types.MessageOrigin._parse(
                 client,
                 reply.reply_from,
                 users,
                 chats,
             ),
-            chat=types.Chat._parse_chat(
+            chat=await types.Chat._parse_chat(
                 client,
                 chats.get(utils.get_raw_peer_id(reply.reply_to_peer_id)),
             ),
@@ -330,5 +341,5 @@ class ExternalReplyInfo(Object):
             location=location,
             poll=poll,
             venue=venue,
-            checklist=checklist
+            checklist=checklist,
         )

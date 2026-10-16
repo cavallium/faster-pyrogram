@@ -16,18 +16,26 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram.filters import Filter
+from .unbound_arguments import unbound_arguments
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from .handler_type import HandlerType
 
 
 class OnChatBoost:
     def on_chat_boost(
-        self=None,
-        filters=None,
+        self: OnChatBoost | Filter | None = None,
+        filters: Filter | None = None,
         group: int = 0,
-    ) -> Callable:
+    ) -> Callable[[HandlerType], HandlerType]:
         """Decorator for handling applied chat boosts.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
@@ -45,17 +53,19 @@ class OnChatBoost:
 
         """
 
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: HandlerType) -> HandlerType:
             if isinstance(self, pyrogram.Client):
                 self.add_handler(pyrogram.handlers.ShippingQueryHandler(func, filters), group)
             elif isinstance(self, Filter) or self is None:
                 if not hasattr(func, "handlers"):
                     func.handlers = []
 
+                arguments = unbound_arguments(self, filters=filters, group=group)
+
                 func.handlers.append(
                     (
-                        pyrogram.handlers.ShippingQueryHandler(func, self),
-                        group if filters is None else filters
+                        pyrogram.handlers.ShippingQueryHandler(func, arguments.filters),
+                        arguments.group,
                     )
                 )
 

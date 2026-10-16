@@ -16,8 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import re
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import errors, raw, types, utils
@@ -25,12 +24,12 @@ from pyrogram import errors, raw, types, utils
 
 class UpgradeGift:
     async def upgrade_gift(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         owned_gift_id: str,
-        keep_original_details: Optional[bool] = None,
-        star_count: int = None,
-        business_connection_id: str = None
-    ) -> Optional["types.Message"]:
+        keep_original_details: bool | None = None,
+        star_count: int | None = None,
+        business_connection_id: str | None = None,
+    ) -> types.Message | None:
         """Upgrade a given regular gift to a unique gift.
 
         .. note::
@@ -58,7 +57,8 @@ class UpgradeGift:
                 For bots only.
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise,
+            in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
@@ -69,65 +69,40 @@ class UpgradeGift:
                 # Upgrade gift in channel (owned_gift_id packed in format chatID_savedID)
                 await app.upgrade_gift(owned_gift_id="123_456")
         """
-        if not isinstance(owned_gift_id, str):
-            raise ValueError(f"owned_gift_id has to be str, but {type(owned_gift_id)} was provided")
-
-        saved_gift_match = re.match(r"^(-\d+)_(\d+)$", owned_gift_id)
-        slug_match = self.UPGRADED_GIFT_RE.match(owned_gift_id)
-
-        if saved_gift_match:
-            stargift = raw.types.InputSavedStarGiftChat(
-                peer=await self.resolve_peer(saved_gift_match.group(1)),
-                saved_id=int(saved_gift_match.group(2))
-            )
-        elif slug_match:
-            stargift = raw.types.InputSavedStarGiftSlug(
-                slug=slug_match.group(1)
-            )
-        else:
-            stargift = raw.types.InputSavedStarGiftUser(
-                msg_id=int(owned_gift_id)
-            )
+        stargift = await utils.get_input_stargift(self, owned_gift_id)
 
         try:
             r = await self.invoke(
                 raw.functions.payments.UpgradeStarGift(
-                    stargift=stargift,
-                    keep_original_details=keep_original_details
+                    stargift=stargift, keep_original_details=keep_original_details
                 ),
-                business_connection_id=business_connection_id
+                business_connection_id=business_connection_id,
             )
         except errors.PaymentRequired:
             invoice = raw.types.InputInvoiceStarGiftUpgrade(
-                stargift=stargift,
-                keep_original_details=keep_original_details
+                stargift=stargift, keep_original_details=keep_original_details
             )
 
             form = await self.invoke(
-                raw.functions.payments.GetPaymentForm(
-                    invoice=invoice
-                ),
-                business_connection_id=business_connection_id
+                raw.functions.payments.GetPaymentForm(invoice=invoice),
+                business_connection_id=business_connection_id,
             )
 
             if star_count is not None:
                 if star_count < 0:
-                    raise ValueError("Invalid amount of Telegram Stars specified.")
+                    raise ValueError("Invalid amount of Telegram Stars specified.") from None
 
                 if form.invoice.prices[0].amount > star_count:
-                    raise ValueError("Have not enough Telegram Stars.")
+                    raise ValueError("Have not enough Telegram Stars.") from None
 
             r = await self.invoke(
-                raw.functions.payments.SendStarsForm(
-                    form_id=form.form_id,
-                    invoice=invoice
-                ),
-                business_connection_id=business_connection_id
+                raw.functions.payments.SendStarsForm(form_id=form.form_id, invoice=invoice),
+                business_connection_id=business_connection_id,
             )
 
         messages = await utils.parse_messages(
             client=self,
-            messages=r.updates if isinstance(r, raw.types.payments.PaymentResult) else r
+            messages=r.updates if isinstance(r, raw.types.payments.PaymentResult) else r,
         )
 
         return messages[0] if messages else None

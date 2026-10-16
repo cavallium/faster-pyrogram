@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -48,12 +48,12 @@ class Thumbnail(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         file_id: str,
         file_unique_id: str,
         width: int,
         height: int,
-        file_size: int
+        file_size: int,
     ):
         super().__init__(client)
 
@@ -64,7 +64,7 @@ class Thumbnail(Object):
         self.file_size = file_size
 
     @staticmethod
-    def _parse(client, media: Union["raw.types.Photo", "raw.types.Document"]) -> Optional[List["Thumbnail"]]:
+    def _parse(client, media: raw.types.Photo | raw.types.Document) -> list[Thumbnail] | None:
         if isinstance(media, raw.types.Photo):
             raw_thumbs = [i for i in media.sizes if isinstance(i, raw.types.PhotoSize)]
             raw_thumbs.sort(key=lambda p: p.w * p.h)
@@ -72,7 +72,7 @@ class Thumbnail(Object):
 
             file_type = FileType.PHOTO
         elif isinstance(media, raw.types.Document):
-            raw_thumbs = media.thumbs
+            raw_thumbs = media.thumbs or []
             file_type = FileType.THUMBNAIL
         else:
             return
@@ -95,16 +95,15 @@ class Thumbnail(Object):
                         thumbnail_source=ThumbnailSource.THUMBNAIL,
                         thumbnail_size=thumb.type,
                         volume_id=0,
-                        local_id=0
+                        local_id=0,
                     ).encode(),
                     file_unique_id=FileUniqueId(
-                        file_unique_type=FileUniqueType.DOCUMENT,
-                        media_id=media.id
+                        file_unique_type=FileUniqueType.DOCUMENT, media_id=media.id
                     ).encode(),
                     width=thumb.w,
                     height=thumb.h,
                     file_size=thumb.size,
-                    client=client
+                    client=client,
                 )
             )
 

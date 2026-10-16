@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import enums, raw
@@ -24,12 +24,12 @@ from pyrogram import enums, raw
 
 class SendPaidReaction:
     async def send_paid_reaction(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         message_id: int,
         amount: int,
-        privacy: "enums.PaidReactionPrivacy" = None,
-        send_as: Optional[Union[int, str]] = None,
+        privacy: enums.PaidReactionPrivacy | None = None,
+        send_as: int | str | None = None,
     ) -> bool:
         """Send a paid reaction to a message.
 
@@ -64,14 +64,18 @@ class SendPaidReaction:
         if privacy:
             is_queryable = privacy in [enums.PaidReactionPrivacy.CHAT]
 
-            privacy = privacy.value(peer=await self.resolve_peer(send_as)) if is_queryable else privacy.value()
+            privacy = (
+                privacy.value(peer=await self.resolve_peer(send_as))
+                if is_queryable
+                else privacy.value()
+            )
 
         rpc = raw.functions.messages.SendPaidReaction(
             peer=await self.resolve_peer(chat_id),
             msg_id=message_id,
             count=amount,
             random_id=self.rnd_id(),
-            private=privacy
+            private=privacy,
         )
 
         await self.invoke(rpc)

@@ -1,6 +1,17 @@
-name: Pyrogram
+name: Kurigram
 
-on: [push, pull_request]
+on:
+  # Branches live in this repository and are tested through their pull request, so an
+  #  unfiltered `push` ran the whole workflow a second time for the same commit.
+  push:
+    branches: [main, modern-telegram]
+  pull_request:
+  # Every job above installs from `uv.lock`, so a dependency release published after the last
+  #  `uv lock` is exercised by nothing until somebody happens to relock. `test-ceil` resolves
+  #  fresh and is what catches it, which only helps if something runs it without a push.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -9,26 +20,108 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      # `uv` supplies the interpreter as well as the packages, so there is no separate
+      #  Python setup step: it downloads a managed CPython for every version in the
+      #  matrix, including versions no longer shipped as an official macOS arm64 build.
+      - name: Set up uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install tox
+          make sync
 
       - name: Generate API
         run: |
-          make venv
           make api
 
+      # The integration tests need live api credentials, which a fork's runner has
+      #  no way to hold, so they stay deselected and skip on their own besides.
       - name: Run tests
         run: |
-          tox
+          make test-unit
+
+  lint:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.15"
+
+      - name: Install dependencies
+        run: |
+          make sync
+
+      # `ruff` excludes the generated packages, so this job needs no `make api`.
+      - name: Run ruff
+        run: |
+          make lint
+
+  # Its own job rather than a tail step of `lint`: a `ruff` failure would otherwise
+  #  hide the `ty` verdict until the next push.
+  typecheck:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.15"
+
+      - name: Install dependencies
+        run: |
+          make sync
+
+      # Unlike `ruff`, `ty` resolves `pyrogram.raw.*`, so it needs the generated tree.
+      - name: Generate API
+        run: |
+          make api
+
+      - name: Run ty
+        run: |
+          make typecheck
+
+  # The recipe names the interpreter and `uv` provisions it, so neither of these jobs pins one:
+  #  `setup-uv`'s `python-version` would export `UV_PYTHON` over the whole workflow.
+  test-floor:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      # Builds `.venv-floor` and generates the API in it, so no `make sync` or `make api` here.
+      - name: Run the suite at the dependency floor
+        run: |
+          make test-floor
+
+  test-ceil:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Run the suite at the dependency ceiling
+        run: |
+          make test-ceil

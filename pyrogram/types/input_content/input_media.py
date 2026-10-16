@@ -16,10 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Union, BinaryIO
+from __future__ import annotations as _annotations
 
-from ..messages_and_media import MessageEntity
+from typing import TYPE_CHECKING, Any, BinaryIO
+
 from ..object import Object
+
+if TYPE_CHECKING:
+    import pyrogram
+    from pyrogram import raw
+
+    from ..._typing import PathType
+    from ..messages_and_media import MessageEntity
 
 
 class InputMedia(Object):
@@ -28,18 +36,19 @@ class InputMedia(Object):
     It should be one of:
 
     - :obj:`~pyrogram.types.InputMediaAnimation`
-    - :obj:`~pyrogram.types.InputMediaDocument`
     - :obj:`~pyrogram.types.InputMediaAudio`
+    - :obj:`~pyrogram.types.InputMediaDocument`
+    - :obj:`~pyrogram.types.InputMediaLivePhoto`
     - :obj:`~pyrogram.types.InputMediaPhoto`
     - :obj:`~pyrogram.types.InputMediaVideo`
     """
 
     def __init__(
         self,
-        media: Union[str, BinaryIO],
+        media: PathType | BinaryIO | None = None,
         caption: str = "",
-        parse_mode: str = None,
-        caption_entities: List[MessageEntity] = None
+        parse_mode: str | None = None,
+        caption_entities: list[MessageEntity] | None = None,
     ):
         super().__init__()
 
@@ -47,3 +56,6 @@ class InputMedia(Object):
         self.caption = caption
         self.parse_mode = parse_mode
         self.caption_entities = caption_entities
+
+    async def write(self, *, client: pyrogram.Client, **kwargs: Any) -> raw.base.InputMedia:
+        raise NotImplementedError

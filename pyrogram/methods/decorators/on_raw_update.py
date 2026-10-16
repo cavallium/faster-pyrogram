@@ -16,18 +16,26 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable, Optional
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram.filters import Filter
+from .unbound_arguments import unbound_arguments
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from .handler_type import HandlerType
 
 
 class OnRawUpdate:
     def on_raw_update(
-        self: Optional["OnRawUpdate"] = None,
-        filters=None,
+        self: OnRawUpdate | Filter | None = None,
+        filters: Filter | None = None,
         group: int = 0,
-    ) -> Callable:
+    ) -> Callable[[HandlerType], HandlerType]:
         """Decorator for handling raw updates.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
@@ -44,18 +52,17 @@ class OnRawUpdate:
                 The group identifier, defaults to 0.
         """
 
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: HandlerType) -> HandlerType:
             if isinstance(self, pyrogram.Client):
                 self.add_handler(pyrogram.handlers.RawUpdateHandler(func, filters), group)
             elif isinstance(self, Filter) or self is None:
                 if not hasattr(func, "handlers"):
                     func.handlers = []
 
+                arguments = unbound_arguments(self, filters=filters, group=group)
+
                 func.handlers.append(
-                    (
-                        pyrogram.handlers.RawUpdateHandler(func, self),
-                        group if filters is None else filters
-                    )
+                    (pyrogram.handlers.RawUpdateHandler(func, arguments.filters), arguments.group)
                 )
 
             return func

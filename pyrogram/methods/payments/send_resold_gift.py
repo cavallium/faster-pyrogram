@@ -16,8 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types, utils
@@ -25,11 +24,11 @@ from pyrogram import raw, types, utils
 
 class SendResoldGift:
     async def send_resold_gift(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         gift_link: str,
-        new_owner_chat_id: Union[int, str],
-        star_count: int = None
-    ) -> Optional["types.Message"]:
+        new_owner_chat_id: int | str,
+        price: types.GiftResalePrice,
+    ) -> types.Message | None:
         """Send an upgraded gift that is available for resale to another user or channel chat.
 
         .. note::
@@ -47,55 +46,69 @@ class SendResoldGift:
                 For your personal cloud (Saved Messages) you can simply use "me" or "self".
                 For a contact that exists in your Telegram address book you can use his phone number (str).
 
-            star_count (``int``, *optional*):
-                The amount of Telegram Stars required to pay for the gift.
+            price (:obj:`~pyrogram.types.GiftResalePrice`):
+                The price that the user agreed to pay for the gift.
 
         Returns:
-            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+            :obj:`~pyrogram.types.Message` | ``None``: On success, the sent message is returned, otherwise,
+            in case the server answered with no message, None is returned.
 
         Example:
             .. code-block:: python
 
-                # Transfer gift to another user
-                await app.send_resold_gift(gift_link="https://t.me/nft/NekoHelmet-9215", new_owner_chat_id=123)
+                # Buy gift from telegram market and transfer it to another user
+                await app.send_resold_gift(
+                    gift_link="https://t.me/nft/NekoHelmet-9215",
+                    new_owner_chat_id=123,
+                    price=types.GiftResalePriceStar(star_count=100_000)
+                )
+
+                # Buy ton gift
+                from pyrogram import utils
+
+                await app.send_resold_gift(
+                    gift_link="https://t.me/nft/NekoHelmet-9215",
+                    new_owner_chat_id=123,
+                    price=types.GiftResalePriceTon(
+                        toncoin_cent_count=utils.to_nano(5) # 5 ton
+                    )
+                )
         """
         match = self.UPGRADED_GIFT_RE.match(gift_link)
 
         if not match:
-            raise ValueError(
-                "Invalid gift link provided."
-            )
+            raise ValueError("Invalid gift link provided.")
 
         peer = await self.resolve_peer(new_owner_chat_id)
 
         invoice = raw.types.InputInvoiceStarGiftResale(
-            slug=match.group(1),
-            to_id=peer
+            slug=match.group(1), to_id=peer, ton=isinstance(price, types.GiftResalePriceTon)
         )
 
-        form = await self.invoke(
-            raw.functions.payments.GetPaymentForm(
-                invoice=invoice
+        form = await self.invoke(raw.functions.payments.GetPaymentForm(invoice=invoice))
+
+        if isinstance(price, types.GiftResalePriceTon):
+            amount = price.toncoin_cent_count
+        else:
+            amount = price.star_count
+
+        if amount < 0:
+            raise ValueError("Invalid price specified.")
+
+        if form.invoice.prices[0].amount > amount:
+            raise ValueError(
+                "Have not enough {}".format(
+                    "Toncoins" if isinstance(price, types.GiftResalePriceTon) else "Telegram Stars"
+                )
             )
-        )
-
-        if star_count is not None:
-            if star_count < 0:
-                raise ValueError("Invalid amount of Telegram Stars specified.")
-
-            if form.invoice.prices[0].amount > star_count:
-                raise ValueError("Have not enough Telegram Stars.")
 
         r = await self.invoke(
-            raw.functions.payments.SendStarsForm(
-                form_id=form.form_id,
-                invoice=invoice
-            )
+            raw.functions.payments.SendStarsForm(form_id=form.form_id, invoice=invoice)
         )
 
         messages = await utils.parse_messages(
             client=self,
-            messages=r.updates if isinstance(r, raw.types.payments.PaymentResult) else r
+            messages=r.updates if isinstance(r, raw.types.payments.PaymentResult) else r,
         )
 
         return messages[0] if messages else None

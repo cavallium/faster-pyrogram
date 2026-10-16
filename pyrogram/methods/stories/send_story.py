@@ -16,38 +16,46 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import os
-from typing import BinaryIO, Callable, List, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
 
 import pyrogram
 from pyrogram import StopTransmission, enums, raw, types, utils
 from pyrogram.errors import FilePartMissing
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pyrogram._typing import PathType
+
 
 class SendStory:
     async def send_story(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        media: Union[str, BinaryIO],
-        caption: str = None,
-        period: int = None,
+        self: pyrogram.Client,
+        chat_id: int | str,
+        media: PathType | BinaryIO,
+        caption: str | None = None,
+        period: int | None = None,
+        media_areas: list[types.MediaArea] | None = None,
         duration: int = 0,
         width: int = 0,
         height: int = 0,
-        thumb: Union[str, BinaryIO] = None,
+        thumb: PathType | BinaryIO | None = None,
         supports_streaming: bool = True,
-        file_name: str = None,
-        privacy: "enums.StoriesPrivacyRules" = None,
-        allowed_users: List[Union[int, str]] = None,
-        disallowed_users: List[Union[int, str]] = None,
-        pinned: bool = None,
-        protect_content: bool = None,
-        parse_mode: "enums.ParseMode" = None,
-        caption_entities: List["types.MessageEntity"] = None,
-        progress: Callable = None,
+        file_name: str | None = None,
+        privacy: enums.StoriesPrivacyRules | None = None,
+        allowed_users: list[int | str] | None = None,
+        disallowed_users: list[int | str] | None = None,
+        pinned: bool | None = None,
+        protect_content: bool | None = None,
+        parse_mode: enums.ParseMode | None = None,
+        caption_entities: list[types.MessageEntity] | None = None,
+        progress: Callable | None = None,
         progress_args: tuple = (),
-        media_areas: List["types.MediaArea"] = None
-    ) -> "types.Story":
+    ) -> types.Story | None:
         """Post new story.
 
         .. include:: /_includes/usable-by/users.rst
@@ -57,7 +65,7 @@ class SendStory:
                 Unique identifier (int) or username (str) of the target chat.
                 For your personal cloud (Saved Messages) you can simply use "me" or "self".
 
-            media (``str`` | ``BinaryIO``):
+            media (``str`` | ``os.PathLike`` | ``BinaryIO``):
                 Video or photo to send.
                 Pass a file_id as string to send a animation that exists on the Telegram servers,
                 pass a file path as string to upload a new animation that exists on your local machine, or
@@ -71,6 +79,9 @@ class SendStory:
                 Must be one of ``6 * 3600``, ``12 * 3600``, ``86400``, or ``2 * 86400`` for Telegram Premium users,
                 and 86400 otherwise.
 
+            media_areas (List of :obj:`~pyrogram.types.MediaArea`, *optional*):
+                List of media areas to add to the story.
+
             duration (``int``, *optional*):
                 Duration of sent video in seconds.
 
@@ -80,7 +91,7 @@ class SendStory:
             height (``int``, *optional*):
                 Video height.
 
-            thumb (``str`` | ``BinaryIO``, *optional*):
+            thumb (``str`` | ``os.PathLike`` | ``BinaryIO``, *optional*):
                 Thumbnail of the video sent.
                 The thumbnail should be in JPEG format and less than 200 KB in size.
                 A thumbnail's width and height should not exceed 320 pixels.
@@ -118,7 +129,7 @@ class SendStory:
                 By default, texts are parsed using both Markdown and HTML styles.
                 You can combine both syntaxes together.
 
-            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`):
+            caption_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
                 List of special entities that appear in the caption, which can be specified instead of *parse_mode*.
 
             progress (``Callable``, *optional*):
@@ -132,11 +143,10 @@ class SendStory:
                 You can pass anything you need to be available in the progress callback scope; for example, a Message
                 object or a Client instance in order to edit the message with the updated progress status.
 
-            media_areas (List of :obj:`~pyrogram.types.MediaArea`, *optional*):
-                List of media areas to add to the story.
-
         Returns:
-            :obj:`~pyrogram.types.Story` a single story is returned.
+            :obj:`~pyrogram.types.Story` | ``None``: On success, the sent story is returned, otherwise,
+            in case the upload is deliberately stopped with :meth:`~pyrogram.Client.stop_transmission`,
+            None is returned.
 
         Example:
             .. code-block:: python
@@ -149,16 +159,19 @@ class SendStory:
 
         Raises:
             ValueError: In case of invalid arguments.
+            FileNotFoundError: In case a local ``os.PathLike`` doesn't point to an existing file.
         """
-        # TODO: media_areas
-
-        message, entities = (await utils.parse_text_entities(self, caption, parse_mode, caption_entities)).values()
+        message, entities = (
+            await utils.parse_text_entities(self, caption, parse_mode, caption_entities)
+        ).values()
 
         try:
-            if isinstance(media, str):
+            if isinstance(media, (str, os.PathLike)):
                 if os.path.isfile(media):
                     thumb = await self.save_file(thumb)
-                    file = await self.save_file(media, progress=progress, progress_args=progress_args)
+                    file = await self.save_file(
+                        media, progress=progress, progress_args=progress_args
+                    )
                     mime_type = self.guess_mime_type(file.name)
                     if mime_type == "video/mp4":
                         media = raw.types.InputMediaUploadedDocument(
@@ -167,19 +180,24 @@ class SendStory:
                             thumb=thumb,
                             attributes=[
                                 raw.types.DocumentAttributeVideo(
+                                    supports_streaming=supports_streaming,
                                     duration=duration,
                                     w=width,
                                     h=height,
                                 ),
-                                raw.types.DocumentAttributeFilename(file_name=file_name or os.path.basename(media))
-                            ]
+                                raw.types.DocumentAttributeFilename(
+                                    file_name=file_name or Path(media).name
+                                ),
+                            ],
                         )
                     else:
                         media = raw.types.InputMediaUploadedPhoto(
                             file=file,
                         )
-                else:
+                elif isinstance(media, str):
                     media = utils.get_input_media_from_file_id(media)
+                else:
+                    raise FileNotFoundError(f"No such file or directory: {media}")
             else:
                 thumb = await self.save_file(thumb)
                 file = await self.save_file(media, progress=progress, progress_args=progress_args)
@@ -191,13 +209,13 @@ class SendStory:
                         thumb=thumb,
                         attributes=[
                             raw.types.DocumentAttributeVideo(
-                                supports_streaming=supports_streaming or None,
+                                supports_streaming=supports_streaming,
                                 duration=duration,
                                 w=width,
                                 h=height,
                             ),
-                            raw.types.DocumentAttributeFilename(file_name=file_name or media.name)
-                        ]
+                            raw.types.DocumentAttributeFilename(file_name=file_name or media.name),
+                        ],
                     )
                 else:
                     media = raw.types.InputMediaUploadedPhoto(
@@ -222,7 +240,9 @@ class SendStory:
                     users = [await self.resolve_peer(user_id) for user_id in allowed_users]
                     privacy_rules.append(raw.types.InputPrivacyValueAllowUsers(users=users))
                 else:
-                    privacy_rules.append(raw.types.InputPrivacyValueAllowUsers(users=[raw.types.InputPeerEmpty()]))
+                    privacy_rules.append(
+                        raw.types.InputPrivacyValueAllowUsers(users=[raw.types.InputPeerEmpty()])
+                    )
             elif privacy == enums.StoriesPrivacyRules.SELECTED_USERS:
                 _allowed_users = []
                 _allowed_chats = []
@@ -232,15 +252,23 @@ class SendStory:
                         peer = await self.resolve_peer(user)
                         if isinstance(peer, raw.types.InputPeerUser):
                             _allowed_users.append(peer)
-                        elif isinstance(peer, (raw.types.InputPeerChat, raw.types.InputPeerChannel)):
+                        elif isinstance(
+                            peer, (raw.types.InputPeerChat, raw.types.InputPeerChannel)
+                        ):
                             _allowed_chats.append(peer)
                 else:
-                    privacy_rules.append(raw.types.InputPrivacyValueAllowUsers(users=[raw.types.InputPeerEmpty()]))
+                    privacy_rules.append(
+                        raw.types.InputPrivacyValueAllowUsers(users=[raw.types.InputPeerEmpty()])
+                    )
 
                 if _allowed_users:
-                    privacy_rules.append(raw.types.InputPrivacyValueAllowUsers(users=_allowed_users))
+                    privacy_rules.append(
+                        raw.types.InputPrivacyValueAllowUsers(users=_allowed_users)
+                    )
                 if _allowed_chats:
-                    privacy_rules.append(raw.types.InputPrivacyValueAllowChatParticipants(chats=_allowed_chats))
+                    privacy_rules.append(
+                        raw.types.InputPrivacyValueAllowChatParticipants(chats=_allowed_chats)
+                    )
             else:
                 privacy_rules.append(raw.types.InputPrivacyValueAllowAll())
 
@@ -254,14 +282,19 @@ class SendStory:
                             random_id=self.rnd_id(),
                             pinned=pinned,
                             noforwards=protect_content,
-                            media_areas=[await area.write(self) for area in (media_areas or [])] or None,
+                            media_areas=[await area.write(self) for area in (media_areas or [])]
+                            or None,
                             caption=message,
                             entities=entities,
                             period=period,
                         )
                     )
                 except FilePartMissing as e:
-                    await self.save_file(media, file_id=file.id, file_part=e.value)
+                    # The error names the missing part; without it there is nothing to resave.
+                    if e.file_part is None:
+                        raise
+
+                    await self.save_file(media, file_id=file.id, file_part=e.file_part)
                 else:
                     for i in r.updates:
                         if isinstance(i, raw.types.UpdateStory):
@@ -270,7 +303,7 @@ class SendStory:
                                 i.story,
                                 i.peer,
                                 {i.id: i for i in r.users},
-                                {i.id: i for i in r.chats}
+                                {i.id: i for i in r.chats},
                             )
         except StopTransmission:
             return None

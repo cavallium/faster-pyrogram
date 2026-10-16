@@ -16,25 +16,29 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Iterable
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class AnswerInlineQuery:
     async def answer_inline_query(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         inline_query_id: str,
-        results: Iterable["types.InlineQueryResult"],
+        results: Iterable[types.InlineQueryResult],
         cache_time: int = 300,
         is_gallery: bool = False,
         is_personal: bool = False,
         next_offset: str = "",
         switch_pm_text: str = "",
-        switch_pm_parameter: str = ""
-    ):
+        switch_pm_parameter: str = "",
+    ) -> bool:
         """Send answers to an inline query.
 
         A maximum of 50 results per query is allowed.
@@ -101,12 +105,13 @@ class AnswerInlineQuery:
                 query_id=int(inline_query_id),
                 results=[await r.write(self) for r in results],
                 cache_time=cache_time,
-                gallery=is_gallery or None,
-                private=is_personal or None,
+                gallery=is_gallery,
+                private=is_personal,
                 next_offset=next_offset or None,
                 switch_pm=raw.types.InlineBotSwitchPM(
-                    text=switch_pm_text,
-                    start_param=switch_pm_parameter
-                ) if switch_pm_text else None
+                    text=switch_pm_text, start_param=switch_pm_parameter
+                )
+                if switch_pm_text
+                else None,
             )
         )

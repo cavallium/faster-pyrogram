@@ -16,13 +16,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-import pyrogram
-from pyrogram.session import Session
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pyrogram
 
 
 class Connect:
     async def connect(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
     ) -> bool:
         """
         Connect the client to Telegram servers.
@@ -39,13 +43,29 @@ class Connect:
 
         await self.load_session()
 
-        self.session = Session(
-            self, await self.storage.dc_id(),
-            await self.storage.auth_key(), await self.storage.test_mode()
-        )
+        try:
+            server_address = await self.storage.server_address()
 
-        await self.session.start()
+            # `load_session` fills the address only for a fresh session; a stored one
+            #  missing it is corrupt, and `":" in None` would raise a bare `TypeError`.
+            if server_address is None:
+                raise ValueError("The session storage holds no server address")
+
+            self.session = await self.get_session(
+                server_address=server_address,
+                port=await self.storage.port(),
+                export_authorization=False,
+                temporary=True,
+            )
+        except BaseException:
+            await self.storage.close()
+            raise
 
         self.is_connected = True
+
+        is_ipv6_session: bool = ":" in server_address
+
+        if (self.ipv6 and not is_ipv6_session) or (not self.ipv6 and is_ipv6_session):
+            await self.set_dc(dc_id=await self.storage.dc_id())
 
         return bool(await self.storage.user_id())

@@ -16,16 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 from pyrogram.file_id import FileId
 
-class AddToGifs():
-    async def add_to_gifs(
-        self: "pyrogram.Client",
-        file_id: str,
-        unsave: bool = False
-    ) -> bool:
+
+class AddToGifs:
+    async def add_to_gifs(self: pyrogram.Client, file_id: str, unsave: bool = False) -> bool:
         """Add a GIF to the list of saved GIFs.
 
         .. include:: /_includes/usable-by/users.rst
@@ -34,7 +33,7 @@ class AddToGifs():
             file_id (``str``):
                 Unique identifier for the GIF.
 
-            unsave (``bool``, optional):
+            unsave (``bool``, optional, *optional*):
                 Whether to remove the GIF from the list of saved GIFs. Defaults to ``False``.
 
         Returns:
@@ -55,6 +54,6 @@ class AddToGifs():
                     file_reference=decoded_file_id.file_reference,
                     access_hash=decoded_file_id.access_hash,
                 ),
-                unsave=unsave
+                unsave=unsave,
             )
         )

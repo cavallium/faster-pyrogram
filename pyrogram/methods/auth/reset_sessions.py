@@ -16,13 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 
 
 class ResetSessions:
     async def reset_sessions(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
     ) -> bool:
         """Terminates all user's authorized sessions except for the current one.
 
@@ -32,8 +34,6 @@ class ResetSessions:
             ``bool``: On success, in case the sessions is destroyed, True is returned. Otherwise, False is returned.
 
         """
-        r = await self.invoke(
-            raw.functions.auth.ResetAuthorizations()
-        )
+        r = await self.invoke(raw.functions.auth.ResetAuthorizations())
 
         return r

@@ -16,14 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import List
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import raw, utils
 from pyrogram import types
 from pyrogram.file_id import FileId, FileType, FileUniqueId, FileUniqueType
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class Audio(Object):
@@ -65,17 +69,17 @@ class Audio(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         file_id: str,
         file_unique_id: str,
         duration: int,
-        performer: str = None,
-        title: str = None,
-        file_name: str = None,
-        mime_type: str = None,
-        file_size: int = None,
-        date: datetime = None,
-        thumbs: List["types.Thumbnail"] = None
+        performer: str | None = None,
+        title: str | None = None,
+        file_name: str | None = None,
+        mime_type: str | None = None,
+        file_size: int | None = None,
+        date: datetime | None = None,
+        thumbs: list[types.Thumbnail] | None = None,
     ):
         super().__init__(client)
 
@@ -93,21 +97,20 @@ class Audio(Object):
     @staticmethod
     def _parse(
         client,
-        audio: "raw.types.Document",
-        audio_attributes: "raw.types.DocumentAttributeAudio",
-        file_name: str
-    ) -> "Audio":
+        audio: raw.types.Document,
+        audio_attributes: raw.types.DocumentAttributeAudio,
+        file_name: str,
+    ) -> Audio:
         return Audio(
             file_id=FileId(
                 file_type=FileType.AUDIO,
                 dc_id=audio.dc_id,
                 media_id=audio.id,
                 access_hash=audio.access_hash,
-                file_reference=audio.file_reference
+                file_reference=audio.file_reference,
             ).encode(),
             file_unique_id=FileUniqueId(
-                file_unique_type=FileUniqueType.DOCUMENT,
-                media_id=audio.id
+                file_unique_type=FileUniqueType.DOCUMENT, media_id=audio.id
             ).encode(),
             duration=audio_attributes.duration,
             performer=audio_attributes.performer,
@@ -117,5 +120,5 @@ class Audio(Object):
             file_name=file_name,
             date=utils.timestamp_to_datetime(audio.date),
             thumbs=types.Thumbnail._parse(client, audio),
-            client=client
+            client=client,
         )

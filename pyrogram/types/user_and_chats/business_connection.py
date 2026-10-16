@@ -16,14 +16,20 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-from typing import Optional, Union
+from __future__ import annotations as _annotations
 
-from pyrogram import types, raw, utils
+from typing import TYPE_CHECKING
+
+from pyrogram import raw, types, utils
+
 from ..object import Object
+from ..update import Update
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
-class BusinessConnection(Object):
+class BusinessConnection(Object, Update):
     """Business information of a user.
 
     Parameters:
@@ -42,19 +48,19 @@ class BusinessConnection(Object):
         is_enabled (``bool``, *optional*):
             True, if the connection is active.
 
-        permissions (:obj:`~pyrogram.types.BusinessBotPermissions`, *optional*):
-            Permissions for the business bot.
+        rights (:obj:`~pyrogram.types.BusinessBotRights`, *optional*):
+            Rights of the business bot.
     """
 
     def __init__(
         self,
         *,
         id: str,
-        user: "types.User",
+        user: types.User,
         dc_id: int,
         date: datetime,
-        is_enabled: bool = None,
-        rights: "types.BusinessBotRights" = None
+        is_enabled: bool | None = None,
+        rights: types.BusinessBotRights | None = None,
     ):
         self.id = id
         self.user = user
@@ -64,11 +70,15 @@ class BusinessConnection(Object):
         self.rights = rights
 
     @staticmethod
-    def _parse(
+    async def _parse(
         client,
-        connection: Union["raw.types.BotBusinessConnection", "raw.types.UpdateBotBusinessConnect"] = None,
-        users = {}
-    ) -> Optional["BusinessConnection"]:
+        connection: raw.types.BotBusinessConnection
+        | raw.types.UpdateBotBusinessConnect
+        | None = None,
+        users: dict[int, raw.base.User] | None = None,
+    ) -> BusinessConnection | None:
+        users = users or {}
+
         if not connection:
             return None
 
@@ -77,9 +87,9 @@ class BusinessConnection(Object):
 
         return BusinessConnection(
             id=connection.connection_id,
-            user=types.User._parse(client, users.get(connection.user_id)),
+            user=await types.User._parse(client, users.get(connection.user_id)),
             dc_id=connection.dc_id,
             date=utils.timestamp_to_datetime(connection.date),
             is_enabled=not connection.disabled,
-            rights=types.BusinessBotRights._parse(connection.rights)
+            rights=types.BusinessBotRights._parse(connection.rights),
         )

@@ -16,19 +16,18 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types
 
 
 class RevokeChatInviteLink:
     async def revoke_chat_invite_link(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
         invite_link: str,
-    ) -> "types.ChatInviteLink":
+    ) -> types.ChatInviteLink | None:
         """Revoke a previously created invite link.
 
         If the primary link is revoked, a new link is automatically generated.
@@ -46,14 +45,14 @@ class RevokeChatInviteLink:
                The invite link to revoke.
 
         Returns:
-            :obj:`~pyrogram.types.ChatInviteLink`: On success, the invite link object is returned.
+            :obj:`~pyrogram.types.ChatInviteLink` | ``None``: On success, the invite link object is
+            returned, otherwise, in case the chat only accepts join requests through its public link, None is
+            returned.
         """
 
         r = await self.invoke(
             raw.functions.messages.EditExportedChatInvite(
-                peer=await self.resolve_peer(chat_id),
-                link=invite_link,
-                revoked=True
+                peer=await self.resolve_peer(chat_id), link=invite_link, revoked=True
             )
         )
 
@@ -65,4 +64,4 @@ class RevokeChatInviteLink:
             else r.invite
         )
 
-        return types.ChatInviteLink._parse(self, chat_invite, users)
+        return await types.ChatInviteLink._parse(self, chat_invite, users)

@@ -16,10 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
+from __future__ import annotations as _annotations
+
+from typing import TYPE_CHECKING
 
 from pyrogram import raw, types, utils
 from ..object import Object
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class CheckedGiftCode(Object):
@@ -29,8 +34,11 @@ class CheckedGiftCode(Object):
         date (:py:obj:`~datetime.datetime`):
             Date when the giveaway was launched.
 
-        months (``int``):
-            Number of months of subscription.
+        month_count (``int``):
+            Number of months the Telegram Premium subscription will be active after code activation.
+
+        day_count (``int``):
+            Number of days the Telegram Premium subscription will be active after code activation.
 
         via_giveaway (``bool``, *optional*):
             True if the gift code is received via giveaway.
@@ -52,17 +60,19 @@ class CheckedGiftCode(Object):
         self,
         *,
         date: datetime,
-        months: int,
-        via_giveaway: bool = None,
-        from_chat: "types.Chat" = None,
-        winner: "types.User" = None,
-        giveaway_message_id: int = None,
-        used_date: datetime = None
+        month_count: int,
+        day_count: int,
+        via_giveaway: bool | None = None,
+        from_chat: types.Chat | None = None,
+        winner: types.User | None = None,
+        giveaway_message_id: int | None = None,
+        used_date: datetime | None = None,
     ):
         super().__init__()
 
         self.date = date
-        self.months = months
+        self.month_count = month_count
+        self.day_count = day_count
         self.via_giveaway = via_giveaway
         self.from_chat = from_chat
         self.winner = winner
@@ -70,23 +80,26 @@ class CheckedGiftCode(Object):
         self.used_date = used_date
 
     @staticmethod
-    def _parse(client, checked_gift_code: "raw.types.payments.CheckedGiftCode", users, chats):
+    async def _parse(client, checked_gift_code: raw.types.payments.CheckedGiftCode, users, chats):
         from_chat = None
         winner = None
 
         if getattr(checked_gift_code, "from_id", None):
-            from_chat = types.Chat._parse_chat(
+            from_chat = await types.Chat._parse_chat(
                 client, chats.get(utils.get_raw_peer_id(checked_gift_code.from_id))
             )
         if getattr(checked_gift_code, "to_id", None):
-            winner = types.User._parse(client, users.get(checked_gift_code.to_id))
+            winner = await types.User._parse(client, users.get(checked_gift_code.to_id))
 
         return CheckedGiftCode(
             date=utils.timestamp_to_datetime(checked_gift_code.date),
-            months=checked_gift_code.months,
+            month_count=utils.get_premium_duration_month_count(checked_gift_code.days),
+            day_count=checked_gift_code.days,
             via_giveaway=getattr(checked_gift_code, "via_giveaway", None),
             from_chat=from_chat,
             winner=winner,
             giveaway_message_id=getattr(checked_gift_code, "giveaway_msg_id", None),
-            used_date=utils.timestamp_to_datetime(checked_gift_code.used_date) if getattr(checked_gift_code, "used_date") else None,
+            used_date=utils.timestamp_to_datetime(checked_gift_code.used_date)
+            if checked_gift_code.used_date
+            else None,
         )

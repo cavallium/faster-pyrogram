@@ -16,15 +16,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import html
 import re
-from typing import List, Optional, Tuple, Union
+import urllib.parse
+from typing import TYPE_CHECKING
 
-import pyrogram
 from pyrogram.enums import MessageEntityType
 
 from . import utils
 from .html import HTML
+
+if TYPE_CHECKING:
+    import pyrogram
+    from pyrogram import types
 
 BOLD_DELIM = "**"
 ITALIC_DELIM = "__"
@@ -37,42 +43,51 @@ BLOCKQUOTE_DELIM = ">"
 BLOCKQUOTE_EXPANDABLE_DELIM = "**>"
 BLOCKQUOTE_EXPANDABLE_END_DELIM = "||"
 
-MARKDOWN_RE = re.compile(r"({d})|(!?)\[(.+?)\]\((.+?)\)".format(
-    d="|".join(
-        ["".join(i) for i in [
-            [rf"\{j}" for j in i]
-            for i in [
-                PRE_DELIM,
-                CODE_DELIM,
-                STRIKE_DELIM,
-                UNDERLINE_DELIM,
-                ITALIC_DELIM,
-                BOLD_DELIM,
-                SPOILER_DELIM
+MARKDOWN_RE = re.compile(
+    r"({d})|(!?)\[(.+?)\]\((.+?)\)".format(
+        d="|".join(
+            [
+                "".join(i)
+                for i in [
+                    [rf"\{j}" for j in i]
+                    for i in [
+                        PRE_DELIM,
+                        CODE_DELIM,
+                        STRIKE_DELIM,
+                        UNDERLINE_DELIM,
+                        ITALIC_DELIM,
+                        BOLD_DELIM,
+                        SPOILER_DELIM,
+                    ]
+                ]
             ]
-        ]]
-    )))
+        )
+    )
+)
 
 OPENING_TAG = "<{}>"
 CLOSING_TAG = "</{}>"
 URL_MARKUP = '<a href="{}">{}</a>'
-EMOJI_MARKUP = "<emoji id={}>{}</emoji>"
+EMOJI_MARKUP = '<tg-emoji emoji-id="{}">{}</tg-emoji>'
+DATE_TIME_MARKUP = '<tg-time unix="{}">{}</tg-time>'
+FORMATTED_DATE_TIME_MARKUP = '<tg-time unix="{}" format="{}">{}</tg-time>'
 FIXED_WIDTH_DELIMS = [CODE_DELIM, PRE_DELIM]
 
 
 class Markdown:
-    def __init__(self, client: Optional["pyrogram.Client"]):
+    # TODO: Full refactor
+    def __init__(self, client: pyrogram.Client | None):
         self.html = HTML(client)
 
     @staticmethod
     def escape_and_create_quotes(text: str, strict: bool):
-        text_lines: List[Union[str, None]] = text.splitlines()
+        text_lines: list[str | None] = text.splitlines()
 
         # Indexes of Already escaped lines
-        html_escaped_list: List[int] = []
+        html_escaped_list: list[int] = []
 
         # Temporary Queue to hold lines to be quoted
-        to_quote_list: List[Tuple[int, str]] = []
+        to_quote_list: list[tuple[int, str]] = []
 
         def create_blockquote(expandable: bool = False) -> None:
             """
@@ -98,11 +113,17 @@ class Markdown:
         # Handle Expandable Quote
         inside_blockquote = False
         for index, line in enumerate(text_lines):
+            # `create_blockquote()` only nils out indexes strictly before the current one
+            # (already-merged lines), so `line` here is never one of its `None` placeholders.
+            if line is None:
+                continue
+
             if line.startswith(BLOCKQUOTE_EXPANDABLE_DELIM) and not inside_blockquote:
-                delim_stripped_line = line[len(BLOCKQUOTE_EXPANDABLE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_EXPANDABLE_DELIM} ") else 0) :]
-                parsed_line = (
-                    html.escape(delim_stripped_line) if strict else delim_stripped_line
-                )
+                delim_stripped_line = line[
+                    len(BLOCKQUOTE_EXPANDABLE_DELIM)
+                    + (1 if line.startswith(f"{BLOCKQUOTE_EXPANDABLE_DELIM} ") else 0) :
+                ]
+                parsed_line = html.escape(delim_stripped_line) if strict else delim_stripped_line
 
                 to_quote_list.append((index, parsed_line))
                 html_escaped_list.append(index)
@@ -111,14 +132,16 @@ class Markdown:
                 continue
 
             elif line.endswith(BLOCKQUOTE_EXPANDABLE_END_DELIM) and inside_blockquote:
-                if line.startswith(BLOCKQUOTE_DELIM):
-                    line = line[len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :]
+                unwrapped_line = line
+                if unwrapped_line.startswith(BLOCKQUOTE_DELIM):
+                    unwrapped_line = unwrapped_line[
+                        len(BLOCKQUOTE_DELIM)
+                        + (1 if unwrapped_line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :
+                    ]
 
-                delim_stripped_line = line[:-len(BLOCKQUOTE_EXPANDABLE_END_DELIM)]
+                delim_stripped_line = unwrapped_line[: -len(BLOCKQUOTE_EXPANDABLE_END_DELIM)]
 
-                parsed_line = (
-                    html.escape(delim_stripped_line) if strict else delim_stripped_line
-                )
+                parsed_line = html.escape(delim_stripped_line) if strict else delim_stripped_line
 
                 to_quote_list.append((index, parsed_line))
                 html_escaped_list.append(index)
@@ -128,7 +151,9 @@ class Markdown:
                 create_blockquote(expandable=True)
 
             if inside_blockquote:
-                parsed_line = line[len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :]
+                parsed_line = line[
+                    len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :
+                ]
                 parsed_line = html.escape(parsed_line) if strict else parsed_line
                 to_quote_list.append((index, parsed_line))
                 html_escaped_list.append(index)
@@ -139,36 +164,33 @@ class Markdown:
                 continue
 
             if line.startswith(BLOCKQUOTE_DELIM):
-                delim_stripped_line = line[len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :]
-                parsed_line = (
-                    html.escape(delim_stripped_line) if strict else delim_stripped_line
-                )
+                delim_stripped_line = line[
+                    len(BLOCKQUOTE_DELIM) + (1 if line.startswith(f"{BLOCKQUOTE_DELIM} ") else 0) :
+                ]
+                parsed_line = html.escape(delim_stripped_line) if strict else delim_stripped_line
 
                 to_quote_list.append((index, parsed_line))
                 html_escaped_list.append(index)
 
             elif len(to_quote_list) > 0:
                 create_blockquote()
-        else:
-            create_blockquote()
+        create_blockquote()
 
         if strict:
             for idx, line in enumerate(text_lines):
                 if idx not in html_escaped_list:
                     text_lines[idx] = html.escape(line)
 
-        return "\n".join(
-            [valid_line for valid_line in text_lines if valid_line is not None]
-        )
+        return "\n".join([valid_line for valid_line in text_lines if valid_line is not None])
 
     async def parse(self, text: str, strict: bool = False):
         text = self.escape_and_create_quotes(text, strict=strict)
         delims = set()
         is_fixed_width = False
 
-        for i, match in enumerate(re.finditer(MARKDOWN_RE, text)):
+        for match in re.finditer(MARKDOWN_RE, text):
             start, _ = match.span()
-            delim, is_emoji, text_url, url = match.groups()
+            delim, is_emoji_like, text_url, url = match.groups()
             full = match.group(0)
 
             if delim in FIXED_WIDTH_DELIMS:
@@ -177,14 +199,31 @@ class Markdown:
             if is_fixed_width and delim not in FIXED_WIDTH_DELIMS:
                 continue
 
-            if not is_emoji and text_url:
+            if not is_emoji_like and text_url:
                 text = utils.replace_once(text, full, URL_MARKUP.format(url, text_url), start)
                 continue
 
-            if is_emoji:
-                emoji = text_url
-                emoji_id = url.lstrip("tg://emoji?id=")
-                text = utils.replace_once(text, full, EMOJI_MARKUP.format(emoji_id, emoji), start)
+            if is_emoji_like:
+                parsed = urllib.parse.urlparse(url)
+                params = urllib.parse.parse_qs(parsed.query)
+                emoji_date = text_url
+
+                if parsed.netloc == "time":
+                    unix_time = params.get("unix", [""])[0]
+                    date_time_format = params.get("format", [""])[0]
+
+                    if date_time_format:
+                        markup = FORMATTED_DATE_TIME_MARKUP.format(
+                            unix_time, date_time_format, emoji_date
+                        )
+                    else:
+                        markup = DATE_TIME_MARKUP.format(unix_time, emoji_date)
+                    text = utils.replace_once(text, full, markup, start)
+                elif parsed.netloc == "emoji":
+                    emoji_id = params.get("id", [""])[0]
+                    markup = EMOJI_MARKUP.format(emoji_id, emoji_date)
+                    text = utils.replace_once(text, full, markup, start)
+
                 continue
 
             if delim == BOLD_DELIM:
@@ -212,9 +251,11 @@ class Markdown:
                 tag = CLOSING_TAG.format(tag)
 
             if delim == PRE_DELIM and delim in delims:
-                delim_and_language = text[text.find(PRE_DELIM):].split("\n")[0]
-                language = delim_and_language[len(PRE_DELIM):]
-                text = utils.replace_once(text, delim_and_language, f'<pre language="{language}">', start)
+                delim_and_language = text[text.find(PRE_DELIM) :].split("\n")[0]
+                language = delim_and_language[len(PRE_DELIM) :]
+                text = utils.replace_once(
+                    text, delim_and_language, f'<pre language="{language}">', start
+                )
                 continue
 
             text = utils.replace_once(text, delim, tag, start)
@@ -222,7 +263,7 @@ class Markdown:
         return await self.html.parse(text)
 
     @staticmethod
-    def unparse(text: str, entities: list):
+    def unparse(text: str, entities: list[types.MessageEntity]):
         text = utils.add_surrogates(text)
 
         entities_offsets = []
@@ -255,12 +296,22 @@ class Markdown:
                 for line in lines:
                     if len(line) == 0 and last_length == end:
                         continue
-                    start_offset = start+last_length
-                    last_length = last_length+len(line)
-                    end_offset = start_offset+last_length
-                    entities_offsets.append((start_tag, start_offset,))
-                    entities_offsets.append((end_tag, end_offset,))
-                    last_length = last_length+1
+                    start_offset = start + last_length
+                    last_length = last_length + len(line)
+                    end_offset = start_offset + last_length
+                    entities_offsets.append(
+                        (
+                            start_tag,
+                            start_offset,
+                        )
+                    )
+                    entities_offsets.append(
+                        (
+                            end_tag,
+                            end_offset,
+                        )
+                    )
+                    last_length = last_length + 1
                 continue
             elif entity_type == MessageEntityType.SPOILER:
                 start_tag = end_tag = SPOILER_DELIM
@@ -276,18 +327,36 @@ class Markdown:
                 emoji_id = entity.custom_emoji_id
                 start_tag = "!["
                 end_tag = f"](tg://emoji?id={emoji_id})"
+            elif entity_type == MessageEntityType.DATE_TIME:
+                unix_time = entity.unix_time
+                date_time_format = entity.date_time_format
+                start_tag = "!["
+                if date_time_format:
+                    end_tag = f"](tg://time?unix={unix_time}&format={date_time_format})"
+                else:
+                    end_tag = f"](tg://time?unix={unix_time})"
             else:
                 continue
 
-            entities_offsets.append((start_tag, start,))
-            entities_offsets.append((end_tag, end,))
+            entities_offsets.append(
+                (
+                    start_tag,
+                    start,
+                )
+            )
+            entities_offsets.append(
+                (
+                    end_tag,
+                    end,
+                )
+            )
 
-        entities_offsets = map(
-            lambda x: x[1],
-            sorted(
+        entities_offsets = (
+            entity_and_offset
+            for _, entity_and_offset in sorted(
                 enumerate(entities_offsets),
-                key=lambda x: (x[1][1], x[0]),
-                reverse=True
+                key=lambda indexed: (indexed[1][1], indexed[0]),
+                reverse=True,
             )
         )
 

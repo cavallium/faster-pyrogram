@@ -15,6 +15,9 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import annotations as _annotations
+
 import re
 
 import pyrogram
@@ -23,9 +26,9 @@ from pyrogram import raw, types
 
 class CheckGiftCode:
     async def check_gift_code(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         link: str,
-    ) -> "types.CheckedGiftCode":
+    ) -> types.CheckedGiftCode:
         """Get information about a gift code.
 
         .. include:: /_includes/usable-by/users.rst
@@ -46,7 +49,10 @@ class CheckGiftCode:
                 # get information about a gift code
                 await app.check_gift_code("t.me/giftcode/abc1234567def")
         """
-        match = re.match(r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:giftcode/|\+))([\w-]+)$", link)
+        match = re.match(
+            r"^(?:https?://)?(?:www\.)?(?:t(?:elegram)?\.(?:org|me|dog)/(?:giftcode/|\+))([\w-]+)$",
+            link,
+        )
 
         if match:
             slug = match.group(1)
@@ -55,13 +61,9 @@ class CheckGiftCode:
         else:
             raise ValueError("Invalid gift code link")
 
-        r = await self.invoke(
-            raw.functions.payments.CheckGiftCode(
-                slug=slug
-            )
-        )
+        r = await self.invoke(raw.functions.payments.CheckGiftCode(slug=slug))
 
         users = {i.id: i for i in r.users}
         chats = {i.id: i for i in r.chats}
 
-        return types.CheckedGiftCode._parse(self, r, users, chats)
+        return await types.CheckedGiftCode._parse(self, r, users, chats)

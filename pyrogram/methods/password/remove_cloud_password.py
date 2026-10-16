@@ -16,16 +16,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 from pyrogram.utils import compute_password_check
 
 
 class RemoveCloudPassword:
-    async def remove_cloud_password(
-        self: "pyrogram.Client",
-        password: str
-    ) -> bool:
+    async def remove_cloud_password(self: pyrogram.Client, password: str) -> bool:
         """Turn off the Two-Step Verification security feature (Cloud Password) on your account.
 
         .. include:: /_includes/usable-by/users.rst
@@ -54,10 +53,8 @@ class RemoveCloudPassword:
             raw.functions.account.UpdatePasswordSettings(
                 password=compute_password_check(r, password),
                 new_settings=raw.types.account.PasswordInputSettings(
-                    new_algo=raw.types.PasswordKdfAlgoUnknown(),
-                    new_password_hash=b"",
-                    hint=""
-                )
+                    new_algo=raw.types.PasswordKdfAlgoUnknown(), new_password_hash=b"", hint=""
+                ),
             )
         )
 

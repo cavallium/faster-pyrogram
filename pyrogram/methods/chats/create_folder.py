@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
@@ -24,24 +24,24 @@ from pyrogram import enums, raw, types, utils
 
 class CreateFolder:
     async def create_folder(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
         name: str,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        entities: Optional[List["types.MessageEntity"]] = None,
-        animate_custom_emoji: Optional[bool] = None,
-        icon: Optional[str] = None,
-        color: Optional["enums.FolderColor"] = None,
-        pinned_chats: Optional[List[Union[int, str]]] = None,
-        included_chats: Optional[List[Union[int, str]]] = None,
-        excluded_chats: Optional[List[Union[int, str]]] = None,
-        exclude_muted: Optional[bool] = None,
-        exclude_read: Optional[bool] = None,
-        exclude_archived: Optional[bool] = None,
-        include_contacts: Optional[bool] = None,
-        include_non_contacts: Optional[bool] = None,
-        include_bots: Optional[bool] = None,
-        include_groups: Optional[bool] = None,
-        include_channels: Optional[bool] = None
+        parse_mode: enums.ParseMode | None = None,
+        entities: list[types.MessageEntity] | None = None,
+        animate_custom_emoji: bool | None = None,
+        icon: str | None = None,
+        color: enums.FolderColor | None = None,
+        pinned_chats: list[int | str] | None = None,
+        included_chats: list[int | str] | None = None,
+        excluded_chats: list[int | str] | None = None,
+        exclude_muted: bool | None = None,
+        exclude_read: bool | None = None,
+        exclude_archived: bool | None = None,
+        include_contacts: bool | None = None,
+        include_non_contacts: bool | None = None,
+        include_bots: bool | None = None,
+        include_groups: bool | None = None,
+        include_channels: bool | None = None,
     ) -> int:
         """Create new chat folder.
 
@@ -65,12 +65,9 @@ class CreateFolder:
                 The chosen icon for the chat folder.
                 Pass None to leave the folder icon as default.
 
-            color (:obj:`~pyrogram.enums.FolderColor`, *optional*)
+            color (:obj:`~pyrogram.enums.FolderColor`, *optional*):
                 Pass :obj:`~pyrogram.enums.FolderColor` to set folder color.
                 Can't be changed if folder tags are disabled or the current user doesn't have Telegram Premium subscription.
-
-            is_shareable (``bool``, *optional*):
-                True, if at least one link has been created for the folder.
 
             pinned_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
                 The pinned chats in the folder.
@@ -123,7 +120,8 @@ class CreateFolder:
         dialog_filters = await self.invoke(raw.functions.messages.GetDialogFilters())
 
         raw_folders_ids = [
-            folder.id for folder in dialog_filters.filters
+            folder.id
+            for folder in dialog_filters.filters
             if isinstance(folder, (raw.types.DialogFilter, raw.types.DialogFilterChatlist))
         ]
 
@@ -133,7 +131,9 @@ class CreateFolder:
                 folder_id = i
                 break
 
-        name, title_entities = (await utils.parse_text_entities(self, name, parse_mode, entities)).values()
+        name, title_entities = (
+            await utils.parse_text_entities(self, name, parse_mode, entities)
+        ).values()
         title_entities = title_entities or []
 
         pinned_chats = pinned_chats or []
@@ -149,18 +149,9 @@ class CreateFolder:
                         text=name,
                         entities=title_entities,
                     ),
-                    pinned_peers=[
-                        await self.resolve_peer(user_id)
-                        for user_id in pinned_chats
-                    ],
-                    include_peers=[
-                        await self.resolve_peer(user_id)
-                        for user_id in included_chats
-                    ],
-                    exclude_peers=[
-                        await self.resolve_peer(user_id)
-                        for user_id in excluded_chats
-                    ],
+                    pinned_peers=[await self.resolve_peer(user_id) for user_id in pinned_chats],
+                    include_peers=[await self.resolve_peer(user_id) for user_id in included_chats],
+                    exclude_peers=[await self.resolve_peer(user_id) for user_id in excluded_chats],
                     contacts=include_contacts,
                     non_contacts=include_non_contacts,
                     groups=include_groups,
@@ -171,8 +162,8 @@ class CreateFolder:
                     exclude_archived=exclude_archived,
                     title_noanimate=not animate_custom_emoji,
                     emoticon=icon,
-                    color=color.value if color else None
-                )
+                    color=color.value if color else None,
+                ),
             )
         )
 

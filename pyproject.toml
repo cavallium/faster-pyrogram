@@ -1,5 +1,7 @@
 [build-system]
-requires = ["hatchling"]
+# PEP 639 metadata (`license` as an expression, `license-files` as a list) needs 1.26.3.
+#  Below it the build fails with `TypeError: Field project.license-files must be a table`.
+requires = ["hatchling>=1.26.3"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,9 +9,12 @@ name = "Kurigram"
 dynamic = ["version"]
 description = "Elegant, modern and asynchronous Telegram MTProto API framework in Python for users and bots"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [{ name = "Dan", email = "dan@pyrogram.org" }]
-maintainers = [{ name = "KurimuzonAkuma" }]
+maintainers = [
+    { name = "KurimuzonAkuma" },
+    { name = "Danipulok", email = "danipulok@gmail.com" },
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -18,12 +23,12 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: Python :: Implementation",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
@@ -34,9 +39,19 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
-dependencies = ["pyaes<=1.6.1", "pysocks<=1.7.1"]
+# Every constraint is a floor, measured rather than guessed: the oldest version this code
+#  works with, and the start of an unbroken range up to the newest. No ceilings, because an
+#  upper bound propagates into every downstream resolve and ages by hand.
+dependencies = [
+    # 1.1.0 and below are Python 2 only: the import fails with a `SyntaxError` on a `print`
+    #  statement, and 1.0.0 with a `NameError` on `xrange`.
+    "pyaes>=1.2.0",
+    # `tcp.py` builds the proxy as `Proxy(proxy_type=..., host=..., port=...)`, and 2.3.0
+    #  and below have no such constructor: `TypeError: Proxy() takes no arguments`.
+    "python-socks[asyncio]>=2.4.0",
+]
 license = "LGPL-3.0-or-later"
-license-files = ["COPYING", "COPYING.lesser"]
+license-files = ["COPYING", "COPYING.lesser", "NOTICE"]
 keywords = [
     "telegram",
     "chat",
@@ -49,34 +64,104 @@ keywords = [
 ]
 
 [project.urls]
-Homepage = "https://kurigram.live"
-Documentation = "https://docs.kurigram.live"
-Source = "https://github.com/KurimuzonAkuma/pyrogram"
-Issues = "https://github.com/KurimuzonAkuma/pyrogram/issues"
+Homepage = "https://kurigram.icu"
+Documentation = "https://docs.kurigram.icu"
+Source = "https://github.com/kurigram-org/kurigram"
+Issues = "https://github.com/kurigram-org/kurigram/issues"
 Community = "https://t.me/kurigram_chat"
 
 [project.optional-dependencies]
+fast = [
+    # 1.2.1 shipped no sdist and no wheel past `cp38`, so it cannot be installed on a
+    #  current interpreter at all, while 1.2.0 below it and 1.2.2 above it both can. The
+    #  floor sits above that hole rather than at the oldest working release.
+    "tgcrypto>=1.2.2",
+    "uvloop>=0.21.0; sys_platform == 'darwin' or sys_platform == 'linux'",
+]
+
+qrcode = [
+    # `Client.authorize_qr` calls `print_ascii(tty=True)`, and on 5.2 and 5.2.1 that raises
+    #  a `TypeError`: it writes bytes into a text buffer. 5.1 below the hole and 5.2.2 above
+    #  it both work, so the floor sits above the hole.
+    "qrcode>=5.2.2",
+]
+
+# `dev` and `docs` are tooling, not something a user of the library installs, so they are
+#  dependency groups rather than extras: `uv sync` takes them from the lock file and `pip
+#  install kurigram[dev]` stops being a thing anyone can type by accident.
+#
+# Their floors are deliberately above the oldest version that runs. A linter or a
+#  documentation theme resolved a year back gives a different verdict and a different site
+#  from the one CI gives, which is worse than a version conflict.
+[dependency-groups]
+# `dev` is the aggregate one `uv sync` installs by default. It lists groups, never packages,
+#  so every package below sits in a group that says what it is for and a leaner install can
+#  ask for that group alone.
 dev = [
-    "keyring<=25.1.0",
-    "hatch<=1.7.0",
-    "pytest<=7.4.3",
-    "pytest-asyncio<=0.21.1",
-    "pytest-cov<=4.1.0",
-    "twine<=4.0.2",
+    { include-group = "lint" },
+    { include-group = "test" },
+]
+
+lint = [
+    # The build backend, already named in `[build-system]`. It is here because
+    #  `hatch_build.py` imports `hatchling.builders.hooks.plugin.interface` and `ty` checks
+    #  that file like any other: without it, `make typecheck` fails on an unresolved import.
+    "hatchling>=1.27.0",
+    "pre-commit>=3.5.0",
+    "ruff>=0.16.3",
+    "ty>=0.0.78",
+]
+
+test = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "pytest-timeout>=2.4.0",
 ]
 
 docs = [
-    "Sphinx<=8.2.3",
-    "furo<=2024.8.8",
-    "sphinx-autobuild<=2024.10.3",
-    "sphinx-copybutton<=0.5.2",
-    "pygments<=2.19.1",
+    "Sphinx>=7.4.7",
+    "shibuya>=2025.10.21",
+    "sphinx-autobuild>=2024.10.3",
+    "sphinx-copybutton>=0.5.2",
+    "sphinx-iconify>=0.3.0",
+    "sphinx-design>=0.6.1",
+    "pygments>=2.19.2",
 ]
 
-fast = [
-    "tgcrypto<=1.2.5",
-    "uvloop<=0.21.0; sys_platform == 'darwin' or sys_platform == 'linux'",
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# A relay that never answers `down?cursor=&wait=` hangs a run with nothing to
+#  break the deadlock. Offline tests finish in ~0.1s and the live ones stay
+#  under the carrier's own 25-30s ceilings, so this only ever fires on a hang.
+timeout = 120
+markers = [
+    "unit: fast, no network or filesystem beyond the repo",
+    "guard: asserts a property of the repository rather than the behaviour of one module",
+    "integration: opens a real socket or talks to a real service",
 ]
+
+# So the number describes what somebody wrote, the same paths `[tool.ruff] extend-exclude` names
+#  are dropped here too, in the glob form `coverage` matches files with. `[tool.ty.src].exclude`
+#  below carries the reasoning for the list and for the split, and both blocks defer to it.
+[tool.coverage.run]
+source = ["pyrogram"]
+omit = [
+    "pyrogram/raw/base/*",
+    "pyrogram/raw/functions/*",
+    "pyrogram/raw/types/*",
+    "pyrogram/raw/all.py",
+    "pyrogram/errors/exceptions/*",
+]
+
+[tool.coverage.report]
+# No threshold, deliberately. The offline suite covers 55% of 24444 statements as of 2026-09-24,
+#  and a gate set at a number nobody has agreed to is raised until it stops firing, so `fail_under`
+#  waits for a number somebody has looked at and chosen.
 
 [tool.hatch.version]
 path = "pyrogram/__init__.py"
@@ -86,14 +171,104 @@ path = "pyrogram/__init__.py"
 [tool.hatch.metadata]
 allow-direct-references = true
 
+# An allowlist, because the exclude list it replaces could only name what had already leaked:
+#  `hatchling` reads the root `.gitignore` and never a nested one, so a local-only directory
+#  whose ignore rule lives inside itself was packed whole.
+#  https://github.com/pypa/hatch/blob/558061c5ecbe7e9b10d81965d4cdc8df05832228/backend/src/hatchling/builders/config.py#L754
+#  `pyproject.toml`, `hatch_build.py`, `README.md`, the `license-files` above and `.gitignore`
+#  land in the archive whatever this list says, so they are not repeated here.
+#  https://github.com/pypa/hatch/blob/558061c5ecbe7e9b10d81965d4cdc8df05832228/backend/src/hatchling/builders/sdist.py#L330
 [tool.hatch.build.targets.sdist]
-exclude = [
-    ".github/",
-    "docs/",
-    "tests/",
-    ".gitignore",
+include = [
+    "/pyrogram",
+    # The generated modules are git-ignored and therefore absent from the archive; a build
+    #  from the archive writes them, and it needs the sources and templates to do it.
+    "/compiler",
+    # Shipped so whoever repackages the archive can check the build: a bare `pytest` finds
+    #  them through `testpaths` above and needs nothing else out of the tree.
+    "/tests",
 ]
 
 [tool.hatch.build.targets.wheel]
 ignore-vcs = true
 packages = ["pyrogram"]
+
+[tool.ruff]
+# 100 is where the hand-written tree already sits: p95 is 87 columns and the tail runs to
+#  about 116. It is also the smallest reformat of the three candidates, 674 files and 11787
+#  diff lines, against 731/15048 at the default 88 and 719/12870 at 120. The default splits
+#  that tail, and 120 joins back lines that were split by hand.
+line-length = 100
+
+# Exactly the paths `make api` writes, so a checkout that has already been built lints the
+#  same as a fresh one. `TOML` cannot share a list, so this repeats `[tool.ty.src].exclude`
+#  below, which carries the reasoning for the split.
+extend-exclude = [
+    "pyrogram/raw/base",
+    "pyrogram/raw/functions",
+    "pyrogram/raw/types",
+    "pyrogram/raw/all.py",
+    "pyrogram/errors/exceptions",
+]
+
+[tool.ruff.format]
+# Already the default, pinned so a future `ruff` release cannot rewrite the tree by changing
+#  it. Nothing else here needs setting: preserving the quotes instead of normalizing them
+#  shrinks the reformat by 120 lines out of 15048, so the tree is double-quoted throughout.
+quote-style = "double"
+
+[tool.ruff.lint]
+# This selection is a floor, not a style guide. It is the set of rules the tree already
+#  passes, so the check can only ever fail on something newly written, and it is meant to
+#  grow one rule at a time. Anything wider is unusable for now: `ruff check --select ALL
+#  --statistics` reports nearly 19000 findings, the bulk of them line length, missing
+#  trailing commas and docstring section formatting.
+select = [
+    "B",      # flake8-bugbear: mutable/call-based argument defaults, bare `except: raise`,
+              #  unused loop variables, `zip()` without `strict=`.
+    "C4",     # flake8-comprehensions: a comprehension a plain builtin call already expresses.
+    "E9",     # Syntax errors and files that cannot be read.
+    "EXE",    # flake8-executable: a shebang without the matching executable bit, or vice versa.
+    "F",      # Pyflakes: unused imports and locals, wildcard imports, f-strings with no field.
+    "ICN",    # flake8-import-conventions: an import that does not follow its usual alias.
+    "INP",    # flake8-no-pep420: a `.py` file whose own directory has no `__init__.py`.
+    "INT",    # flake8-gettext: a gettext call built from an f-string/concatenation.
+    "ISC",    # flake8-implicit-str-concat: a `+` between adjacent literals, or two on one line.
+    "LOG",    # flake8-logging: stdlib `logging` misuse, e.g. constructing a `Logger` directly.
+    "PGH",    # pygrep-hooks: a blanket `# noqa`/`# type: ignore` with no code, or `eval()`.
+    "PIE",    # flake8-pie: a `range(0, ...)` start, a stray `pass`, a duplicate class field.
+    "PLC",    # Pylint convention: dict `.items()` misuse, deferred imports, `str.split` maxsplit.
+    "PLE",    # Pylint Error: real bugs (bad `super()` call, `yield` outside a function, ...).
+    "PLW",    # Pylint warning: dead loop-else, shadowed loop vars, self-assignment, eq/hash.
+    "PYI",    # flake8-pyi: the stub conventions that also hold in a regular `.py` file.
+    "RSE",    # flake8-raise: a parenthesized exception with no arguments, e.g. `raise Exc()`.
+    "RUF013", # Implicit `Optional`, e.g. `def method(chat_id: int = None)`.
+    "SLOT",   # flake8-slots: an immutable-builtin subclass missing `__slots__`.
+    "T10",    # flake8-debugger: a leftover `breakpoint()`/`pdb.set_trace()`.
+    "TC",     # flake8-type-checking: an import needed only for annotations.
+    "UP",     # pyupgrade: outdated typing syntax, and `.format()` calls an f-string replaces.
+    "W",      # pycodestyle warnings: an invalid escape sequence, and whitespace the
+              #  formatter already normalizes.
+    "YTT",    # flake8-2020: a `sys.version_info` comparison that breaks on Python 10 and later.
+]
+
+[tool.ty.src]
+# `pyrogram/raw/{base,functions,types,all.py}` and `pyrogram/errors/exceptions` are
+#  written by `make api`; `pyrogram/raw/core` is hand-written and stays in scope. A CLI
+#  `--exclude` changes tree traversal and gives a different diagnostic count, so the
+#  exclude has to live here to be reproducible.
+exclude = [
+    "pyrogram/raw/base",
+    "pyrogram/raw/functions",
+    "pyrogram/raw/types",
+    "pyrogram/raw/all.py",
+    "pyrogram/errors/exceptions",
+]
+
+[tool.ty.rules]
+# This ignore list is a ceiling, not a target: it is exactly the set of rules the tree
+#  fails today, so the check can only regress on rules not listed here, and the list is
+#  meant to shrink one rule at a time, the same pattern `[tool.ruff.lint].select` uses.
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+unresolved-attribute = "ignore"

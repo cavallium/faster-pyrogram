@@ -15,17 +15,17 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import annotations as _annotations
+
 import pyrogram
-from pyrogram import raw
-from pyrogram import types
+from pyrogram import raw, types, utils
 
 
 class CreateChannel:
     async def create_channel(
-        self: "pyrogram.Client",
-        title: str,
-        description: str = ""
-    ) -> "types.Chat":
+        self: pyrogram.Client, title: str, description: str = ""
+    ) -> types.Chat:
         """Create a new broadcast channel.
 
         .. include:: /_includes/usable-by/users.rst
@@ -46,11 +46,7 @@ class CreateChannel:
                 await app.create_channel("Channel Title", "Channel Description")
         """
         r = await self.invoke(
-            raw.functions.channels.CreateChannel(
-                title=title,
-                about=description,
-                broadcast=True
-            )
+            raw.functions.channels.CreateChannel(title=title, about=description, broadcast=True)
         )
 
-        return types.Chat._parse_chat(self, r.chats[0])
+        return utils.require_parsed(await types.Chat._parse_chat(self, r.chats[0]))

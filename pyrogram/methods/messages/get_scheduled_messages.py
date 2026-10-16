@@ -16,8 +16,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from typing import Union, List
 
 import pyrogram
 from pyrogram import raw
@@ -29,9 +30,8 @@ log = logging.getLogger(__name__)
 
 class GetScheduledMessages:
     async def get_scheduled_messages(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str]
-    ) -> List["types.Message"]:
+        self: pyrogram.Client, chat_id: int | str
+    ) -> list[types.Message]:
         """Get one or more scheduled messages from a chat.
 
         .. include:: /_includes/usable-by/users.rst
@@ -55,7 +55,9 @@ class GetScheduledMessages:
             ValueError: In case of invalid arguments.
         """
         r = await self.invoke(
-            raw.functions.messages.GetScheduledHistory(peer=await self.resolve_peer(chat_id), hash=0)
+            raw.functions.messages.GetScheduledHistory(
+                peer=await self.resolve_peer(chat_id), hash=0
+            )
         )
 
         return await utils.parse_messages(self, r, replies=0)

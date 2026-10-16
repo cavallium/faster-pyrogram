@@ -16,46 +16,43 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union, BinaryIO, Optional
+from __future__ import annotations as _annotations
+
+import logging
+from typing import TYPE_CHECKING, BinaryIO
 
 import pyrogram
-from pyrogram import raw
+from pyrogram import raw, types
+
+if TYPE_CHECKING:
+    from pyrogram._typing import PathType
+
+log = logging.getLogger(__name__)
 
 
 class SetProfilePhoto:
     async def set_profile_photo(
-        self: "pyrogram.Client",
+        self: pyrogram.Client,
+        photo: types.InputChatPhoto | None = None,
+        is_public: bool | None = None,
         *,
-        photo: Optional[Union[str, BinaryIO]] = None,
-        video: Optional[Union[str, BinaryIO]] = None,
-        is_public: Optional[bool] = None
+        video: PathType | BinaryIO | None = None,
     ) -> bool:
-        """Set a new profile photo or video (H.264/MPEG-4 AVC video, max 5 seconds).
+        """Changes a profile photo for the current user.
 
-        The ``photo`` and ``video`` arguments are mutually exclusive.
-        Pass either one as named argument (see examples below).
-
-        .. note::
-
-            This method only works for Users.
-            Bots profile photos must be set using BotFather.
-
-        .. include:: /_includes/usable-by/users.rst
+        .. include:: /_includes/usable-by/users-bots.rst
 
         Parameters:
-            photo (``str`` | ``BinaryIO``, *optional*):
+            photo (:obj:`~pyrogram.types.InputChatPhoto`, *optional*):
                 Profile photo to set.
-                Pass a file path as string to upload a new photo that exists on your local machine or
-                pass a binary file-like object with its attribute ".name" set for in-memory uploads.
+
+            is_public (``bool``, *optional*):
+                Pass True to set the public photo, which will be visible even if the main photo is hidden by privacy settings.
 
             video (``str`` | ``BinaryIO``, *optional*):
                 Profile video to set.
-                Pass a file path as string to upload a new video that exists on your local machine or
-                pass a binary file-like object with its attribute ".name" set for in-memory uploads.
-
-            is_public (``bool``, *optional*):
-                If set to True, the chosen profile photo will be shown to users that can't display
-                your main profile photo due to your privacy settings.
+                This parameter is deprecated and should not be used.
+                Use `photo` instead.
 
         Returns:
             ``bool``: True on success.
@@ -64,21 +61,112 @@ class SetProfilePhoto:
             .. code-block:: python
 
                 # Set a new profile photo
-                await app.set_profile_photo(photo="new_photo.jpg")
+                await app.set_profile_photo(photo=types.InputChatPhotoStatic("new_photo.jpg"))
 
                 # Set a new profile video
-                await app.set_profile_photo(video="new_video.mp4")
+                await app.set_profile_photo(photo=types.InputChatPhotoAnimation("new_video.mp4"))
+
+                # Set a previous profile photo
+                await app.set_profile_photo(photo=types.InputChatPhotoPrevious(file_id))
 
                 # Set/update your account's public profile photo
-                await app.set_profile_photo(photo="new_photo.jpg", is_public=True)
+                await app.set_profile_photo(photo=types.InputChatPhotoStatic("new_photo.jpg"), is_public=True)
         """
+        if video is not None:
+            log.warning(
+                "`video` is deprecated and will be removed in future updates. Use `photo` instead."
+            )
 
-        return bool(
-            await self.invoke(
-                raw.functions.photos.UploadProfilePhoto(
-                    fallback=is_public,
-                    file=await self.save_file(photo),
-                    video=await self.save_file(video)
+            photo = types.InputChatPhotoAnimation(animation=video)
+
+        if photo is not None and not isinstance(photo, types.InputChatPhoto):
+            log.warning(
+                "You must pass `photo` as `types.InputChatPhoto`. Passing `photo` as a string "
+                "or binary object is deprecated and will be removed in future updates."
+            )
+
+            photo = types.InputChatPhotoStatic(photo=photo)
+
+        if isinstance(photo, types.InputChatPhotoPrevious):
+            return bool(
+                await self.invoke(
+                    raw.functions.photos.UpdateProfilePhoto(
+                        fallback=is_public,
+                        id=await photo.write(self),
+                    )
                 )
             )
-        )
+        else:
+            return bool(
+                await self.invoke(
+                    raw.functions.photos.UploadProfilePhoto(
+                        fallback=is_public,
+                        file=await photo.write(self)
+                        if isinstance(photo, types.InputChatPhotoStatic)
+                        else None,
+                        video=await photo.write(self)
+                        if isinstance(photo, types.InputChatPhotoAnimation)
+                        else None,
+                        video_start_ts=getattr(photo, "main_frame_timestamp", None),
+                    )
+                )
+            )
+
+
+class SetBotProfilePhoto:
+    async def set_bot_profile_photo(
+        self: pyrogram.Client,
+        bot_user_id: int | str,
+        photo: types.InputChatPhoto | None = None,
+    ) -> bool:
+        """Changes a profile photo for a bot.
+
+        .. include:: /_includes/usable-by/users.rst
+
+        Parameters:
+            bot_user_id (``int`` | ``str``):
+                Unique identifier (int) or username (str) of the target bot.
+
+            photo (:obj:`~pyrogram.types.InputChatPhoto`, *optional*):
+                Profile photo to set.
+                Pass None to remove the profile photo.
+
+        Returns:
+            ``bool``: True on success.
+
+        Example:
+            .. code-block:: python
+
+                # Set a new bot profile photo
+                await app.set_bot_profile_photo(bot_user_id="@KurigramBot", photo=types.InputChatPhotoStatic("new_photo.jpg"))
+
+                # Set a new bot profile video
+                await app.set_bot_profile_photo(bot_user_id="@KurigramBot", photo=types.InputChatPhotoAnimation("new_video.mp4"))
+
+                # Remove bot profile photo
+                await app.set_bot_profile_photo(bot_user_id="@KurigramBot")
+        """
+        if isinstance(photo, types.InputChatPhotoPrevious):
+            return bool(
+                await self.invoke(
+                    raw.functions.photos.UpdateProfilePhoto(
+                        id=await photo.write(self) if photo else raw.types.InputPhotoEmpty(),
+                        bot=await self.resolve_peer(bot_user_id),
+                    )
+                )
+            )
+        else:
+            return bool(
+                await self.invoke(
+                    raw.functions.photos.UploadProfilePhoto(
+                        bot=await self.resolve_peer(bot_user_id),
+                        file=await photo.write(self)
+                        if isinstance(photo, types.InputChatPhotoStatic)
+                        else None,
+                        video=await photo.write(self)
+                        if isinstance(photo, types.InputChatPhotoAnimation)
+                        else None,
+                        video_start_ts=getattr(photo, "main_frame_timestamp", None),
+                    )
+                )
+            )

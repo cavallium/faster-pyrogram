@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw
@@ -24,9 +24,7 @@ from pyrogram import raw
 
 class ReadReactions:
     async def read_reactions(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        topic_id: bool = None
+        self: pyrogram.Client, chat_id: int | str, topic_id: int | None = None
     ) -> bool:
         """Mark a reaction in the chat as read.
 
@@ -56,8 +54,7 @@ class ReadReactions:
         """
         r = await self.invoke(
             raw.functions.messages.ReadReactions(
-                peer=await self.resolve_peer(chat_id),
-                top_msg_id=topic_id
+                peer=await self.resolve_peer(chat_id), top_msg_id=topic_id
             )
         )
 

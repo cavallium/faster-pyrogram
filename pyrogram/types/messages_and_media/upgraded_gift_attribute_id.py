@@ -15,7 +15,8 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Optional
+
+from __future__ import annotations as _annotations
 
 from pyrogram import raw, types
 
@@ -27,9 +28,9 @@ class UpgradedGiftAttributeId(Object):
 
     It can be one of:
 
-    - :obj:`~pyrogram.types.UpgradedfGiftAttributeIdModel`
-    - :obj:`~pyrogram.types.UpgradedfGiftAttributeIdSymbol`
-    - :obj:`~pyrogram.types.UpgradedfGiftAttributeIdBackdrop`
+    - :obj:`~pyrogram.types.UpgradedGiftAttributeIdModel`
+    - :obj:`~pyrogram.types.UpgradedGiftAttributeIdSymbol`
+    - :obj:`~pyrogram.types.UpgradedGiftAttributeIdBackdrop`
     """
 
     def __init__(
@@ -38,21 +39,13 @@ class UpgradedGiftAttributeId(Object):
         super().__init__()
 
     @staticmethod
-    def _parse(
-        attribute_id: "raw.base.StarGiftAttributeId"
-    ) -> Optional["UpgradedGiftAttributeId"]:
+    def _parse(attribute_id: raw.base.StarGiftAttributeId) -> UpgradedGiftAttributeId | None:
         if not attribute_id:
             return None
 
         if isinstance(attribute_id, raw.types.StarGiftAttributeIdModel):
-            return types.UpgradedfGiftAttributeIdModel(
-                sticker_id=attribute_id.document_id
-            )
+            return types.UpgradedfGiftAttributeIdModel(sticker_id=attribute_id.document_id)
         elif isinstance(attribute_id, raw.types.StarGiftAttributeIdPattern):
-            return types.UpgradedfGiftAttributeIdSymbol(
-                sticker_id=attribute_id.document_id
-            )
+            return types.UpgradedfGiftAttributeIdSymbol(sticker_id=attribute_id.document_id)
         elif isinstance(attribute_id, raw.types.StarGiftAttributeIdBackdrop):
-            return types.UpgradedfGiftAttributeIdBackdrop(
-                backdrop_id=attribute_id.backdrop_id
-            )
+            return types.UpgradedfGiftAttributeIdBackdrop(backdrop_id=attribute_id.backdrop_id)

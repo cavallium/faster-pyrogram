@@ -16,39 +16,44 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import logging
-from datetime import datetime
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING
 
 import pyrogram
 from pyrogram import enums, raw, types, utils
 
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
 log = logging.getLogger(__name__)
+
 
 class CopyMediaGroup:
     async def copy_media_group(
-        self: "pyrogram.Client",
-        chat_id: Union[int, str],
-        from_chat_id: Union[int, str],
+        self: pyrogram.Client,
+        chat_id: int | str,
+        from_chat_id: int | str,
         message_id: int,
-        captions: Union[List[str], str] = None,
-        has_spoilers: Union[List[bool], bool] = None,
-        disable_notification: bool = None,
-        message_thread_id: int = None,
-        schedule_date: datetime = None,
-        show_caption_above_media: bool = None,
-        allow_paid_broadcast: bool = None,
-        paid_message_star_count: int = None,
-        reply_parameters: "types.ReplyParameters" = None,
-
-        reply_to_message_id: int = None,
-        reply_to_chat_id: Union[int, str] = None,
-        reply_to_story_id: int = None,
-        quote_text: str = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: List["types.MessageEntity"] = None,
-        quote_offset: int = None,
-    ) -> List["types.Message"]:
+        captions: list[str] | str | None = None,
+        has_spoilers: list[bool] | bool | None = None,
+        disable_notification: bool | None = None,
+        message_thread_id: int | None = None,
+        schedule_date: datetime | timedelta | None = None,
+        protect_content: bool | None = None,
+        show_caption_above_media: bool | None = None,
+        allow_paid_broadcast: bool | None = None,
+        paid_message_star_count: int | None = None,
+        reply_parameters: types.ReplyParameters | None = None,
+        reply_to_message_id: int | None = None,
+        reply_to_chat_id: int | str | None = None,
+        reply_to_story_id: int | None = None,
+        quote_text: str | None = None,
+        parse_mode: enums.ParseMode | None = None,
+        quote_entities: list[types.MessageEntity] | None = None,
+        quote_offset: int | None = None,
+    ) -> list[types.Message]:
         """Copy a media group by providing one of the message ids.
 
         .. include:: /_includes/usable-by/users-bots.rst
@@ -72,9 +77,13 @@ class CopyMediaGroup:
                 If not specified, the original caption is kept.
                 Pass "" (empty string) to remove the caption.
 
-                If a ``string`` is passed, it becomes a caption only for the first media.
-                If a list of ``string`` passed, each element becomes caption for each media element.
+                If a ``str`` is passed, it becomes a caption only for the first media.
+                If a list of ``str`` passed, each element becomes caption for each media element.
                 You can pass ``None`` in list to keep the original caption (see examples below).
+
+            has_spoilers (List of ``bool`` | ``bool``, *optional*):
+                Pass True if the media needs to be covered with a spoiler animation.
+                Pass a list of booleans to cover each medium of the group separately.
 
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
@@ -87,8 +96,47 @@ class CopyMediaGroup:
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
-            schedule_date (:py:obj:`~datetime.datetime`, *optional*):
+            reply_to_message_id (``int``, *optional*):
+                If the message is a reply, ID of the original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_chat_id (``int`` | ``str``, *optional*):
+                Unique identifier (int) or username (str) of the chat holding the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            reply_to_story_id (``int``, *optional*):
+                If the message is a reply to a story, ID of the story.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_text (``str``, *optional*):
+                Text of the quoted part of the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
+                Parse mode of the quoted part of the message that is replied to.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
+                List of special entities that appear in the quote, which can be specified instead of *parse_mode*.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            quote_offset (``int``, *optional*):
+                Offset for quote in original message.
+                This parameter is deprecated and should not be used.
+                Use `reply_parameters` instead.
+
+            schedule_date (:py:obj:`~datetime.datetime` | :py:obj:`~datetime.timedelta`, *optional*):
                 Date when the message will be automatically sent.
+                A :py:obj:`~datetime.timedelta` is counted from now.
+
+            protect_content (``bool``, *optional*):
+                Protects the contents of the sent message from forwarding and saving.
 
             show_caption_above_media (``bool``, *optional*):
                 Pass True, if the caption must be shown above the message media.
@@ -169,7 +217,7 @@ class CopyMediaGroup:
                 quote=quote_text,
                 quote_parse_mode=parse_mode,
                 quote_entities=quote_entities,
-                quote_position=quote_offset
+                quote_position=quote_offset,
             )
 
         media_group = await self.get_media_group(from_chat_id, message_id)
@@ -191,8 +239,7 @@ class CopyMediaGroup:
                 file_id=file_id,
                 has_spoiler=(
                     has_spoilers[i]
-                    if isinstance(has_spoilers, list)
-                    and i < len(has_spoilers)
+                    if isinstance(has_spoilers, list) and i < len(has_spoilers)
                     else (
                         has_spoilers
                         if isinstance(has_spoilers, bool)
@@ -205,10 +252,16 @@ class CopyMediaGroup:
                     media=media,
                     random_id=self.rnd_id(),
                     **await self.parser.parse(
-                        captions[i] if isinstance(captions, list) and i < len(captions) and captions[i] else
-                        captions if isinstance(captions, str) and i == 0 else
-                        message.caption if message.caption and message.caption != "None" and not type(
-                            captions) is str else "")
+                        captions[i]
+                        if isinstance(captions, list) and i < len(captions) and captions[i]
+                        else captions
+                        if isinstance(captions, str) and i == 0
+                        else message.caption
+                        if message.caption
+                        and message.caption != "None"
+                        and not type(captions) is str
+                        else ""
+                    ),
                 )
             )
 
@@ -216,30 +269,15 @@ class CopyMediaGroup:
             raw.functions.messages.SendMultiMedia(
                 peer=await self.resolve_peer(chat_id),
                 multi_media=multi_media,
-                silent=disable_notification or None,
-                reply_to=await utils.get_reply_to(
-                    self,
-                    reply_parameters,
-                    message_thread_id
-                ),
+                silent=disable_notification,
+                reply_to=await utils.get_reply_to(self, reply_parameters, message_thread_id),
                 schedule_date=utils.datetime_to_timestamp(schedule_date),
+                noforwards=protect_content,
                 invert_media=show_caption_above_media,
                 allow_paid_floodskip=allow_paid_broadcast,
-                allow_paid_stars=paid_message_star_count
+                allow_paid_stars=paid_message_star_count,
             ),
-            sleep_threshold=60
+            sleep_threshold=60,
         )
 
-        return await utils.parse_messages(
-            self,
-            raw.types.messages.Messages(
-                messages=[m.message for m in filter(
-                    lambda u: isinstance(u, (raw.types.UpdateNewMessage,
-                                             raw.types.UpdateNewChannelMessage,
-                                             raw.types.UpdateNewScheduledMessage)),
-                    r.updates
-                )],
-                users=r.users,
-                chats=r.chats
-            )
-        )
+        return await utils.parse_messages(client=self, messages=r)

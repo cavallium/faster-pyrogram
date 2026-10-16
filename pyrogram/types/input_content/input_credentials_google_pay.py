@@ -16,6 +16,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations as _annotations
+
 import pyrogram
 from pyrogram import raw
 
@@ -29,6 +31,7 @@ class InputCredentialsGooglePay(InputCredentials):
         data (``str``):
             JSON-encoded data with the credential identifier.
     """
+
     def __init__(
         self,
         data: str,
@@ -37,7 +40,7 @@ class InputCredentialsGooglePay(InputCredentials):
 
         self.data = data
 
-    async def write(self, client: "pyrogram.Client"):
+    async def write(self, client: pyrogram.Client):
         return raw.types.InputPaymentCredentialsGooglePay(
             payment_token=raw.types.DataJSON(data=self.data)
         )

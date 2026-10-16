@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from __future__ import annotations as _annotations
 
 import pyrogram
 from pyrogram import raw, types
@@ -41,7 +41,7 @@ class WebPage(Object):
         type (``str``, *optional*):
             Type of webpage preview.
             One of the following:
-            
+
             - video
             - gif
             - photo
@@ -132,31 +132,31 @@ class WebPage(Object):
     def __init__(
         self,
         *,
-        client: "pyrogram.Client" = None,
+        client: pyrogram.Client | None = None,
         id: str,
         url: str,
-        display_url: Optional[str] = None,
-        type: Optional[str] = None,
-        site_name: Optional[str] = None,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        audio: Optional["types.Audio"] = None,
-        document: Optional["types.Document"] = None,
-        photo: Optional["types.Photo"] = None,
-        animation: Optional["types.Animation"] = None,
-        video: Optional["types.Video"] = None,
-        embed_url: Optional[str] = None,
-        embed_type: Optional[str] = None,
-        embed_width: Optional[int] = None,
-        embed_height: Optional[int] = None,
-        has_large_media: Optional[bool] = None,
-        prefer_large_media: Optional[bool] = None,
-        prefer_small_media: Optional[bool] = None,
-        manual: Optional[bool] = None,
-        safe: Optional[bool] = None,
-        duration: Optional[int] = None,
-        author: Optional[str] = None,
-        raw: Optional["raw.types.MessageMediaWebPage"] = None
+        display_url: str | None = None,
+        type: str | None = None,
+        site_name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        audio: types.Audio | None = None,
+        document: types.Document | None = None,
+        photo: types.Photo | None = None,
+        animation: types.Animation | None = None,
+        video: types.Video | None = None,
+        embed_url: str | None = None,
+        embed_type: str | None = None,
+        embed_width: int | None = None,
+        embed_height: int | None = None,
+        has_large_media: bool | None = None,
+        prefer_large_media: bool | None = None,
+        prefer_small_media: bool | None = None,
+        manual: bool | None = None,
+        safe: bool | None = None,
+        duration: int | None = None,
+        author: str | None = None,
+        raw: raw.types.MessageMediaWebPage | None = None,
     ):
         super().__init__(client)
 
@@ -186,10 +186,7 @@ class WebPage(Object):
         self.raw = raw
 
     @staticmethod
-    def _parse(
-        client,
-        media: "raw.types.MessageMediaWebPage"
-    ) -> Optional["WebPage"]:
+    def _parse(client, media: raw.types.MessageMediaWebPage) -> WebPage | None:
         if not media:
             return None
 
@@ -214,9 +211,7 @@ class WebPage(Object):
                 attributes = {type(i): i for i in doc.attributes}
 
                 file_name = getattr(
-                    attributes.get(
-                        raw.types.DocumentAttributeFilename, None
-                    ), "file_name", None
+                    attributes.get(raw.types.DocumentAttributeFilename, None), "file_name", None
                 )
 
                 if raw.types.DocumentAttributeAudio in attributes:
@@ -258,5 +253,5 @@ class WebPage(Object):
             safe=media.safe,
             duration=getattr(webpage, "duration", None),
             author=getattr(webpage, "author", None),
-            raw=media
+            raw=media,
         )

@@ -17,3 +17,21 @@
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
 from .connection import Connection
+from .proxy import (
+    HTTPProxy,
+    MTProxy,
+    Proxy,
+    SOCKS4Proxy,
+    SOCKS5Proxy,
+    WebProxy,
+)
+
+__all__ = [
+    "Connection",
+    "HTTPProxy",
+    "MTProxy",
+    "Proxy",
+    "SOCKS4Proxy",
+    "SOCKS5Proxy",
+    "WebProxy",
+]
