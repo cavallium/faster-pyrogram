@@ -44,8 +44,10 @@ from pyrogram.raw.all import layer
 from pyrogram.raw.core import FutureSalts, Int, MsgContainer, TLObject
 
 from .internals import MsgFactory
+from .diagnostics import ConnectionDiagnostics, record_for
 
 log = logging.getLogger(__name__)
+_SESSION_DIAGNOSTICS = os.environ.get("PYROGRAM_SESSION_DIAGNOSTICS") == "1"
 
 
 class SessionState(Enum):
@@ -143,6 +145,8 @@ class Session:
         self._run_generation = 0
         self._start_task: Optional[asyncio.Task] = None
         self._start_generation = None
+        if _SESSION_DIAGNOSTICS:
+            self._diagnostic_last_open = None
         self.transport_send_failures = 0
         self.restart_requests_ignored = 0
 
@@ -253,7 +257,20 @@ class Session:
                             loop=self.client.loop
                         )
 
+                        diagnostics = None
+                        if _SESSION_DIAGNOSTICS:
+                            try:
+                                diagnostics = ConnectionDiagnostics(generation, self.dc_id, self._diagnostic_last_open)
+                                connection._session_diagnostics = diagnostics
+                                self._diagnostic_last_open = diagnostics.started
+                            except Exception:
+                                diagnostics = None
                         await connection.connect()
+                        if diagnostics is not None:
+                            try:
+                                diagnostics.connected()
+                            except Exception:
+                                pass
 
                         if not self._owns_start(generation, connection):
                             raise asyncio.CancelledError
@@ -367,15 +384,25 @@ class Session:
                  if task is not None and task is not asyncio.current_task()]
         connection = self.connection
 
+        diagnostics = record_for(connection) if _SESSION_DIAGNOSTICS else None
+
         async def close_attempt():
             # A ping may own the transport send lock that close also needs.
             for task in tasks:
                 if not task.done():
                     task.cancel()
+            closed = False
             try:
                 if connection is not None:
                     await connection.close()
+                closed = True
             finally:
+                if diagnostics is not None:
+                    try:
+                        diagnostics.emit('close', self.state.name, self.is_started.is_set(),
+                            getattr(self.client, 'session', None) is self, self.connection is connection, closed)
+                    except Exception:
+                        pass
                 outcomes = await asyncio.gather(*tasks, return_exceptions=True)
                 self.ping_task = self.recv_task = None
                 if self.connection is connection:
@@ -607,6 +634,14 @@ class Session:
 
                     try:
                         if error_code == 429:
+                            if _SESSION_DIAGNOSTICS:
+                                diagnostics = record_for(connection)
+                                if diagnostics is not None:
+                                    try:
+                                        diagnostics.emit('transport_429', self.state.name, self.is_started.is_set(),
+                                            getattr(self.client, 'session', None) is self, self.connection is connection)
+                                    except Exception:
+                                        pass
                             raise TransportFlood(
                                 "Transport flood. Please slow down your requests."
                             )
@@ -641,6 +676,7 @@ class Session:
         connection = self.connection
         if connection is None or connection.protocol is None:
             raise OSError("Session transport is not connected")
+        diagnostics = record_for(connection) if _SESSION_DIAGNOSTICS else None
         message = await self.msg_factory.create(data)
         msg_id = message.msg_id
 
@@ -661,15 +697,46 @@ class Session:
             )
 
             try:
-                await connection.send(payload)
+                if diagnostics is None:
+                    await connection.send(payload)
+                else:
+                    category = None
+                    try:
+                        category = diagnostics.attempt(data, self.state.name, self.is_started.is_set(),
+                            self.connection is connection,
+                            self.state == SessionState.STARTING and asyncio.current_task() is self._start_task)
+                    except Exception:
+                        pass
+                    try:
+                        await connection.send(payload)
+                    except BaseException as error:
+                        try:
+                            diagnostics.complete(category, error)
+                        except Exception:
+                            pass
+                        raise
+                    else:
+                        try:
+                            diagnostics.complete(category)
+                        except Exception:
+                            pass
             except OSError:
                 self.transport_send_failures += 1
                 if self.connection is connection and self.state == SessionState.STARTED:
                     self.is_started.clear()
+                closed = False
                 try:
                     await connection.close()
+                    closed = True
                 except Exception:
                     pass
+                finally:
+                    if diagnostics is not None:
+                        try:
+                            diagnostics.emit('send_oserror_close', self.state.name, self.is_started.is_set(),
+                                getattr(self.client, 'session', None) is self, self.connection is connection, closed)
+                        except Exception:
+                            pass
                 raise
 
             if wait_response:

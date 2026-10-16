@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 import unittest
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ from pyrogram.connection.transport.tcp.tcp_abridged import TCPAbridged
 from pyrogram.errors import InternalServerError, HistoryGetFailed
 from pyrogram.raw.core import Message, MsgContainer
 from pyrogram.session import session as sdk
+from pyrogram.session import diagnostics as diagnostic
 
 
 class TaskLoop:
@@ -1230,6 +1232,249 @@ class SessionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(0, session.transport_send_failures)
         writer.close.assert_not_called()
         writer.transport.abort.assert_not_called()
+
+    def diagnostic_bootstrap(self):
+        session, _ = self.bootstrap_session()
+        writer = self.writer()
+        connection = self.connection(writer)
+        connection.connect = AsyncMock()
+        async def drain():
+            for result in session.results.values():
+                result.value = 'success'
+                result.event.set()
+        writer.drain.side_effect = drain
+        session.client.connection_factory.return_value = connection
+        del session.send
+        return session, connection
+
+    async def test_diagnostic_disabled_never_reads_clock_or_logs_or_attaches_record(self):
+        with patch.object(sdk, '_SESSION_DIAGNOSTICS', False), patch.object(diagnostic, 'time') as clock, \
+                patch.object(diagnostic.log, 'info') as log:
+            clock.monotonic.side_effect = AssertionError('diagnostic clock on disabled path')
+            session, connection = self.diagnostic_bootstrap()
+            with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+                await session.start()
+                await session.send(raw.functions.Ping(ping_id=5), wait_response=False)
+                await session.stop()
+            self.assertFalse(hasattr(connection, '_session_diagnostics'))
+            clock.monotonic.assert_not_called()
+            log.assert_not_called()
+
+    def test_diagnostic_categories_are_fixed_and_wrappers_bounded(self):
+        history = raw.functions.messages.GetHistory(peer=raw.types.InputPeerSelf(), offset_id=0,
+            offset_date=0, add_offset=0, limit=1, max_id=0, min_id=0, hash=0)
+        difference = raw.functions.updates.GetChannelDifference(channel=raw.types.InputChannelEmpty(),
+            filter=raw.types.ChannelMessagesFilterEmpty(), pts=0, limit=1)
+        init = raw.functions.InitConnection(api_id=123, device_model='secret-device', system_version='x',
+            app_version='x', system_lang_code='x', lang_pack='', lang_code='x', query=raw.functions.help.GetConfig())
+        self.assertEqual(0, diagnostic.ConnectionDiagnostics.category(raw.functions.Ping(ping_id=0), bootstrap=True))
+        cases = [(raw.functions.Ping(ping_id=0), 4), (init, 0), (history, 1), (difference, 1),
+            (raw.functions.updates.GetDifference(pts=0, date=0, qts=0), 2),
+            (raw.types.MsgsAck(msg_ids=[987654321987]), 3),
+            (raw.functions.PingDelayDisconnect(ping_id=5, disconnect_delay=15), 4),
+            (raw.functions.help.GetConfig(), 5)]
+        difference.filter = raw.types.ChannelMessagesFilter(ranges=[])
+        self.assertEqual(2, diagnostic.ConnectionDiagnostics.category(difference))
+        difference.filter = raw.types.ChannelMessagesFilterEmpty()
+        for query, expected in cases:
+            self.assertEqual(expected, diagnostic.ConnectionDiagnostics.category(query))
+            wrapped = raw.functions.InvokeWithLayer(layer=230,
+                query=raw.functions.InvokeWithoutUpdates(query=raw.functions.InvokeWithTakeout(takeout_id=5, query=query)))
+            self.assertEqual(expected, diagnostic.ConnectionDiagnostics.category(wrapped))
+        cyclic = raw.functions.InvokeWithoutUpdates(query=history)
+        cyclic.query = cyclic
+        self.assertEqual(5, diagnostic.ConnectionDiagnostics.category(cyclic))
+
+    async def test_diagnostic_startup_state_success_summary_and_privacy(self):
+        now = [10.0]
+        with patch.object(sdk, '_SESSION_DIAGNOSTICS', True), \
+                patch.object(diagnostic, 'time', SimpleNamespace(monotonic=lambda: now[0])), \
+                patch.object(diagnostic.log, 'info') as log:
+            session, connection = self.diagnostic_bootstrap()
+            session.client.session = session
+            session.client.name = 'private-client-name'
+            session.server_address = 'private-server-address'
+            with patch.object(sdk.mtproto, 'pack', return_value=b'private-payload'):
+                await session.start()
+                record = connection._session_diagnostics
+                self.assertEqual(2, record.counts[0][0])
+                self.assertEqual(2, record.counts[0][1])
+                self.assertEqual(2, record.counts[0][5])
+                self.assertEqual(2, record.counts[0][6])
+                await session.send(raw.types.MsgsAck(msg_ids=[987654321987]), wait_response=False)
+                now[0] = 12.5
+                await session.stop()
+            log.assert_called_once()
+            summary = json.loads(log.call_args.args[1])
+            self.assertEqual(3, summary['actual_connection_send_attempts'])
+            self.assertEqual(3, summary['attempt_bucket_1s_total_peak'])
+            self.assertEqual(2, summary['categories']['bootstrap']['attempt_bucket_1s_peak'])
+            self.assertEqual(3, summary['actual_connection_send_completions'])
+            self.assertEqual(0, summary['inflight_at_cutoff'])
+            self.assertTrue(summary['is_current_primary'])
+            self.assertEqual('STOPPING', summary['state'])
+            self.assertFalse(summary['ready'])
+            self.assertEqual(2.5, summary['logical_open_duration_s'])
+            self.assertTrue(summary['close_succeeded'])
+            rendered = log.call_args.args[1]
+            for secret in ('private-client-name', 'private-server-address', 'private-payload', '987654321987', session.auth_key.hex()):
+                self.assertNotIn(secret, rendered)
+            self.assertEqual(set(diagnostic._CATEGORIES), set(summary['categories']))
+            self.assertFalse(hasattr(record, '__dict__'))
+
+    async def test_diagnostic_actual_send_error_and_cancel_accounting_preserves_results(self):
+        for error in (OSError('private-write-error'), asyncio.CancelledError()):
+            with self.subTest(error=type(error).__name__), patch.object(sdk, '_SESSION_DIAGNOSTICS', True), \
+                    patch.object(diagnostic.log, 'info') as log:
+                session = self.session(self.connection(self.writer()))
+                connection = session.connection
+                record = connection._session_diagnostics = diagnostic.ConnectionDiagnostics(0, 2, None)
+                connection.send = AsyncMock(side_effect=error)
+                with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+                    with self.assertRaises(type(error)):
+                        await session.send(raw.functions.Ping(ping_id=5))
+                self.assertEqual({}, session.results)
+                self.assertEqual(1, record.counts[4][0])
+                self.assertEqual(1, record.counts[4][2 if isinstance(error, OSError) else 3])
+                self.assertEqual(1 if isinstance(error, OSError) else 0, session.transport_send_failures)
+                if isinstance(error, OSError):
+                    self.assertFalse(session.is_started.is_set())
+                    log.assert_called_once()
+                    self.assertNotIn('private-write-error', log.call_args.args[1])
+
+    async def test_diagnostic_snapshot_429_freezes_inflight_and_deduplicates_close(self):
+        with patch.object(sdk, '_SESSION_DIAGNOSTICS', True), patch.object(diagnostic.log, 'info') as log:
+            session = self.session(self.connection(self.writer()))
+            session._state = sdk.SessionState.STARTING
+            session.is_started.clear()
+            connection = session.connection
+            record = connection._session_diagnostics = diagnostic.ConnectionDiagnostics(0, 2, None)
+            entered, release = asyncio.Event(), asyncio.Event()
+            async def send(payload):
+                entered.set()
+                await release.wait()
+            connection.send = send
+            connection.recv = AsyncMock(return_value=(-429).to_bytes(4, 'little', signed=True))
+            with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+                caller = asyncio.create_task(session.send(raw.functions.Ping(ping_id=0), wait_response=False))
+                await asyncio.wait_for(entered.wait(), 1)
+                await session.recv_worker()
+                snapshot = json.loads(log.call_args.args[1])
+                self.assertEqual('transport_429', snapshot['reason'])
+                self.assertEqual(1, snapshot['inflight_at_cutoff'])
+                self.assertEqual(0, snapshot['actual_connection_send_completions'])
+                release.set()
+                await caller
+            await session.stop()
+            log.assert_called_once()
+            self.assertEqual(0, record.counts[0][1])  # Frozen as of cutoff, not a claim of final completion.
+
+    async def test_diagnostic_old_captured_send_never_updates_replacement_record(self):
+        with patch.object(sdk, '_SESSION_DIAGNOSTICS', True):
+            old = self.connection(self.writer())
+            session = self.session(old)
+            replacement = self.connection(self.writer())
+            first = old._session_diagnostics = diagnostic.ConnectionDiagnostics(1, 2, None)
+            second = replacement._session_diagnostics = diagnostic.ConnectionDiagnostics(2, 2, first.started)
+            entered, release = asyncio.Event(), asyncio.Event()
+            async def drain():
+                entered.set()
+                await release.wait()
+            old.protocol.writer.drain.side_effect = drain
+            with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+                caller = asyncio.create_task(session.send(raw.functions.Ping(ping_id=5), wait_response=False))
+                await asyncio.wait_for(entered.wait(), 1)
+                session.connection = replacement
+                release.set()
+                await caller
+            self.assertNotEqual(first.ordinal, second.ordinal)
+            self.assertEqual(1, first.counts[4][1])
+            self.assertEqual(0, sum(row[0] for row in second.counts))
+            self.assertTrue(session.is_started.is_set())
+            self.assertIsNotNone(second.interval)
+
+    def test_diagnostic_bucket_peaks_and_storage_are_bounded(self):
+        now = [100.0]
+        with patch.object(diagnostic, 'time', SimpleNamespace(monotonic=lambda: now[0])), \
+                patch.object(diagnostic.log, 'info') as log:
+            record = diagnostic.ConnectionDiagnostics(1, 2, None)
+            query = raw.functions.Ping(ping_id=5)
+            for index in range(10000):
+                now[0] = 100.0 + index // 3
+                category = record.attempt(query, 'STARTED', True, True)
+                record.complete(category)
+            self.assertEqual(3, record.bucket_total_peak)
+            self.assertEqual(3, record.counts[4][8])
+            self.assertEqual(10000, record.counts[4][0])
+            self.assertEqual(6, len(record.counts))
+            self.assertEqual(6, len(record.bucket_counts))
+            self.assertTrue(all(len(row) == 9 for row in record.counts))
+            record.emit('close', 'STOPPED', False, False, False, True)
+            record.emit('close', 'STOPPED', False, False, False, True)
+            log.assert_called_once()
+
+    async def test_diagnostic_hook_and_logger_failures_do_not_change_send_outcomes(self):
+        for broken in ('attempt', 'complete', 'emit'):
+            for outcome in ('success', 'oserror', 'cancel'):
+                fail = outcome == 'oserror'
+                error = OSError('original') if fail else (asyncio.CancelledError() if outcome == 'cancel' else None)
+                with self.subTest(broken=broken, outcome=outcome), patch.object(sdk, '_SESSION_DIAGNOSTICS', True):
+                    session = self.session(self.connection(self.writer()))
+                    connection = session.connection
+                    connection._session_diagnostics = diagnostic.ConnectionDiagnostics(0, 2, None)
+                    connection.send = AsyncMock(side_effect=error)
+                    target = diagnostic.log if broken == 'emit' else diagnostic.ConnectionDiagnostics
+                    method = 'info' if broken == 'emit' else broken
+                    with patch.object(target, method, side_effect=RuntimeError('diagnostic-only')), \
+                            patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+                        if fail:
+                            with self.assertRaisesRegex(OSError, '^original$'):
+                                await session.send(raw.functions.Ping(ping_id=5))
+                        elif outcome == 'cancel':
+                            with self.assertRaises(asyncio.CancelledError):
+                                await session.send(raw.functions.Ping(ping_id=5))
+                        else:
+                            await session.send(raw.functions.Ping(ping_id=5), wait_response=False)
+                            await session.stop()
+                    self.assertEqual({}, session.results)
+                    self.assertEqual(int(fail), session.transport_send_failures)
+
+    async def test_diagnostic_does_not_count_factory_or_encoding_failures_as_send_attempts(self):
+        for stage in ('factory', 'encoding'):
+            with self.subTest(stage=stage), patch.object(sdk, '_SESSION_DIAGNOSTICS', True):
+                session = self.session(self.connection(self.writer()))
+                record = session.connection._session_diagnostics = diagnostic.ConnectionDiagnostics(0, 2, None)
+                if stage == 'factory':
+                    session.msg_factory.create = AsyncMock(side_effect=OSError('before send'))
+                with patch.object(sdk.mtproto, 'pack', side_effect=OSError('before send')):
+                    with self.assertRaisesRegex(OSError, '^before send$'):
+                        await session.send(raw.functions.Ping(ping_id=5))
+                self.assertEqual(0, sum(sum(row) for row in record.counts))
+                self.assertFalse(record.reported)
+                self.assertEqual(0, session.transport_send_failures)
+                self.assertEqual({}, session.results)
+                self.assertTrue(session.is_started.is_set())
+
+    async def test_diagnostic_custom_factory_attachment_and_lookup_failure_is_inert(self):
+        class FixedConnection:
+            __slots__ = ('connect', 'close', 'send', 'protocol')
+            def __getattribute__(self, name):
+                if name == '_session_diagnostics':
+                    raise RuntimeError('custom lookup failure')
+                return object.__getattribute__(self, name)
+        with patch.object(sdk, '_SESSION_DIAGNOSTICS', True), patch.object(diagnostic.log, 'info') as log:
+            session, original = self.diagnostic_bootstrap()
+            connection = FixedConnection()
+            connection.connect, connection.close = AsyncMock(), AsyncMock()
+            connection.protocol, connection.send = original.protocol, original.send
+            session.client.connection_factory.return_value = connection
+            with patch.object(sdk.mtproto, 'pack', return_value=b'data'):
+                await session.start()
+                self.assertTrue(session.is_started.is_set())
+                await session.stop()
+            connection.connect.assert_awaited_once()
+            connection.close.assert_awaited_once()
+            log.assert_not_called()
 
     async def test_pack_oserror_is_not_counted_as_transport_send_failure(self):
         writer = self.writer()
