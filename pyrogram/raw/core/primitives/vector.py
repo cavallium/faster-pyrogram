@@ -49,9 +49,10 @@ class Vector(bytes, TLObject):
     @classmethod
     def read(cls, data: BytesIO, t: Any = None, *args: Any) -> List:
         count = Int.read(data)
-        left = len(data.read())
+        position = data.tell()
+        left = max(0, data.seek(0, 2) - position)
+        data.seek(position)
         size = (left / count) if count else 0
-        data.seek(-left, 1)
 
         return List(
             t.read(data) if t
